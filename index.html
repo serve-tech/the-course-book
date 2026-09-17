@@ -3233,7 +3233,7 @@ document.getElementById("authSubmit").onclick=async()=>{
      result=await supabaseClient.auth.signUp({email,password,options:{emailRedirectTo:AUTH_REDIRECT_URL,data:{username,display_name:username}}});
      if(!result.error)setPendingAuthEmail(email);
    }else{
-     loginEmail=email;
+     loginEmail=username;
      result=await supabaseClient.auth.signInWithPassword({email:loginEmail,password});
    }
    if(result.error)throw result.error;
