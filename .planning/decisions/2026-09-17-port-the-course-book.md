@@ -20,7 +20,7 @@ Create `serve-tech/the-course-book` and Supabase project The Course Book (`punga
 
 - The two backends are independent; future source writes do not sync automatically.
 - Existing account IDs/password hashes are preserved, but users sign in again on the new site.
-- The actual Resend key is needed to complete SMTP; the API's returned password hash is not reusable.
+- SMTP uses the actual owner-provided Resend key; the API's returned password fingerprint is not reusable. Secure SMTP authentication passed without sending an email.
 - The schema is recorded in a versioned baseline migration; private exports never enter Git.
 - Existing behavior/access policies remain in effect, apart from the necessary fix for the discovered empty-email sign-in bug.
 

@@ -33,9 +33,9 @@ This repository preserves the existing application and Git history from [ribbing
 
 The existing accounts, courses, rankings, and round history were copied and verified. Existing users sign in again with the same email and password. The copied database schema is recorded in `supabase/migrations/`.
 
-Custom signup-confirmation email delivery still needs the actual Resend API key entered in the new project's SMTP settings. Supabase exposes only a hash of the source SMTP password; the default email service is temporarily active.
+Custom Resend SMTP is configured using the owner-provided credential and the original sender settings. Configuration read-back and a secure SMTP authentication check passed; no test email was sent.
 
-See [migration details and verification](docs/port-2026-09-17.md) for the snapshot, checks, and remaining email setup.
+See [migration details and verification](docs/port-2026-09-17.md) for the snapshot and verification checks.
 
 
 ## Verification
