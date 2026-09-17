@@ -27,3 +27,23 @@ Supabase authentication must use the live app URL as its site URL and allow it a
 ## Port scope
 
 This repository preserves the existing application and Git history from [ribbingmike33/Top100Golf](https://github.com/ribbingmike33/Top100Golf). This port changes ownership, hosting configuration, and the Supabase connection. It does not migrate the frontend to React or move hosting to Render.
+
+
+## Migrated backend
+
+The existing accounts, courses, rankings, and round history were copied and verified. Existing users sign in again with the same email and password. The copied database schema is recorded in `supabase/migrations/`.
+
+Custom signup-confirmation email delivery still needs the actual Resend API key entered in the new project's SMTP settings. Supabase exposes only a hash of the source SMTP password; the default email service is temporarily active.
+
+See [migration details and verification](docs/port-2026-09-17.md) for the snapshot, checks, and remaining email setup.
+
+
+## Verification
+
+Run the authentication regression tests with Node.js:
+
+```sh
+node --test tests/auth.test.mjs
+```
+
+The tests stub the external Supabase client and exercise the actual submit handler without contacting production.
