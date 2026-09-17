@@ -35,7 +35,7 @@ The app uses Mike Ribbing's original Supabase project. Both Mike's original site
 
 The original project's allowed authentication redirects include this site's GitHub Pages URL. Its original default site URL and SMTP configuration remain in place.
 
-The Serve Electric copy is being retired after verification. **Serve Electric Incubator** exists but remains empty; a separate backend there is deferred until billing is arranged. The schema in `supabase/migrations/` records the earlier copy and is not automatically applied to the original backend.
+The Serve Electric copy was deleted after deployment and data verification. **Serve Electric Incubator** exists but remains empty; a separate backend there is deferred until billing is arranged. The schema in `supabase/migrations/` records the earlier copy and is not automatically applied to the original backend.
 
 See [the current backend decision](.planning/decisions/2026-09-17-restore-original-backend.md). The [initial port report](docs/port-2026-09-17.md) is historical.
 

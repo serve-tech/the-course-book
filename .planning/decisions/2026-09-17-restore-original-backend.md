@@ -25,4 +25,4 @@ Use option 3. Keep the Serve Tech repository, GitHub Pages site, and sign-in fix
 - No data migration or schema change to the original project is required.
 - Serve Electric Incubator (`bnsettpggrnfgisqweka`) remains empty, owned by JoshLinneburg, pending future billing/setup.
 - The previous migration SQL remains a historical baseline, not an automatically applied source-project migration.
-- Retirement status will be recorded after deployment verification and deletion.
+- Completed: GitHub Pages deployment `37ef11e` was verified in a browser against the original backend; all four auth regression tests passed. A final data comparison passed before deletion, and the replacement is now absent from the Supabase project list. The original remains ACTIVE_HEALTHY and Incubator has zero projects. No test email or real authentication request was sent.
