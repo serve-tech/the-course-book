@@ -1,7 +1,7 @@
 # Port The Course Book before changing its application stack
 
 **Date:** 2026-09-17
-**Status:** Accepted
+**Status:** Superseded for backend hosting by [Restore the original backend](2026-09-17-restore-original-backend.md); Serve Tech frontend hosting remains in effect.
 
 ## Context
 
