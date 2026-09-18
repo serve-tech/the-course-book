@@ -44,3 +44,9 @@ The runnable directory now contains `20260918134813_course_book_incubator_baseli
 Access policy behavior was preserved. Security advisor findings match the inherited schema: two auxiliary tables without RLS, pg_trgm in public, broad execute permissions on the signup function, and disabled leaked-password protection. These are separate security-hardening work, not new migration regressions.
 
 The staging project remains available as a fallback and continues to incur its paid compute charge until explicitly deleted. No collaborator invitation or membership change was performed.
+
+## Release checks
+
+Cutover commit `689029f` deployed successfully through GitHub Pages. All nine authentication/migration-history tests passed. The live read-only migration preflight found no missing or pending migration versions. Public API checks returned the full 1482-course and 1430-ranking catalogs with the correct Pages-origin CORS response; Auth settings were reachable. The final project is ACTIVE_HEALTHY. The old Supabase Preview check is now skipped because its former production Git mapping is disabled; no failing checks remain on the cutover commit.
+
+Live browser checks also passed: the app requested only the final Supabase host; World, USA All, and USA Public each rendered 100 courses; no JavaScript errors or failed normal app requests occurred. Sign-in was intercepted locally and verified to submit the visible email to the final project. No real authentication request was sent.
