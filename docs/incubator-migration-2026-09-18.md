@@ -2,6 +2,8 @@
 
 Date: 2026-09-18
 
+**Historical verification snapshot:** Resource plans/health, staging availability, row counts and check results below describe observations at this migration, not continuous current status. See [README.md](../README.md) for current development and deployment instructions. The React migration followed this infrastructure cutover.
+
 ## Resources
 
 - App: https://serve-tech.github.io/the-course-book/
@@ -37,7 +39,7 @@ The old check reported `Remote migration versions not found in local migrations 
 
 The runnable directory now contains `20260918134813_course_book_incubator_baseline.sql`, matching the final project's applied ledger. The retired baseline is archived at `docs/archive/20260917142631_port_existing_course_book.sql`. The original project's production Git branch mapping was cleared before it was paused. Future database migrations are manual until an Incubator integration is deliberately configured.
 
-`node scripts/check-migration-history.mjs` provides a separate read-only check against the backend named in index.html. Regression tests cover the original mismatch, aligned histories, pending migrations, malformed versions, and duplicates.
+`node scripts/check-migration-history.mjs` provides a separate read-only check against the backend selected by `src/infrastructure/supabase/public-config.json` (the shared configuration introduced by the React migration). Regression tests cover the original mismatch, aligned histories, pending migrations, malformed versions, and duplicates.
 
 ## Existing follow-up items
 

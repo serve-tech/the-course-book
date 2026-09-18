@@ -1,6 +1,8 @@
 # React migration compatibility notes
 
-Baseline: `b4b34b4`. Implementation branch: `feat/react-typescript`. No production deployment or database mutation is part of this rewrite.
+Baseline: `b4b34b4`. Implementation branch: `feat/react-typescript`. The rewrite made no database changes.
+
+**Implemented:** [PR #1](https://github.com/serve-tech/the-course-book/pull/1) merged on 2026-09-18 and the React app is deployed through GitHub Pages. These notes record migration compatibility and verification limits. For current working instructions, see [AGENTS.md](../AGENTS.md) and the [architecture guide](architecture.md).
 
 ## Contracts retained
 
@@ -39,7 +41,7 @@ These preserve normal user workflows while avoiding known unsafe failure behavio
 
 Tests use synthetic accounts and mocked external APIs. Service tests cover owner races, existing cloud rank protection, membership-only migration, round compensation, count reduction, state persistence and identity reconciliation. Browser tests exercise the production build at desktop and mobile sizes and compare the initial layout directly with the frozen legacy page.
 
-These checks do not send real confirmation emails, mutate production records or validate physical iOS keyboard behavior. Before release, review the branch and smoke-test the normal workflows with an authorized account. Existing Supabase policy/security findings from the infrastructure migration are outside this frontend rewrite.
+These checks do not send real confirmation emails, mutate production records or validate physical iOS keyboard behavior. For future releases, review the change and smoke-test affected normal workflows with an authorized account and explicit permission for live writes. Existing Supabase policy/security findings from the infrastructure migration are outside this frontend rewrite.
 
 ## References
 
