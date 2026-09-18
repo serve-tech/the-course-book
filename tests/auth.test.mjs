@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import vm from 'node:vm';
 
-const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+const html = readFileSync(new URL('./fixtures/legacy/index.html', import.meta.url), 'utf8');
 const handlerStart = html.indexOf('document.getElementById("authSubmit").onclick=async()=>{');
 const handlerEnd = html.indexOf('\nif(supabaseClient){', handlerStart);
 assert.ok(handlerStart >= 0 && handlerEnd > handlerStart, 'Locate the real auth submit handler');
