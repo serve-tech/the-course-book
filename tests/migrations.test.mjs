@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { compareMigrationVersions } from '../scripts/check-migration-history.mjs';
+import { compareMigrationVersions, resolveProjectRef } from '../scripts/check-migration-history.mjs';
 
 const original = ['20260915224029', '20260915224116', '20260916044654'];
 const retiredBaseline = '20260917142631';
@@ -30,3 +30,8 @@ for (const versions of [['invalid'], [retiredBaseline, retiredBaseline]]) {
     assert.throws(() => compareMigrationVersions(original, versions));
   });
 }
+
+test('resolves the React public configuration and rejects malformed targets', () => {
+ assert.equal(resolveProjectRef({url:'https://naawqzwvegqbhioqqzkh.supabase.co'}),'naawqzwvegqbhioqqzkh');
+ for(const config of [{}, {url:'https://example.com'}, {url:'https://naawqzwvegqbhioqqzkh.supabase.co.evil.test'}])assert.throws(()=>resolveProjectRef(config));
+});

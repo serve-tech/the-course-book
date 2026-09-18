@@ -18,12 +18,17 @@ export function compareMigrationVersions(localVersions, remoteVersions) {
   };
 }
 
+export function resolveProjectRef(config) {
+  const ref = typeof config?.url === 'string' ? config.url.match(/^https:\/\/([a-z]{20})\.supabase\.co$/)?.[1] : undefined;
+  if (!ref) throw new Error('Could not identify the frontend Supabase project.');
+  return ref;
+}
+
 async function main() {
   const token = process.env.SUPABASE_ACCESS_TOKEN;
   if (!token) throw new Error('Set SUPABASE_ACCESS_TOKEN to run the read-only check.');
-  const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
-  const projectRef = html.match(/const SUPABASE_URL = "https:\/\/([a-z]{20})\.supabase\.co";/)?.[1];
-  if (!projectRef) throw new Error('Could not identify the frontend Supabase project.');
+  const config = JSON.parse(await readFile(new URL('../src/infrastructure/supabase/public-config.json', import.meta.url), 'utf8'));
+  const projectRef = resolveProjectRef(config);
   const files = await readdir(new URL('../supabase/migrations/', import.meta.url));
   const versions = files.filter(file => file.endsWith('.sql')).map(file => {
     const version = file.match(/^(\d{14})_.+\.sql$/)?.[1];

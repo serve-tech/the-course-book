@@ -1,0 +1,2 @@
+# Preserve the frozen production fixture byte-for-byte, including historical whitespace.
+tests/fixtures/legacy/index.html -whitespace

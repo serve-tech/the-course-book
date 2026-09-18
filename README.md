@@ -1,56 +1,81 @@
 # The Course Book
 
-A golf journal and course-ranking app maintained by Serve Tech.
+A React and TypeScript golf journal maintained by Serve Tech, using Supabase for accounts and data and GitHub Pages for static hosting.
 
 - Live app: https://serve-tech.github.io/the-course-book/
 - Repository: https://github.com/serve-tech/the-course-book
-- Supabase: **The Course Book**, project `naawqzwvegqbhioqqzkh`, in **Serve Electric Incubator**.
+- Backend: The Course Book, project `naawqzwvegqbhioqqzkh`, in Serve Electric Incubator.
 
-## Run locally
+## Development
 
-The app is a static `index.html` file with inline CSS and JavaScript. No build step or package installation is required.
-
-```sh
-python3 -m http.server 8000
-```
-
-Open http://localhost:8000. The checked-in configuration connects to the production Supabase project; signed-in changes affect live data.
-
-## Deployment and configuration
-
-GitHub Pages publishes the repository root on `main`. Pushing changes to `main` updates the live app. `.nojekyll` keeps deployment as plain static files.
-
-`index.html` contains the Supabase project URL, browser-safe publishable key, and authentication redirect URL. The publishable key is intentionally public; database permissions and row-level security control access. Never put Supabase secret or service-role keys in this repository.
-
-The live app URL is the final project's Auth site URL and allowed email-confirmation redirect destination.
-
-## Port scope
-
-This repository preserves the existing application and Git history from [ribbingmike33/Top100Golf](https://github.com/ribbingmike33/Top100Golf). The frontend is hosted by Serve Tech and connects to the Serve Electric Incubator backend. It does not migrate the frontend to React or move hosting to Render.
-
-
-## Current backend
-
-The Incubator project contains the copied accounts, passwords, courses, rankings, and round history. Members sign in again with their existing email and password. Resend SMTP is configured with the approved existing credential. Mike's original Top100Golf project is paused and intact; the Serve Electric staging copy remains available as a fallback.
-
-`supabase/migrations/` contains the baseline actually applied to the Incubator project. The retired project's baseline is archived under `docs/archive/`, outside the migration deployment directory. The original project's production Git synchronization is disabled; the Incubator project currently uses manual database migrations. GitHub Pages still deploys automatically from `main`.
-
-See [the Incubator migration decision](.planning/decisions/2026-09-18-move-to-serve-electric-incubator.md) and [verification report](docs/incubator-migration-2026-09-18.md). Earlier port and rollback reports are historical.
-
-## Verification
-
-Run the authentication and migration-history regression tests with Node.js:
+Use Node 24 LTS, version 24.15 or later within that major version. The system Node 25 installation is outside this project's supported runtime range.
 
 ```sh
-node --test tests/*.test.mjs
+nvm use
+npm ci
+npm run dev
 ```
 
-The auth tests stub the external Supabase client and exercise the actual submit handler; migration tests cover the historical mismatch and pending-SQL detection. Unit tests do not contact production.
+Open http://localhost:5173/the-course-book/. Development uses the existing production backend by default; signed-in manual actions write live data. Automated tests use synthetic data and mocked external services.
 
-Before any future database deployment, set `SUPABASE_ACCESS_TOKEN` securely in your environment and run:
+```sh
+npm run lint
+npm run typecheck
+npm test
+npm run build
+npm run preview
+```
+
+For browser tests, install Chromium once, then run the suite. The suite builds and serves the production artifact.
+
+```sh
+npx playwright install chromium
+npm run test:e2e
+```
+
+## Organization
+
+- `src/app/`: application composition, navigation and dependency injection.
+- `src/features/auth/`: email authentication validation, repository and dialog.
+- `src/features/catalog/`: course identity, geography, search, published rankings and catalog repository.
+- `src/features/journal/`: per-account caches, pure ordering/reconciliation, owner-scoped synchronization and personal-list components.
+- `src/features/rounds/`: round repository, mutation orchestration and dialogs.
+- `src/features/friends/`: registered-member directory and read-only rankings.
+- `src/infrastructure/supabase/`: generated database types, typed client and public configuration.
+- `src/shared/`: small shared UI primitives, guarded storage, geographic options and preserved styles.
+
+Components render state and dispatch operations. Repositories contain Supabase queries; services coordinate external operations. Identity, search scoring, geographic filtering and account reconciliation are pure functions with colocated tests. Domain models are separate from generated database DTOs. No service-role or SMTP credential belongs in browser code.
+
+The compiler enables strict mode, unchecked-index checks and exact optional properties. Typed ESLint and React hooks rules run in CI. TypeScript 6.0.3 is deliberately pinned to the version supported by the current typescript-eslint release; upgrading to TypeScript 7 also requires a compatible linter.
+
+## Compatibility and verification
+
+`tests/fixtures/legacy/index.html` is the frozen production baseline at `b4b34b4`, used only for characterization and browser comparisons. The production bundle contains the React application, not the legacy runtime.
+
+The migration preserves the existing Supabase session storage, per-account local storage keys, course identities, published-ranking semantics, personal order and round-count source. Existing CSS was serialized from Chromium's parsed stylesheet rules because the original contains malformed CSS that browsers already ignore. Desktop and mobile layout tests compare the new view directly against the executable legacy fixture.
+
+See [the migration notes](docs/react-migration.md) for preserved quirks, intentional correctness improvements and verification limits. Historical inline-auth tests remain as baseline characterization; new TypeScript and browser tests exercise the replacement.
+
+## GitHub Pages
+
+Vite builds static assets into `dist/` with base `/the-course-book/`. Render is not required.
+
+The feature branch does not change the production Pages setting. **When this branch is approved for release, switch Settings → Pages → Build and deployment → Source to GitHub Actions, then merge.** The main-only `pages.yml` workflow builds and uploads `dist/`; publishing repository-root TypeScript through the old branch source will not work. CI verifies feature branches and pull requests without deploying them.
+
+Keep the live Auth site URL and email-confirmation redirect at https://serve-tech.github.io/the-course-book/.
+
+## Supabase configuration and migrations
+
+The browser-safe configuration is in `src/infrastructure/supabase/public-config.json`. Its publishable key is intentionally public; database grants and row-level security enforce access. The typed client retains Supabase's default session persistence.
+
+The React rewrite does not alter database schema, accounts, SMTP configuration or authorization policies. `supabase/migrations/` contains the baseline applied to Incubator; retired migrations remain under `docs/archive/`.
+
+Before any database deployment, set `SUPABASE_ACCESS_TOKEN` securely and run:
 
 ```sh
 node scripts/check-migration-history.mjs
 ```
 
-This separate live check derives the target from `index.html` and reads its migration ledger. It reports missing local versions or pending SQL and makes no database changes. A mismatch requires reviewing the target and intended migrations before deployment; do not repair a live migration ledger merely to silence an error.
+This read-only check derives its target from the same public JSON configuration and compares the remote migration ledger. Review mismatches before deployment; never repair a live ledger simply to silence an error.
+
+See the [Incubator migration report](docs/incubator-migration-2026-09-18.md) for historical account/data transfer verification.
