@@ -6,9 +6,13 @@ A React and TypeScript golf journal maintained by Serve Tech, using Supabase for
 - Repository: https://github.com/serve-tech/the-course-book
 - Backend: The Course Book, project `naawqzwvegqbhioqqzkh`, in Serve Electric Incubator.
 
+## Working on the project
+
+Start with [CONTRIBUTING.md](CONTRIBUTING.md). Agents must follow [AGENTS.md](AGENTS.md), which points to the [architecture and extension guide](docs/architecture.md) and [testing guide](docs/testing.md). Claude and GitHub Copilot entry points refer to the same instructions so conventions stay in one place.
+
 ## Development
 
-Use Node 24 LTS, version 24.15 or later within that major version. The system Node 25 installation is outside this project's supported runtime range.
+Use Node 24 LTS, version 24.15 or later within that major version. Node 25 is outside this project's supported runtime range.
 
 ```sh
 nvm use
@@ -60,7 +64,7 @@ See [the migration notes](docs/react-migration.md) for preserved quirks, intenti
 
 Vite builds static assets into `dist/` with base `/the-course-book/`. Render is not required.
 
-The feature branch does not change the production Pages setting. **When this branch is approved for release, switch Settings → Pages → Build and deployment → Source to GitHub Actions, then merge.** The main-only `pages.yml` workflow builds and uploads `dist/`; publishing repository-root TypeScript through the old branch source will not work. CI verifies feature branches and pull requests without deploying them.
+GitHub Pages is configured to use GitHub Actions. The main-only `pages.yml` workflow builds and uploads `dist/` on a push or merge to `main`; repository-root TypeScript is not the production artifact. CI verifies feature branches and pull requests without deploying them. Check the PR verification result before an authorized merge: Pages deployment runs separately and does not wait for the full browser-test workflow.
 
 Keep the live Auth site URL and email-confirmation redirect at https://serve-tech.github.io/the-course-book/.
 

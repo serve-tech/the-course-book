@@ -3,6 +3,8 @@
 **Date:** 2026-09-18
 **Status:** Accepted
 
+**Implementation:** [PR #1](https://github.com/serve-tech/the-course-book/pull/1) merged on 2026-09-18; GitHub Actions now deploys the React build to Pages. The consequences below record the original release plan. See [current contributor instructions](../../CONTRIBUTING.md) for subsequent changes.
+
 ## Context
 The owner requested a branch-based rewrite preserving behavior and appearance. The baseline is b4b34b4. Existing local course identities, account caches, Supabase sessions, round history and personal order are compatibility contracts.
 
