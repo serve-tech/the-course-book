@@ -4,7 +4,7 @@ A golf journal and course-ranking app maintained by Serve Tech.
 
 - Live app: https://serve-tech.github.io/the-course-book/
 - Repository: https://github.com/serve-tech/the-course-book
-- Supabase: Mike Ribbing's **Top100Golf**, project `zcblgnjfdrdccbpgmhzr`, in the **Scotland 2027** organization.
+- Supabase: **The Course Book**, project `naawqzwvegqbhioqqzkh`, in **Serve Electric Incubator**.
 
 ## Run locally
 
@@ -22,29 +22,35 @@ GitHub Pages publishes the repository root on `main`. Pushing changes to `main` 
 
 `index.html` contains the Supabase project URL, browser-safe publishable key, and authentication redirect URL. The publishable key is intentionally public; database permissions and row-level security control access. Never put Supabase secret or service-role keys in this repository.
 
-Supabase authentication must use the live app URL as its site URL and allow it as an email-confirmation redirect destination.
+The live app URL is the final project's Auth site URL and allowed email-confirmation redirect destination.
 
 ## Port scope
 
-This repository preserves the existing application and Git history from [ribbingmike33/Top100Golf](https://github.com/ribbingmike33/Top100Golf). The frontend is hosted by Serve Tech and currently connects to the original Supabase backend. It does not migrate the frontend to React or move hosting to Render.
+This repository preserves the existing application and Git history from [ribbingmike33/Top100Golf](https://github.com/ribbingmike33/Top100Golf). The frontend is hosted by Serve Tech and connects to the Serve Electric Incubator backend. It does not migrate the frontend to React or move hosting to Render.
 
 
 ## Current backend
 
-The app uses Mike Ribbing's original Supabase project. Both Mike's original site and this site share accounts, courses, rankings, and round history; changes through either site affect the same data. Members use their existing email and password and may need to sign in again after the backend switch.
+The Incubator project contains the copied accounts, passwords, courses, rankings, and round history. Members sign in again with their existing email and password. Resend SMTP is configured with the approved existing credential. Mike's original Top100Golf project is paused and intact; the Serve Electric staging copy remains available as a fallback.
 
-The original project's allowed authentication redirects include this site's GitHub Pages URL. Its original default site URL and SMTP configuration remain in place.
+`supabase/migrations/` contains the baseline actually applied to the Incubator project. The retired project's baseline is archived under `docs/archive/`, outside the migration deployment directory. The original project's production Git synchronization is disabled; the Incubator project currently uses manual database migrations. GitHub Pages still deploys automatically from `main`.
 
-The Serve Electric copy was deleted after deployment and data verification. **Serve Electric Incubator** exists but remains empty; a separate backend there is deferred until billing is arranged. The schema in `supabase/migrations/` records the earlier copy and is not automatically applied to the original backend.
-
-See [the current backend decision](.planning/decisions/2026-09-17-restore-original-backend.md). The [initial port report](docs/port-2026-09-17.md) is historical.
+See [the Incubator migration decision](.planning/decisions/2026-09-18-move-to-serve-electric-incubator.md) and [verification report](docs/incubator-migration-2026-09-18.md). Earlier port and rollback reports are historical.
 
 ## Verification
 
-Run the authentication regression tests with Node.js:
+Run the authentication and migration-history regression tests with Node.js:
 
 ```sh
-node --test tests/auth.test.mjs
+node --test tests/*.test.mjs
 ```
 
-The tests stub the external Supabase client and exercise the actual submit handler without contacting production.
+The auth tests stub the external Supabase client and exercise the actual submit handler; migration tests cover the historical mismatch and pending-SQL detection. Unit tests do not contact production.
+
+Before any future database deployment, set `SUPABASE_ACCESS_TOKEN` securely in your environment and run:
+
+```sh
+node scripts/check-migration-history.mjs
+```
+
+This separate live check derives the target from `index.html` and reads its migration ledger. It reports missing local versions or pending SQL and makes no database changes. A mismatch requires reviewing the target and intended migrations before deployment; do not repair a live migration ledger merely to silence an error.

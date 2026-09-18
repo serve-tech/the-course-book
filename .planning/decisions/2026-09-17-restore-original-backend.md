@@ -1,7 +1,7 @@
 # Restore the original backend and defer Incubator migration
 
 **Date:** 2026-09-17
-**Status:** Accepted
+**Status:** Superseded by [Move to Serve Electric Incubator](2026-09-18-move-to-serve-electric-incubator.md).
 
 ## Context
 
