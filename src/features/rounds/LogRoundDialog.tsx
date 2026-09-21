@@ -74,9 +74,12 @@ export function LogRoundDialog({
     /*
      * Never show the local Course Book catalog
      * while searching.
+     *
+     * Results are cleared by changeQuery(), so
+     * there is nothing to clear synchronously
+     * inside this effect.
      */
     if (text.length < 2) {
-      setResults([]);
       return;
     }
 
