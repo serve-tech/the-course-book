@@ -29,7 +29,9 @@ export function App() {
 
   const [page, setPage] = useState(Page.Mine),
     [dialog, setDialog] = useState<Dialog | null>(null),
-    [rankings, setRankings] = useState<readonly RankedCourse[]>([]);
+    [rankings, setRankings] = useState<
+      readonly RankedCourse[]
+    >([]);
 
   const [selectedState, setSelectedState] = useState(
     () =>
@@ -40,9 +42,9 @@ export function App() {
 
   const [toast, setToast] = useState(""),
     [refreshing, setRefreshing] = useState(false),
-    toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
-      undefined,
-    ),
+    toastTimer = useRef<
+      ReturnType<typeof setTimeout> | undefined
+    >(undefined),
     pageRef = useRef(page);
 
   const notify = useCallback((message: string) => {
@@ -56,7 +58,10 @@ export function App() {
 
   const onState = useCallback(
     (code: string) => {
-      services.storage.write("theCourseBookSelectedState", code);
+      services.storage.write(
+        "theCourseBookSelectedState",
+        code,
+      );
       setSelectedState(code);
     },
     [services],
@@ -72,23 +77,31 @@ export function App() {
       authEvents = 0;
 
     const hydrate = () => {
-      if (!active || !services.journal.getSnapshot().user) return;
+      if (!active || !services.journal.getSnapshot().user)
+        return;
 
       if (pageRef.current === Page.Friends) {
         timer = setTimeout(hydrate, 2000);
         return;
       }
 
-      void services.journal.initialize().catch((error: unknown) => {
-        if (active) {
-          console.warn("Account synchronization failed", error);
-          notify("Cloud sync failed; try again");
-        }
-      });
+      void services.journal.initialize().catch(
+        (error: unknown) => {
+          if (active) {
+            console.warn(
+              "Account synchronization failed",
+              error,
+            );
+            notify("Cloud sync failed; try again");
+          }
+        },
+      );
     };
 
     const apply = (
-      session: Awaited<ReturnType<typeof services.auth.session>>,
+      session: Awaited<
+        ReturnType<typeof services.auth.session>
+      >,
     ) => {
       if (!active) return;
 
@@ -96,16 +109,19 @@ export function App() {
 
       clearTimeout(timer);
 
-      if (session) timer = setTimeout(hydrate, 1500);
+      if (session)
+        timer = setTimeout(hydrate, 1500);
     };
 
-    const unsubscribe = services.auth.subscribe((session) => {
-      authEvents++;
+    const unsubscribe = services.auth.subscribe(
+      (session) => {
+        authEvents++;
 
-      queueMicrotask(() => {
-        apply(session);
-      });
-    });
+        queueMicrotask(() => {
+          apply(session);
+        });
+      },
+    );
 
     void services.auth.session().then(
       (session) => {
@@ -143,14 +159,18 @@ export function App() {
       document.documentElement.style.setProperty(
         "--vvh",
         String(
-          window.visualViewport?.height ?? window.innerHeight,
+          window.visualViewport?.height ??
+            window.innerHeight,
         ) + "px",
       );
     };
 
     resize();
 
-    window.visualViewport?.addEventListener("resize", resize);
+    window.visualViewport?.addEventListener(
+      "resize",
+      resize,
+    );
 
     return () => {
       window.visualViewport?.removeEventListener(
@@ -158,7 +178,9 @@ export function App() {
         resize,
       );
 
-      document.body.classList.remove("mobile-searching");
+      document.body.classList.remove(
+        "mobile-searching",
+      );
     };
   }, []);
 
@@ -209,11 +231,11 @@ export function App() {
           id="authOpen"
           onClick={() => {
             if (user)
-              void services.auth.signOut().catch(
-                (error: unknown) => {
+              void services.auth
+                .signOut()
+                .catch((error: unknown) => {
                   notify(errorMessage(error));
-                },
-              );
+                });
             else setDialog(Dialog.Auth);
           }}
         >
@@ -267,7 +289,9 @@ export function App() {
         />
 
         <FriendsPage
-          key={(user?.id ?? "anonymous") + "-friends"}
+          key={
+            (user?.id ?? "anonymous") + "-friends"
+          }
           active={page === Page.Friends}
           notify={notify}
         />
@@ -308,7 +332,9 @@ export function App() {
       )}
 
       <div
-        className={"toast" + (toast ? " show" : "")}
+        className={
+          "toast" + (toast ? " show" : "")
+        }
         id="toast"
         role="status"
       >
@@ -330,13 +356,15 @@ export function App() {
             });
           }}
         >
-          {refreshing ? "Refreshing…" : "Refresh App"}
+          {refreshing
+            ? "Refreshing…"
+            : "Refresh App"}
         </button>
 
         <span id="refreshedDate">
           Last updated{" "}
           {new Date(
-            "2026-09-16T00:45:00-04:00",
+            "2026-09-21T11:00:00-04:00",
           ).toLocaleString([], {
             month: "short",
             day: "numeric",
@@ -344,7 +372,7 @@ export function App() {
             hour: "numeric",
             minute: "2-digit",
           })}{" "}
-          · v175
+          · v176
         </span>
       </footer>
 
