@@ -1,8 +1,7 @@
-import { combineSearchResults, type SearchResult } from "./search-results";
 import { z } from "zod";
 import type { CatalogService } from "./catalog-service";
 import { courseSchema, normalizeName, type Course } from "./course";
-import { resolveRanked } from "./identity";
+import type { SearchResult } from "./search-results";
 import { searchScore } from "./ranking-selectors";
 
 const rawSchema = z.record(z.string(), z.unknown());
@@ -47,15 +46,16 @@ export function parseAPICourse(raw: RawCourse): Course {
     string(raw, "name", "course_name", "title").trim() ||
     "Unnamed Course";
 
-  const city = string(raw, "city").trim(),
-    country = string(
-      raw,
-      "country",
-      "country_name",
-      "countryCode",
-      "country_code",
-      "nation",
-    ).trim();
+  const city = string(raw, "city").trim();
+
+  const country = string(
+    raw,
+    "country",
+    "country_name",
+    "countryCode",
+    "country_code",
+    "nation",
+  ).trim();
 
   const region = string(
     raw,
@@ -67,11 +67,9 @@ export function parseAPICourse(raw: RawCourse): Course {
     "region_code",
   ).trim();
 
-  // Retain v174's case-sensitive API country interpretation during
-  // compatibility migration.
   const isUS =
     !country ||
-    /^(us|usa|united states|united states of america)$/.test(country);
+    /^(us|usa|united states|united states of america)$/i.test(country);
 
   const location =
     [city, region, country].filter(Boolean).join(", ") ||
@@ -107,6 +105,12 @@ export class SearchService {
     private readonly fetcher: typeof fetch = fetch,
   ) {}
 
+  /*
+   * This is retained only as an emergency local helper for callers
+   * that explicitly need local catalog search.
+   *
+   * The main course lookup path below is API-only.
+   */
   local(query: string): SearchResult[] {
     const text = query.toLowerCase().trim();
 
@@ -124,7 +128,10 @@ export class SearchService {
       )
       .slice(0, 10);
 
-    return combineSearchResults(courses, []);
+    return courses.map((course) => ({
+      course,
+      display: course,
+    }));
   }
 
   private async endpoint(
@@ -171,24 +178,17 @@ export class SearchService {
   ): Promise<SearchResult[]> {
     const text = query.trim();
 
-    if (text.length < 2) return this.local(query);
-
-    /*
-     * Course Book rankings are loaded independently of the external
-     * search API. They are used to enrich API results and also provide
-     * the local fallback if the external API is unavailable.
-     */
-    try {
-      await this.catalog.loadRankings();
-    } catch (error) {
-      console.warn(
-        "Published course search unavailable",
-        error,
-      );
-    }
+    if (text.length < 2) return [];
 
     signal.throwIfAborted();
 
+    /*
+     * OpenGolfAPI is the source of truth for course discovery.
+     *
+     * Do NOT load the Course Book rankings here.
+     * Do NOT use Top 100 membership to determine which courses
+     * appear in search.
+     */
     const base =
       "https://api.opengolfapi.org/v1/courses/search?q=" +
       encodeURIComponent(text);
@@ -211,86 +211,59 @@ export class SearchService {
     signal.throwIfAborted();
 
     /*
-     * API is the preferred discovery source.
+     * Keep API results intact.
      *
-     * This allows courses outside the Course Book's Top 100 lists
-     * to appear in Log a Round.
+     * The API's course ID is the identity used for deduplication.
+     * We deliberately do NOT deduplicate based on course name or
+     * fuzzy location matching because two different courses can
+     * legitimately have the same name.
      */
-    const suggestions: Course[] = [];
-
-    let apiReturnedResults = false;
+    const courses = new Map<string, Course>();
 
     for (const result of results) {
       if (result.status === "rejected") {
         console.warn(
-          "Course search endpoint failed",
+          "OpenGolfAPI course search endpoint failed",
           result.reason,
         );
         continue;
       }
 
-      if (result.value.length > 0)
-        apiReturnedResults = true;
+      for (const raw of result.value) {
+        try {
+          const course = parseAPICourse(raw);
 
-      const parsed = result.value
-        .map(parseAPICourse)
-        .sort(
-          (a, b) =>
-            searchScore(b, text) -
-            searchScore(a, text),
-        );
-
-      for (const raw of parsed) {
-        /*
-         * Match the API result against Course Book's catalog only
-         * for ranking/enrichment purposes.
-         *
-         * Do NOT replace the API course here. The API course remains
-         * selectable so non-Top-100 courses can still be logged.
-         */
-        const ranked = resolveRanked(
-          this.catalog.all(),
-          raw.name,
-          raw.location,
-          true,
-        );
-
-        if (ranked) {
-          suggestions.push({
-            ...raw,
-            world: ranked.world ?? raw.world,
-            usa: ranked.usa ?? raw.usa,
-            michigan:
-              ranked.michigan ?? raw.michigan,
-            public: ranked.public ?? raw.public,
-          });
-        } else {
-          suggestions.push(raw);
+          if (!courses.has(course.id))
+            courses.set(course.id, course);
+        } catch (error) {
+          console.warn(
+            "Unable to parse OpenGolfAPI course result",
+            error,
+            raw,
+          );
         }
       }
     }
 
     /*
-     * If the external API returned usable results, those are the
-     * discovery results. This preserves non-Top-100 courses.
-     */
-    if (apiReturnedResults && suggestions.length)
-      return combineSearchResults([], suggestions);
-
-    /*
-     * IMPORTANT FALLBACK:
+     * The API is the discovery source.
      *
-     * If OpenGolfAPI is unavailable, times out, returns an unexpected
-     * response, or simply returns no courses, search the Course Book
-     * catalog instead.
-     *
-     * Log a Round must never become completely unusable just because
-     * the external discovery service is temporarily unavailable.
+     * If the API returns nothing, return an empty result instead of
+     * silently replacing the API with the Course Book's Top 100
+     * catalog. This prevents the search experience from appearing
+     * to work while actually hiding thousands of API courses.
      */
-    console.warn(
-      "OpenGolfAPI returned no usable course results; using Course Book catalog fallback.",
-    );
+    const suggestions = [...courses.values()]
+      .sort(
+        (a, b) =>
+          searchScore(b, text) -
+          searchScore(a, text),
+      )
+      .slice(0, 10);
 
-    return this.local(text);
+    return suggestions.map((course) => ({
+      course,
+      display: course,
+    }));
   }
 }
