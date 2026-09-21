@@ -215,30 +215,46 @@ export class SearchService {
     signal.throwIfAborted();
 
     /*
-     * OpenGolfAPI is the discovery source.
+     * OpenGolfAPI is the only discovery source.
      *
-     * We do NOT use the local Top 100 catalog to populate search
-     * results.
+     * Do not query the local Course Book catalog here.
+     * The Course Book catalog is only used after an API
+     * result exists, to determine whether that API course
+     * corresponds to an existing Course Book identity.
+     *
+     * There is intentionally ONE request for a normal
+     * course search. We do not make a second request with
+     * state=MI, because the Log a Round search has no
+     * Michigan filter.
+     *
+     * A state filter should only be added by a caller that
+     * explicitly asks for one.
      */
-    const base =
+    const url =
       "https://api.opengolfapi.org/v1/courses/search?q=" +
-      encodeURIComponent(text);
+      encodeURIComponent(text) +
+      "&limit=50&_cb=" +
+      String(session);
 
-    const results =
-      await Promise.allSettled([
-        this.endpoint(
-          base +
-            "&limit=50&_cb=" +
-            String(session),
+    let rawCourses: RawCourse[];
+
+    try {
+      rawCourses =
+        await this.endpoint(
+          url,
           signal,
-        ),
-        this.endpoint(
-          base +
-            "&state=MI&limit=50&_cb=" +
-            String(session),
-          signal,
-        ),
-      ]);
+        );
+    } catch (error) {
+      if (signal.aborted)
+        throw error;
+
+      console.warn(
+        "OpenGolfAPI course search failed",
+        error,
+      );
+
+      return [];
+    }
 
     signal.throwIfAborted();
 
@@ -248,84 +264,78 @@ export class SearchService {
         Course
       >();
 
-    for (const result of results) {
-      if (
-        result.status ===
-        "rejected"
-      ) {
-        console.warn(
-          "OpenGolfAPI course search endpoint failed",
-          result.reason,
-        );
-        continue;
-      }
+    for (const raw of rawCourses) {
+      try {
+        const apiCourse =
+          parseAPICourse(raw);
 
-      for (const raw of result.value) {
-        try {
-          const apiCourse =
-            parseAPICourse(raw);
-
-          /*
-           * API discovery remains authoritative.
-           *
-           * We only use the Course Book catalog to determine
-           * whether this API course is the same physical course
-           * as an existing ranked course.
-           */
-          const ranked =
-            resolveAPICourse(
-              this.catalog.all(),
-              apiCourse,
-            );
-
-          const course =
-            ranked
-              ? {
-                  ...ranked,
-
-                  /*
-                   * Preserve useful API location data when
-                   * the Course Book record does not have it.
-                   */
-                  city:
-                    apiCourse.city ||
-                    ranked.city,
-
-                  state:
-                    apiCourse.state ||
-                    ranked.state,
-
-                  country:
-                    apiCourse.country ||
-                    ranked.country,
-
-                  location:
-                    apiCourse.location ||
-                    ranked.location,
-                }
-              : apiCourse;
-
-          /*
-           * Once a confident match exists, the Course Book ID
-           * becomes the identity. This is what allows a round
-           * logged from the API result to count as "Played" on
-           * the existing Top 100 course.
-           *
-           * If there is no confident match, the API ID remains
-           * untouched.
-           */
-          if (!courses.has(course.id))
-            courses.set(
-              course.id,
-              course,
-            );
-        } catch (error) {
-          console.warn(
-            "Unable to parse OpenGolfAPI course result",
-            error,
-            raw,
+        /*
+         * The API controls discovery.
+         *
+         * This lookup does NOT decide whether the API
+         * result should exist in the search results.
+         *
+         * It only answers:
+         *
+         * "Is this API course confidently the same
+         * physical course as an existing Course Book
+         * course?"
+         *
+         * resolveAPICourse() is deliberately conservative
+         * about same-name courses such as Cherry Creek.
+         */
+        const ranked =
+          resolveAPICourse(
+            this.catalog.all(),
+            apiCourse,
           );
-        }
+
+        const course =
+          ranked
+            ? {
+                ...ranked,
+
+                /*
+                 * Preserve useful API location data when
+                 * the existing Course Book record is missing
+                 * one of those fields.
+                 */
+                city:
+                  apiCourse.city ||
+                  ranked.city,
+
+                state:
+                  apiCourse.state ||
+                  ranked.state,
+
+                country:
+                  apiCourse.country ||
+                  ranked.country,
+
+                location:
+                  apiCourse.location ||
+                  ranked.location,
+              }
+            : apiCourse;
+
+        /*
+         * If the API result confidently maps to an existing
+         * Course Book course, the Course Book ID becomes the
+         * identity.
+         *
+         * Otherwise the API identity remains untouched.
+         */
+        if (!courses.has(course.id))
+          courses.set(
+            course.id,
+            course,
+          );
+      } catch (error) {
+        console.warn(
+          "Unable to parse OpenGolfAPI course result",
+          error,
+          raw,
+        );
       }
     }
 
@@ -354,64 +364,39 @@ export class SearchService {
     url: string,
     signal: AbortSignal,
   ): Promise<RawCourse[]> {
-    for (
-      let attempt = 0;
-      attempt < 2;
-      attempt++
-    ) {
-      try {
-        const response =
-          await this.fetcher(
-            url,
-            {
-              headers: {
-                Accept:
-                  "application/json",
-              },
-              cache:
-                "no-store",
-              signal:
-                AbortSignal.any([
-                  signal,
-                  AbortSignal.timeout(
-                    8000,
-                  ),
-                ]),
-            },
-          );
-
-        if (!response.ok)
-          throw new Error(
-            "OpenGolfAPI " +
-              String(
-                response.status,
+    const response =
+      await this.fetcher(
+        url,
+        {
+          headers: {
+            Accept:
+              "application/json",
+          },
+          cache:
+            "no-store",
+          signal:
+            AbortSignal.any([
+              signal,
+              AbortSignal.timeout(
+                8000,
               ),
-          );
+            ]),
+        },
+      );
 
-        const data: unknown =
-          await response.json();
+    if (!response.ok)
+      throw new Error(
+        "OpenGolfAPI " +
+        String(
+          response.status,
+        ),
+      );
 
-        return extractCourses(
-          data,
-        );
-      } catch (error) {
-        if (
-          signal.aborted ||
-          attempt === 1
-        )
-          throw error;
+    const data: unknown =
+      await response.json();
 
-        await new Promise(
-          (resolve) =>
-            setTimeout(
-              resolve,
-              250 *
-                (attempt + 1),
-            ),
-        );
-      }
-    }
-
-    return [];
+    return extractCourses(
+      data,
+    );
   }
 }
