@@ -4,7 +4,6 @@ import type { CatalogService } from "./catalog-service";
 import { courseSchema, normalizeName, type Course } from "./course";
 import { resolveRanked } from "./identity";
 import { searchScore } from "./ranking-selectors";
-import type { SafeStorage } from "../../shared/lib/storage";
 
 const rawSchema = z.record(z.string(), z.unknown());
 
@@ -105,7 +104,6 @@ export function parseAPICourse(raw: RawCourse): Course {
 export class SearchService {
   constructor(
     private readonly catalog: CatalogService,
-    private readonly storage: SafeStorage,
     private readonly fetcher: typeof fetch = fetch,
   ) {}
 
