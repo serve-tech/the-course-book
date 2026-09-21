@@ -108,7 +108,7 @@ export class SearchService {
   ) {}
 
   local(query: string): SearchResult[] {
-    const text = query.toLowerCase();
+    const text = query.toLowerCase().trim();
 
     const courses = this.catalog
       .all()
@@ -116,6 +116,11 @@ export class SearchService {
         (course) =>
           course.name.toLowerCase().includes(text) ||
           course.location.toLowerCase().includes(text),
+      )
+      .sort(
+        (a, b) =>
+          searchScore(b, text) -
+          searchScore(a, text),
       )
       .slice(0, 10);
 
@@ -129,7 +134,9 @@ export class SearchService {
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
         const response = await this.fetcher(url, {
-          headers: { Accept: "application/json" },
+          headers: {
+            Accept: "application/json",
+          },
           cache: "no-store",
           signal: AbortSignal.any([
             signal,
@@ -167,22 +174,17 @@ export class SearchService {
     if (text.length < 2) return this.local(query);
 
     /*
-     * Search order is intentional:
-     *
-     * 1. OpenGolfAPI is the discovery source.
-     * 2. Course Book's Top 100 catalog is used only to verify/enrich
-     *    API results.
-     * 3. We do NOT replace an API result with the Top 100 course here.
-     * 4. Canonical Top 100 matching happens after the user selects
-     *    a result in LogRoundDialog.
-     *
-     * This is important because users must be able to find and log
-     * courses that are not in a Top 100 list.
+     * Course Book rankings are loaded independently of the external
+     * search API. They are used to enrich API results and also provide
+     * the local fallback if the external API is unavailable.
      */
     try {
       await this.catalog.loadRankings();
     } catch (error) {
-      console.warn("Published course search unavailable", error);
+      console.warn(
+        "Published course search unavailable",
+        error,
+      );
     }
 
     signal.throwIfAborted();
@@ -193,7 +195,9 @@ export class SearchService {
 
     const results = await Promise.allSettled([
       this.endpoint(
-        base + "&limit=50&_cb=" + String(session),
+        base +
+          "&limit=50&_cb=" +
+          String(session),
         signal,
       ),
       this.endpoint(
@@ -207,14 +211,14 @@ export class SearchService {
     signal.throwIfAborted();
 
     /*
-     * The API result remains the actual search result.
+     * API is the preferred discovery source.
      *
-     * If it confidently matches a Course Book ranked course, copy
-     * the ranking metadata onto the API course so the UI can show
-     * the appropriate ranking badge without replacing the API
-     * course's identity.
+     * This allows courses outside the Course Book's Top 100 lists
+     * to appear in Log a Round.
      */
     const suggestions: Course[] = [];
+
+    let apiReturnedResults = false;
 
     for (const result of results) {
       if (result.status === "rejected") {
@@ -225,6 +229,9 @@ export class SearchService {
         continue;
       }
 
+      if (result.value.length > 0)
+        apiReturnedResults = true;
+
       const parsed = result.value
         .map(parseAPICourse)
         .sort(
@@ -234,6 +241,13 @@ export class SearchService {
         );
 
       for (const raw of parsed) {
+        /*
+         * Match the API result against Course Book's catalog only
+         * for ranking/enrichment purposes.
+         *
+         * Do NOT replace the API course here. The API course remains
+         * selectable so non-Top-100 courses can still be logged.
+         */
         const ranked = resolveRanked(
           this.catalog.all(),
           raw.name,
@@ -251,23 +265,32 @@ export class SearchService {
             public: ranked.public ?? raw.public,
           });
         } else {
-          /*
-           * This is deliberately retained.
-           *
-           * A course does NOT need to be Top 100 to appear
-           * in Log a Round.
-           */
           suggestions.push(raw);
         }
       }
     }
 
     /*
-     * Do not prepend the local Top 100 catalog here.
-     *
-     * The API is the discovery source. This allows non-Top-100
-     * courses to appear in search results.
+     * If the external API returned usable results, those are the
+     * discovery results. This preserves non-Top-100 courses.
      */
-    return combineSearchResults([], suggestions);
+    if (apiReturnedResults && suggestions.length)
+      return combineSearchResults([], suggestions);
+
+    /*
+     * IMPORTANT FALLBACK:
+     *
+     * If OpenGolfAPI is unavailable, times out, returns an unexpected
+     * response, or simply returns no courses, search the Course Book
+     * catalog instead.
+     *
+     * Log a Round must never become completely unusable just because
+     * the external discovery service is temporarily unavailable.
+     */
+    console.warn(
+      "OpenGolfAPI returned no usable course results; using Course Book catalog fallback.",
+    );
+
+    return this.local(text);
   }
 }
