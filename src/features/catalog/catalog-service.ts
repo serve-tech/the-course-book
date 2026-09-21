@@ -11,117 +11,175 @@ import {
   aliases,
   canonicalize,
   canonicalLocations,
-  resolveRanked,
+  resolveAPICourse,
 } from "./identity";
 import { countryFromLocation } from "./geography";
-import type { CatalogRepository, CourseRow } from "./catalog-repository";
+import type {
+  CatalogRepository,
+  CourseRow,
+} from "./catalog-repository";
 import type { SafeStorage } from "../../shared/lib/storage";
 
-const mapSchema = z.record(z.string(), z.string());
-
-const locationSchema = z.record(
-  z.string(),
-  z.object({
-    location: z.string().optional(),
-    city: z.string().optional(),
-    state: z.string().optional(),
-    country: z.string().optional(),
-  }),
-);
-
-const mappingKey = "theCourseBookCloudCourseMapV3";
-
-export class CatalogService {
-  private records = new Map<string, Course>();
-
-  private readonly bundledIds = new Set(
-    bundled.map((course) => course.id),
+const mapSchema =
+  z.record(
+    z.string(),
+    z.string(),
   );
 
-  private readonly runtimeMapping = new Map<string, string>();
+const locationSchema =
+  z.record(
+    z.string(),
+    z.object({
+      location:
+        z.string().optional(),
+      city:
+        z.string().optional(),
+      state:
+        z.string().optional(),
+      country:
+        z.string().optional(),
+    }),
+  );
 
-  private readonly mapping: Record<string, string>;
+const mappingKey =
+  "theCourseBookCloudCourseMapV3";
 
-  private rankingRequest: Promise<RankedCourse[]> | undefined;
+export class CatalogService {
+  private records =
+    new Map<string, Course>();
 
-  private catalogRequest: Promise<void> | undefined;
+  private readonly bundledIds =
+    new Set(
+      bundled.map(
+        (course) => course.id,
+      ),
+    );
 
-  rankings: readonly RankedCourse[] = [];
+  private readonly runtimeMapping =
+    new Map<string, string>();
+
+  private readonly mapping:
+    Record<string, string>;
+
+  private rankingRequest:
+    | Promise<RankedCourse[]>
+    | undefined;
+
+  private catalogRequest:
+    | Promise<void>
+    | undefined;
+
+  rankings:
+    readonly RankedCourse[] = [];
 
   constructor(
     private readonly repository: CatalogRepository,
     private readonly storage: SafeStorage,
   ) {
-    this.mapping = storage.parse(
-      mappingKey,
-      mapSchema,
-      () => ({}),
-    );
+    this.mapping =
+      storage.parse(
+        mappingKey,
+        mapSchema,
+        () => ({}),
+      );
 
-    const locations = storage.parse(
-      "theCourseBook_ranking_locations_v1",
-      locationSchema,
-      () => ({}),
-    );
+    const locations =
+      storage.parse(
+        "theCourseBook_ranking_locations_v1",
+        locationSchema,
+        () => ({}),
+      );
 
     for (const raw of bundled) {
-      const course = canonicalize(
-        courseSchema.parse(raw),
-      );
+      const course =
+        canonicalize(
+          courseSchema.parse(
+            raw,
+          ),
+        );
 
       this.records.set(
         course.id,
         courseSchema.parse({
           ...course,
-          ...locations[course.id],
+          ...locations[
+            course.id
+          ],
         }),
       );
     }
   }
 
   all(): Course[] {
-    return [...this.records.values()];
+    return [
+      ...this.records.values(),
+    ];
   }
 
-  get(id: string): Course | undefined {
+  get(
+    id: string,
+  ): Course | undefined {
     return this.records.get(id);
   }
 
-  restore(records: readonly Course[]): void {
-    for (const course of records) this.merge(course);
+  restore(
+    records: readonly Course[],
+  ): void {
+    for (const course of records)
+      this.merge(course);
   }
 
-  customRecords(ids: readonly string[]): Course[] {
+  customRecords(
+    ids: readonly string[],
+  ): Course[] {
     return ids.flatMap((id) => {
-      const course = this.get(id);
+      const course =
+        this.get(id);
 
-      return course && !this.bundledIds.has(id)
+      return course &&
+        !this.bundledIds.has(id)
         ? [course]
         : [];
     });
   }
 
-  merge(course: Course): Course {
-    const previous = this.records.get(course.id);
+  merge(
+    course: Course,
+  ): Course {
+    const previous =
+      this.records.get(
+        course.id,
+      );
 
-    const result = canonicalize(
-      previous ?? course,
+    const result =
+      canonicalize(
+        previous ?? course,
+      );
+
+    this.records.set(
+      result.id,
+      result,
     );
-
-    this.records.set(result.id, result);
 
     return result;
   }
 
-  replace(course: Course): void {
+  replace(
+    course: Course,
+  ): void {
     this.records.set(
       course.id,
       canonicalize(course),
     );
   }
 
-  remember(localId: string, dbId: string): void {
-    this.mapping[localId] = dbId;
+  remember(
+    localId: string,
+    dbId: string,
+  ): void {
+    this.mapping[
+      localId
+    ] = dbId;
 
     this.runtimeMapping.set(
       localId,
@@ -138,15 +196,18 @@ export class CatalogService {
     row: CourseRow,
     localIds: readonly string[] = [],
   ): Course {
-    const mapped = Object.entries(
-      this.mapping,
-    ).find(
-      ([, dbId]) => dbId === row.id,
-    )?.[0];
+    const mapped =
+      Object.entries(
+        this.mapping,
+      ).find(
+        ([, dbId]) =>
+          dbId === row.id,
+      )?.[0];
 
-    const mappedCourse = mapped
-      ? this.get(mapped)
-      : undefined;
+    const mappedCourse =
+      mapped
+        ? this.get(mapped)
+        : undefined;
 
     if (mappedCourse) {
       this.runtimeMapping.set(
@@ -157,15 +218,25 @@ export class CatalogService {
       return mappedCourse;
     }
 
-    const matches = localIds.flatMap((id) => {
-      const course = this.get(id);
+    const matches =
+      localIds.flatMap(
+        (id) => {
+          const course =
+            this.get(id);
 
-      return course &&
-        normalizeName(course.name) ===
-          normalizeName(row.name)
-        ? [course]
-        : [];
-    });
+          return (
+            course &&
+            normalizeName(
+              course.name,
+            ) ===
+              normalizeName(
+                row.name,
+              )
+          )
+            ? [course]
+            : [];
+        },
+      );
 
     const local =
       matches.length === 1
@@ -173,24 +244,35 @@ export class CatalogService {
         : undefined;
 
     if (local) {
-      const location = cloudLocation(row);
+      const location =
+        cloudLocation(row);
 
-      const result = canonicalize(
-        location
-          ? {
-              ...local,
-              location,
-              city: row.city ?? "",
-              state: row.state ?? "",
-              country: row.country ?? "",
-              region:
-                (row.country ?? "").toUpperCase() ===
-                "USA"
-                  ? "custom"
-                  : "international",
-            }
-          : local,
-      );
+      const result =
+        canonicalize(
+          location
+            ? {
+                ...local,
+                location,
+                city:
+                  row.city ??
+                  "",
+                state:
+                  row.state ??
+                  "",
+                country:
+                  row.country ??
+                  "",
+                region:
+                  (
+                    row.country ??
+                    ""
+                  ).toUpperCase() ===
+                  "USA"
+                    ? "custom"
+                    : "international",
+              }
+            : local,
+        );
 
       this.records.set(
         result.id,
@@ -205,33 +287,45 @@ export class CatalogService {
       return result;
     }
 
-    const normalized = normalizeName(
-      row.name,
-    );
+    const normalized =
+      normalizeName(
+        row.name,
+      );
 
     const canonical =
-      canonicalLocations.get(normalized);
-
-    const exact = this.all().filter(
-      (course) =>
-        normalizeName(course.name) ===
+      canonicalLocations.get(
         normalized,
-    );
+      );
 
-    const alias = this.get(
-      aliases.get(normalized) ?? "",
-    );
+    const exact =
+      this.all().filter(
+        (course) =>
+          normalizeName(
+            course.name,
+          ) === normalized,
+      );
 
-    const matched = canonical
-      ? exact.length === 1
-        ? exact[0]
-        : exact.find(
-            (course) =>
-              normalizeName(course.location) ===
-              normalizeName(canonical),
-          )
-      : (
-          alias ??
+    const alias =
+      this.get(
+        aliases.get(
+          normalized,
+        ) ?? "",
+      );
+
+    const matched =
+      canonical
+        ? exact.length === 1
+          ? exact[0]
+          : exact.find(
+              (course) =>
+                normalizeName(
+                  course.location,
+                ) ===
+                normalizeName(
+                  canonical,
+                ),
+            )
+        : alias ??
           (
             exact.length === 1
               ? exact[0]
@@ -244,45 +338,59 @@ export class CatalogService {
                       cloudLocation(row),
                     ),
                 )
-          )
-        );
+          );
 
     const location =
       canonical ??
-      (cloudLocation(row) ||
-        "Location not specified");
+      (
+        cloudLocation(row) ||
+        "Location not specified"
+      );
 
-    const country = countryFromLocation(
-      location,
-      canonical
-        ? ""
-        : (row.country ?? ""),
-    );
+    const country =
+      countryFromLocation(
+        location,
+        canonical
+          ? ""
+          : row.country ??
+            "",
+      );
 
     const course =
       matched ??
       courseSchema.parse({
         id: canonical
-          ? "canonical-" + normalized
-          : "cloud-" + row.id,
+          ? "canonical-" +
+            normalized
+          : "cloud-" +
+            row.id,
         name: row.name,
         location,
         country,
-        city: row.city ?? "",
-        state: row.state ?? "",
+        city:
+          row.city ?? "",
+        state:
+          row.state ?? "",
         region:
           country === "USA"
             ? "custom"
             : "international",
-        logo: row.logo_url ?? "",
-        website: row.website_url ?? "",
+        logo:
+          row.logo_url ?? "",
+        website:
+          row.website_url ?? "",
       });
 
-    const result = this.merge(course);
+    const result =
+      this.merge(course);
 
     if (
-      !result.id.startsWith("cloud-") &&
-      !result.id.startsWith("custom-")
+      !result.id.startsWith(
+        "cloud-",
+      ) &&
+      !result.id.startsWith(
+        "custom-",
+      )
     )
       this.remember(
         result.id,
@@ -304,7 +412,8 @@ export class CatalogService {
     this.rankingRequest =
       this.fetchRankings().catch(
         (error: unknown) => {
-          this.rankingRequest = undefined;
+          this.rankingRequest =
+            undefined;
           throw error;
         },
       );
@@ -320,39 +429,50 @@ export class CatalogService {
       await this.repository.courses([
         ...new Set(
           rows.map(
-            (row) => row.course_id,
+            (row) =>
+              row.course_id,
           ),
         ),
       ]);
 
-    const byId = new Map(
-      courses.map((row) => [
-        row.id,
-        row,
-      ]),
-    );
+    const byId =
+      new Map(
+        courses.map(
+          (row) => [
+            row.id,
+            row,
+          ],
+        ),
+      );
 
     const rankings =
-      rows.flatMap((row) => {
-        const course =
-          byId.get(row.course_id);
+      rows.flatMap(
+        (row) => {
+          const course =
+            byId.get(
+              row.course_id,
+            );
 
-        return course
-          ? [
-              {
-                course:
-                  this.fromRow(course),
-                rank: row.rank,
-                type:
-                  row.ranking_type,
-                scope:
-                  row.scope_code,
-              },
-            ]
-          : [];
-      });
+          return course
+            ? [
+                {
+                  course:
+                    this.fromRow(
+                      course,
+                    ),
+                  rank: row.rank,
+                  type:
+                    row.ranking_type,
+                  scope:
+                    row.scope_code,
+                },
+              ]
+            : [];
+        },
+      );
 
-    this.rankings = rankings;
+    this.rankings =
+      rankings;
 
     return rankings;
   }
@@ -368,12 +488,13 @@ export class CatalogService {
           for (const row of rows)
             this.fromRow(row);
         })
-        .catch((error: unknown) => {
-          this.catalogRequest =
-            undefined;
-
-          throw error;
-        });
+        .catch(
+          (error: unknown) => {
+            this.catalogRequest =
+              undefined;
+            throw error;
+          },
+        );
 
     return this.catalogRequest;
   }
@@ -381,119 +502,49 @@ export class CatalogService {
   async rows(
     ids: readonly string[],
   ): Promise<CourseRow[]> {
-    return this.repository.courses(ids);
+    return this.repository.courses(
+      ids,
+    );
   }
 
   /*
-   * API-first course selection.
+   * Resolve an API course to the existing Course Book identity
+   * only when the identity match is conservative and unique.
    *
-   * The API course remains authoritative whenever it contains
-   * usable location information.
-   *
-   * We only attempt to reuse an existing Course Book record when
-   * the API result is missing city and/or state information.
-   *
-   * Matching is deliberately conservative:
-   *
-   *   - exact normalized course name
-   *   - any supplied city must match exactly
-   *   - any supplied state must match exactly
-   *   - the result must be unique
-   *
-   * There is NO fuzzy matching here.
-   *
-   * This prevents two legitimate courses with the same name,
-   * such as two different Cherry Creek courses, from being
-   * accidentally merged.
+   * This is what connects an API search result such as Pine Valley
+   * to the existing Top 100 Pine Valley record.
    */
-  resolveSelection(course: Course): Course {
-    const mapping = this.storage.parse(
-      "theCourseBookApiMappings",
-      mapSchema,
-      () => ({}),
-    );
+  resolveSelection(
+    course: Course,
+  ): Course {
+    const mapping =
+      this.storage.parse(
+        "theCourseBookApiMappings",
+        mapSchema,
+        () => ({}),
+      );
 
     const mapped =
       this.get(
-        mapping[course.id] ?? "",
+        mapping[course.id] ??
+          "",
       );
 
     if (mapped)
       return mapped;
 
-    /*
-     * If the API supplied both city and state, trust the API.
-     * It is the discovery source and should remain the selected
-     * course rather than being replaced by a fuzzy catalog match.
-     */
-    const missingCity =
-      !course.city.trim();
-
-    const missingState =
-      !course.state.trim();
-
-    if (!missingCity && !missingState)
-      return course;
-
-    const normalizedName =
-      normalizeName(course.name);
-
-    if (!normalizedName)
-      return course;
-
-    let candidates = this.all().filter(
-      (existing) =>
-        normalizeName(existing.name) ===
-        normalizedName,
-    );
-
-    if (course.city.trim()) {
-      const city = normalizeName(
-        course.city,
+    const apiMatch =
+      resolveAPICourse(
+        this.all(),
+        course,
       );
 
-      candidates = candidates.filter(
-        (existing) =>
-          normalizeName(existing.city) ===
-          city,
-      );
-    }
-
-    if (course.state.trim()) {
-      const state = normalizeName(
-        course.state,
-      );
-
-      candidates = candidates.filter(
-        (existing) =>
-          normalizeName(existing.state) ===
-          state,
-      );
-    }
-
-    if (course.country.trim()) {
-      const country = normalizeName(
-        course.country,
-      );
-
-      candidates = candidates.filter(
-        (existing) =>
-          normalizeName(existing.country) ===
-          country,
-      );
-    }
-
-    /*
-     * Only reuse an existing Course Book course when there is
-     * exactly one possible match.
-     */
-    if (candidates.length === 1)
-      return candidates[0];
-
-    return course;
+    return apiMatch ?? course;
   }
 
-  async ensure(course: Course): Promise<string> {
+  async ensure(
+    course: Course,
+  ): Promise<string> {
     const runtime =
       this.runtimeMapping.get(
         course.id,
@@ -502,9 +553,19 @@ export class CatalogService {
     if (runtime)
       return runtime;
 
+    const isAPI =
+      course.id.startsWith(
+        "api-",
+      );
+
     const isStatic =
-      !course.id.startsWith("cloud-") &&
-      !course.id.startsWith("custom-");
+      !isAPI &&
+      !course.id.startsWith(
+        "cloud-",
+      ) &&
+      !course.id.startsWith(
+        "custom-",
+      );
 
     const wantedCountry =
       countryFromLocation(
@@ -534,15 +595,19 @@ export class CatalogService {
     if (isStatic && known) {
       const row =
         (
-          await this.repository.courses([
-            known,
-          ])
+          await this.repository.courses(
+            [known],
+          )
         )[0];
 
       if (
         row &&
-        normalizeName(row.name) ===
-          normalizeName(course.name) &&
+        normalizeName(
+          row.name,
+        ) ===
+          normalizeName(
+            course.name,
+          ) &&
         matches(row)
       ) {
         this.runtimeMapping.set(
@@ -566,9 +631,7 @@ export class CatalogService {
 
     const rows =
       await this.repository.byName(
-        isStatic
-          ? course.name
-          : course.name.trim(),
+        course.name.trim(),
       );
 
     const candidates =
@@ -577,56 +640,29 @@ export class CatalogService {
           countryFromLocation(
             cloudLocation(row),
             row.country ?? "",
-          ) === wantedCountry,
+          ) ===
+          wantedCountry,
       );
 
     const exact =
       candidates.find(matches);
 
-    const stateMatch =
-      course.state
-        ? candidates
-            .filter(
-              (row) =>
-                normalizeName(
-                  row.state ?? "",
-                ) ===
-                normalizeName(
-                  course.state,
-                ),
-            )
-            .sort(
-              (a, b) =>
-                Number(!!b.city) -
-                Number(!!a.city),
-            )[0]
-        : undefined;
-
-    const richest =
-      [...candidates].sort(
-        (a, b) =>
-          Number(!!b.city) +
-          Number(!!b.state) -
-          (
-            Number(!!a.city) +
-            Number(!!a.state)
-          ),
-      )[0];
-
     /*
-     * Static Course Book records continue using their exact
-     * location mapping.
+     * API courses are deliberately restricted to an exact
+     * location match.
      *
-     * API courses use the database match only when we have
-     * enough information to make that mapping safely.
+     * If an API result did not confidently match a Course Book
+     * course earlier, do NOT use the old "state match" or
+     * "richest candidate" fallback here.
+     *
+     * That is what prevents two different same-name courses
+     * from being silently merged during save.
      */
-    const match = isStatic
+    const match = isAPI
       ? exact
-      : (
-          exact ??
-          stateMatch ??
-          richest
-        );
+      : isStatic
+        ? exact
+        : exact;
 
     const parts =
       course.location
@@ -650,7 +686,8 @@ export class CatalogService {
               course.state
                 ? null
                 : parts.length > 1
-                  ? (parts[0] ?? null)
+                  ? parts[0] ??
+                    null
                   : null
             ),
           state:
@@ -665,9 +702,11 @@ export class CatalogService {
           country:
             wantedCountry,
           logo_url:
-            course.logo || null,
+            course.logo ||
+            null,
           website_url:
-            course.website || null,
+            course.website ||
+            null,
         })
       );
 
