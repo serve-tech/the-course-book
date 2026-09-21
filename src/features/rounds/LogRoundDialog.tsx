@@ -61,6 +61,9 @@ export function LogRoundDialog({
   const [retry, setRetry] =
     useState(0);
 
+  const [searchError, setSearchError] =
+    useState("");
+
   const [session] =
     useState(Date.now);
 
@@ -75,9 +78,9 @@ export function LogRoundDialog({
      * Never show the local Course Book catalog
      * while searching.
      *
-     * Results are cleared by changeQuery(), so
-     * there is nothing to clear synchronously
-     * inside this effect.
+     * Results and search errors are cleared by
+     * changeQuery(), so stale state never remains
+     * while the user is typing.
      */
     if (text.length < 2) {
       return;
@@ -99,10 +102,12 @@ export function LogRoundDialog({
               if (
                 !controller.signal
                   .aborted
-              )
+              ) {
+                setSearchError("");
                 setResults(
                   value,
                 );
+              }
             },
             (error: unknown) => {
               if (
@@ -115,6 +120,12 @@ export function LogRoundDialog({
                 );
 
                 setResults([]);
+
+                setSearchError(
+                  error instanceof Error
+                    ? error.message
+                    : "Course search is temporarily unavailable. Please try again.",
+                );
               }
             },
           );
@@ -145,6 +156,7 @@ export function LogRoundDialog({
      * results never remain during debounce.
      */
     setResults([]);
+    setSearchError("");
   };
 
   const choose = (
@@ -182,6 +194,7 @@ export function LogRoundDialog({
       selectedCourse.name,
     );
     setResults([]);
+    setSearchError("");
   };
 
   const needsState =
@@ -303,6 +316,26 @@ export function LogRoundDialog({
                   Sign In
                 </button>
               </div>
+            ) : searchError ? (
+              <div className="empty">
+                {searchError}
+
+                <button
+                  className="secondary"
+                  id="apiRetry"
+                  onClick={() => {
+                    setSearchError("");
+                    setResults([]);
+
+                    setRetry(
+                      (value) =>
+                        value + 1,
+                    );
+                  }}
+                >
+                  Retry
+                </button>
+              </div>
             ) : results.length ? (
               results.map(
                 (result) => {
@@ -393,8 +426,7 @@ export function LogRoundDialog({
                     onClick={() => {
                       setRetry(
                         (value) =>
-                          value +
-                          1,
+                          value + 1,
                       );
                     }}
                   >
