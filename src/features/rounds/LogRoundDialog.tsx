@@ -10,6 +10,7 @@ import {
 import { Modal } from "../../shared/ui/Modal";
 import { StateSelect } from "../../shared/ui/StateSelect";
 import { errorMessage } from "../../shared/lib/errors";
+
 export function LogRoundDialog({
   onClose,
   onAdd,
@@ -23,62 +24,142 @@ export function LogRoundDialog({
 }) {
   const { search, catalog, journal, rounds } = useServices(),
     { user, account } = useJournal();
+
   const [query, setQuery] = useState(""),
-    [results, setResults] = useState<SearchResult[]>(() => search.local("")),
-    [selected, setSelected] = useState<SearchResult | null>(null),
+    [results, setResults] = useState<SearchResult[]>(() =>
+      search.local(""),
+    ),
+    [selected, setSelected] = useState<SearchResult | null>(
+      null,
+    ),
     [quantity, setQuantity] = useState("1"),
     [busy, setBusy] = useState(false),
     [retry, setRetry] = useState(0);
+
   const [session] = useState(Date.now);
+
   useEffect(() => {
     if (!user || selected) return;
+
     const controller = new AbortController();
+
     const timeout = setTimeout(() => {
-      void search.search(query, session, controller.signal).then(
+      void search.search(
+        query,
+        session,
+        controller.signal,
+      ).then(
         (value) => {
           if (!controller.signal.aborted) setResults(value);
         },
         (error: unknown) => {
           if (!controller.signal.aborted)
-            console.warn("Course search failed", error);
+            console.warn(
+              "Course search failed",
+              error,
+            );
         },
       );
     }, 180);
+
     return () => {
       clearTimeout(timeout);
       controller.abort();
     };
-  }, [query, retry, search, selected, user, session]);
+  }, [
+    query,
+    retry,
+    search,
+    selected,
+    user,
+    session,
+  ]);
+
   const changeQuery = (value: string) => {
     setQuery(value);
-    setResults(search.local(value.trim().toLowerCase()));
+
+    /*
+     * Keep the immediate local response for an empty/very short
+     * query. Once the user has typed two or more characters,
+     * SearchService.search() becomes the source of truth and
+     * searches OpenGolfAPI.
+     */
+    if (value.trim().length < 2)
+      setResults(
+        search.local(value.trim().toLowerCase()),
+      );
   };
+
   const choose = (result: SearchResult) => {
-    setSelected(result);
-    const course = result.display;
+    /*
+     * The user has now selected the API result.
+     *
+     * Only at this point do we attempt to match it to the
+     * canonical Course Book / Top 100 course.
+     *
+     * If there is no confident match, resolveSelection returns
+     * the API course unchanged, which allows non-Top-100 courses
+     * to be logged.
+     */
+    const resolved = catalog.resolveSelection(
+      result.course,
+    );
+
+    const selectedCourse =
+      resolved.id !== result.course.id
+        ? resolved
+        : result.course;
+
+    setSelected({
+      course: selectedCourse,
+      display: selectedCourse,
+    });
+
     setQuantity("1");
-    setQuery(course.name);
+    setQuery(selectedCourse.name);
   };
+
   const needsState =
-    selected && isUSCourse(selected.display) && !deriveState(selected.display);
+    selected &&
+    isUSCourse(selected.display) &&
+    !deriveState(selected.display);
+
   const log = async () => {
     if (!selected || busy) return;
+
     if (needsState) {
-      notify("Select a state before logging this U.S. course");
+      notify(
+        "Select a state before logging this U.S. course",
+      );
       return;
     }
+
     setBusy(true);
+
     try {
       journal.remember(selected.course);
-      const count = Math.max(1, Math.floor(Number(quantity)) || 1);
+
+      const count = Math.max(
+        1,
+        Math.floor(Number(quantity)) || 1,
+      );
+
       await rounds.log(selected.course, count);
+
       onClose();
-      notify(String(count) + " round" + (count === 1 ? "" : "s") + " added");
+
+      notify(
+        String(count) +
+          " round" +
+          (count === 1 ? "" : "s") +
+          " added",
+      );
     } catch (error) {
       notify(errorMessage(error));
       setBusy(false);
     }
   };
+
   return (
     <Modal
       id="modal"
@@ -94,10 +175,12 @@ export function LogRoundDialog({
             : "How many rounds are you adding?"
           : "Search for the course you played."}
       </div>
+
       {!selected && (
         <>
           <div className="group searchgroup">
             <label htmlFor="modalsearch">Course</label>
+
             <input
               id="modalsearch"
               autoFocus
@@ -110,20 +193,40 @@ export function LogRoundDialog({
               }}
             />
           </div>
+
           <div id="results">
             {!user ? (
               <div className="empty">
                 Sign in to log rounds.
-                <button className="primary" onClick={onSignIn}>
+
+                <button
+                  className="primary"
+                  onClick={onSignIn}
+                >
                   Sign In
                 </button>
               </div>
             ) : results.length ? (
               results.map((result) => {
+                /*
+                 * The search result remains the API course.
+                 *
+                 * Resolve only for purposes of displaying the
+                 * Course Book ranking badge. This does NOT change
+                 * what will be logged until the user actually
+                 * selects the result.
+                 */
                 const course = result.display;
-                const ranking = catalog.rankings.find(
-                  (row) => row.type === "state" && row.course.id === course.id,
-                );
+                const verified =
+                  catalog.resolveSelection(course);
+
+                const ranking =
+                  catalog.rankings.find(
+                    (row) =>
+                      row.type === "state" &&
+                      row.course.id === verified.id,
+                  );
+
                 return (
                   <button
                     className="result"
@@ -133,18 +236,30 @@ export function LogRoundDialog({
                     }}
                   >
                     <strong>{course.name}</strong>
+
                     <small>
                       {course.location}
+
                       {ranking
                         ? " · " +
                           stateName(ranking.scope) +
                           " #" +
                           String(ranking.rank)
                         : ""}
-                      {course.usa ? " · USA #" + String(course.usa) : ""}
-                      {course.world ? " · World #" + String(course.world) : ""}
+
+                      {course.usa
+                        ? " · USA #" +
+                          String(course.usa)
+                        : ""}
+
+                      {course.world
+                        ? " · World #" +
+                          String(course.world)
+                        : ""}
+
                       {course.public
-                        ? " · Public #" + String(course.public)
+                        ? " · Public #" +
+                          String(course.public)
                         : ""}
                     </small>
                   </button>
@@ -153,6 +268,7 @@ export function LogRoundDialog({
             ) : (
               <div className="empty">
                 No courses found. Add the course below.
+
                 <button
                   className="secondary"
                   id="apiRetry"
@@ -165,65 +281,106 @@ export function LogRoundDialog({
               </div>
             )}
           </div>
-          <div className="actions" id="searchActions">
-            <button className="secondary" id="add" onClick={onAdd}>
+
+          <div
+            className="actions"
+            id="searchActions"
+          >
+            <button
+              className="secondary"
+              id="add"
+              onClick={onAdd}
+            >
               + Add Course
             </button>
           </div>
         </>
       )}
+
       {selected && (
         <div id="quantityBox">
-          <div className="selectedcourse" id="selectedCourseCard">
+          <div
+            className="selectedcourse"
+            id="selectedCourseCard"
+          >
             <strong>{selected.display.name}</strong>
+
             <small>
-              {selected.display.location || "Location not specified"}
+              {selected.display.location ||
+                "Location not specified"}
+
               {account.played[selected.course.id]
                 ? " · Already played " +
-                  String(account.played[selected.course.id]) +
+                  String(
+                    account.played[
+                      selected.course.id
+                    ],
+                  ) +
                   "×"
                 : ""}
             </small>
+
             {needsState && (
               <>
                 <div className="selectedcourse-state">
                   <label htmlFor="logCourseState">
-                    State <span aria-hidden="true">*</span>
+                    State{" "}
+                    <span aria-hidden="true">
+                      *
+                    </span>
                   </label>
+
                   <StateSelect
                     id="logCourseState"
                     value={selected.display.state}
                     includeDC
                     onChange={(value) => {
-                      const course = withUSState(selected.course, value);
+                      const course = withUSState(
+                        selected.course,
+                        value,
+                      );
+
                       journal.remember(course);
-                      setSelected({ course, display: course });
+
+                      setSelected({
+                        course,
+                        display: course,
+                      });
                     }}
                   />
                 </div>
+
                 <div className="required-note">
                   State is required for U.S. courses.
                 </div>
               </>
             )}
           </div>
+
           <div className="quantity">
             <div>
-              <div className="quantitylabel">Times played</div>
+              <div className="quantitylabel">
+                Times played
+              </div>
+
               <div className="quantityhint">
                 How many rounds are you adding?
               </div>
             </div>
+
             <input
               id="timesPlayed"
               autoFocus
               aria-label="Times played"
               onFocus={(event) => {
                 event.currentTarget.select();
+
                 setTimeout(() => {
                   document
                     .getElementById("confirmLog")
-                    ?.scrollIntoView({ block: "nearest" });
+                    ?.scrollIntoView({
+                      block: "nearest",
+                    });
                 }, 300);
               }}
               type="number"
@@ -236,6 +393,7 @@ export function LogRoundDialog({
               }}
             />
           </div>
+
           <div className="actions logactions">
             <button
               className="secondary"
@@ -247,6 +405,7 @@ export function LogRoundDialog({
             >
               Change Course
             </button>
+
             <button
               className="primary"
               id="confirmLog"
