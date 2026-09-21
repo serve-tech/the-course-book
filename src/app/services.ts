@@ -10,12 +10,19 @@ import { createFriendsRepository } from "../features/friends/friends-repository"
 import { AccountCache } from "../features/journal/account-state";
 import { JournalStore } from "../features/journal/journal-store";
 import { RoundService } from "../features/rounds/round-service";
+
 export function createServices() {
   const client = createCourseBookClient(),
     storage = new SafeStorage(localStorage);
-  const catalog = new CatalogService(createCatalogRepository(client), storage);
+
+  const catalog = new CatalogService(
+    createCatalogRepository(client),
+    storage,
+  );
+
   const memberships = createJournalRepository(client),
     roundRepository = createRoundRepository(client);
+
   const journal = new JournalStore(
     new AccountCache(storage),
     catalog,
@@ -23,6 +30,7 @@ export function createServices() {
     roundRepository,
     storage,
   );
+
   return {
     storage,
     catalog,
@@ -31,7 +39,8 @@ export function createServices() {
     auth: createAuthRepository(client),
     friends: createFriendsRepository(client),
     rounds: new RoundService(journal, memberships, roundRepository),
-    search: new SearchService(catalog, storage),
+    search: new SearchService(catalog),
   };
 }
+
 export type Services = ReturnType<typeof createServices>;
