@@ -258,11 +258,12 @@ export class SearchService {
        * search result. An empty result means that the
        * API successfully searched and found nothing.
        *
-       * Throwing lets the UI distinguish an unavailable
-       * search service from a genuinely empty result.
+       * Preserve the original error as the cause so
+       * linting and debugging retain the upstream failure.
        */
       throw new Error(
         "Course search is temporarily unavailable. Please try again.",
+        { cause: error },
       );
     }
 
