@@ -499,6 +499,21 @@ export class CatalogService {
     return this.catalogRequest;
   }
 
+  async rows(
+    ids: readonly string[],
+  ): Promise<CourseRow[]> {
+    return this.repository.courses(
+      ids,
+    );
+  }
+
+  /*
+   * Resolve an API course to the existing Course Book identity
+   * only when the identity match is conservative and unique.
+   *
+   * This is what connects an API search result such as Pine Valley
+   * to the existing Top 100 Pine Valley record.
+   */
   resolveSelection(
     course: Course,
   ): Course {
@@ -509,77 +524,203 @@ export class CatalogService {
         () => ({}),
       );
 
-    return (
+    const mapped =
       this.get(
-        mapping[
-          course.id
-        ] ?? "",
-      ) ??
+        mapping[course.id] ??
+          "",
+      );
+
+    if (mapped)
+      return mapped;
+
+    const apiMatch =
       resolveAPICourse(
         this.all(),
         course,
-      ) ??
-      course
-    );
+      );
+
+    return apiMatch ?? course;
   }
 
-  ensure(
+  async ensure(
     course: Course,
-  ): Course {
-    const isStatic =
-      this.bundledIds.has(
+  ): Promise<string> {
+    const runtime =
+      this.runtimeMapping.get(
         course.id,
       );
+
+    if (runtime)
+      return runtime;
 
     const isAPI =
       course.id.startsWith(
         "api-",
       );
 
-    if (isStatic)
-      return (
-        this.get(course.id) ??
-        course
+    const isStatic =
+      !isAPI &&
+      !course.id.startsWith(
+        "cloud-",
+      ) &&
+      !course.id.startsWith(
+        "custom-",
+      );
+
+    const wantedCountry =
+      countryFromLocation(
+        course.location,
+        course.country,
+      );
+
+    const wantedLocation =
+      normalizeName(
+        course.location,
+      );
+
+    const matches = (
+      row: CourseRow,
+    ) =>
+      countryFromLocation(
+        cloudLocation(row),
+        row.country ?? "",
+      ) === wantedCountry &&
+      normalizeName(
+        cloudLocation(row),
+      ) === wantedLocation;
+
+    const known =
+      this.mapping[course.id];
+
+    if (isStatic && known) {
+      const row =
+        (
+          await this.repository.courses(
+            [known],
+          )
+        )[0];
+
+      if (
+        row &&
+        normalizeName(
+          row.name,
+        ) ===
+          normalizeName(
+            course.name,
+          ) &&
+        matches(row)
+      ) {
+        this.runtimeMapping.set(
+          course.id,
+          known,
+        );
+
+        return known;
+      }
+
+      Reflect.deleteProperty(
+        this.mapping,
+        course.id,
+      );
+
+      this.storage.save(
+        mappingKey,
+        this.mapping,
+      );
+    }
+
+    const rows =
+      await this.repository.byName(
+        course.name.trim(),
+      );
+
+    const candidates =
+      rows.filter(
+        (row) =>
+          countryFromLocation(
+            cloudLocation(row),
+            row.country ?? "",
+          ) ===
+          wantedCountry,
       );
 
     const exact =
-      this.all().find(
-        (candidate) =>
-          normalizeName(
-            candidate.name,
-          ) ===
-            normalizeName(
-              course.name,
-            ) &&
-          (
-            !candidate.location ||
-            !course.location ||
-            normalizeName(
-              candidate.location,
-            ) ===
-              normalizeName(
-                course.location,
-              )
-          ),
-      );
+      candidates.find(matches);
 
+    /*
+     * API courses are deliberately restricted to an exact
+     * location match.
+     *
+     * If an API result did not confidently match a Course Book
+     * course earlier, do NOT use the old "state match" or
+     * "richest candidate" fallback here.
+     *
+     * That is what prevents two different same-name courses
+     * from being silently merged during save.
+     */
     const match = isAPI
       ? exact
       : isStatic
         ? exact
         : exact;
 
-    return (
-      match ??
-      this.merge(course)
-    );
-  }
+    const parts =
+      course.location
+        .split(",")
+        .map((part) =>
+          part.trim(),
+        )
+        .filter(Boolean);
 
-  mapRuntime(
-    localId: string,
-  ): string | undefined {
-    return this.runtimeMapping.get(
-      localId,
+    const last =
+      parts.at(-1) ?? "";
+
+    const id =
+      match?.id ??
+      (
+        await this.repository.insert({
+          name: course.name,
+          city:
+            course.city ||
+            (
+              course.state
+                ? null
+                : parts.length > 1
+                  ? parts[0] ??
+                    null
+                  : null
+            ),
+          state:
+            course.state ||
+            (
+              wantedCountry ===
+                "USA" &&
+              last.length === 2
+                ? last
+                : null
+            ),
+          country:
+            wantedCountry,
+          logo_url:
+            course.logo ||
+            null,
+          website_url:
+            course.website ||
+            null,
+        })
+      );
+
+    this.runtimeMapping.set(
+      course.id,
+      id,
     );
+
+    if (isStatic)
+      this.remember(
+        course.id,
+        id,
+      );
+
+    return id;
   }
 }
