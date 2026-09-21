@@ -253,7 +253,17 @@ export class SearchService {
         error,
       );
 
-      return [];
+      /*
+       * Do not convert an API failure into an empty
+       * search result. An empty result means that the
+       * API successfully searched and found nothing.
+       *
+       * Throwing lets the UI distinguish an unavailable
+       * search service from a genuinely empty result.
+       */
+      throw new Error(
+        "Course search is temporarily unavailable. Please try again.",
+      );
     }
 
     signal.throwIfAborted();
