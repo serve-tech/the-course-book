@@ -198,7 +198,7 @@ export class SearchService {
   constructor(
     private readonly catalog: CatalogService,
     private readonly fetcher: typeof fetch =
-      fetch,
+      (input, init) => globalThis.fetch(input, init),
   ) {}
 
   async search(

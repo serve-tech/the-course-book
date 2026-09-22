@@ -73,7 +73,7 @@ These are current product/data contracts, not optional implementation details:
 
 - **Counts:** round rows are the source of play counts. A membership can exist with zero rounds. Never synthesize historical round rows from cached counts.
 - **Order:** published world/USA/public/state rankings and personal ranks are separate. Logging or changing the count of an existing course must not update its personal rank. Explicit moves synchronize personal order.
-- **Hydration:** preserve existing local order and edits made while loading. Fresh-device behavior has characterized quirks; do not rewrite cloud ranks during startup to normalize them.
+- **Hydration:** when cloud memberships exist, use their personal ranks, appending round-only courses afterward. Use local order only when cloud memberships are absent. Reject stale hydration after a local edit, and never rewrite cloud ranks during startup. See the [cloud-order decision](../.planning/decisions/2026-09-22-cloud-order-and-verification.md).
 - **Identity:** bundled/local IDs, database UUIDs and external search IDs are distinct. Resolve selections through catalog identity logic; richer search text must not replace canonical IDs. Preserve canonical Scottish geography even when a cloud row is incorrect.
 - **Account isolation:** capture the journal owner token for async operations and recheck it after awaits before subsequent writes or commits. Its generation distinguishes A → B → A switches. Frontend checks complement, but never replace, RLS.
 - **Partial writes:** when membership creation fails after round insertion, compensate only the newly inserted round IDs. A rollback failure must be surfaced; do not claim the operation was atomic.
@@ -83,7 +83,7 @@ These are current product/data contracts, not optional implementation details:
 - **Authentication:** sign-in reads the visible email from `AuthForm.identity`; `form.email` is signup-only. Reuse the existing credential/validation functions. Signup also handles usernames and confirmation-required responses. Preserve session persistence and the deployed email redirect.
 - **Preferences:** preserve manual state selection, optional geolocation behavior and cached preferences.
 
-Existing quirks, including zero-count local membership, fresh-device order and the Pinehurst alias, are listed in [migration notes](react-migration.md). A requested bug fix may change them, but needs explicit behavior scope, regression tests and consideration of existing data.
+The [migration notes](react-migration.md) record the original compatibility baseline and later changes. Cloud-authoritative ordering superseded the original fresh-device/local-order behavior. Requested changes to remaining quirks need explicit scope, regression tests and consideration of existing data.
 
 ## Storage and backend configuration
 

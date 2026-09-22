@@ -54,6 +54,7 @@ export async function mockBackend(page: Page) {
   ];
   const writes: { table: string; method: string; body: unknown }[] = [];
   const signIns: unknown[] = [];
+  const searchRequests: URL[] = [];
   const user = {
     id: owner,
     email: "golfer@example.com",
@@ -86,6 +87,21 @@ export async function mockBackend(page: Page) {
       url = new URL(request.url());
     if (url.hostname === "127.0.0.1" || url.hostname === "localhost") {
       await route.continue();
+      return;
+    }
+    if (
+      url.hostname === "api.opengolfapi.org" &&
+      url.pathname === "/v1/courses/search"
+    ) {
+      searchRequests.push(url);
+      const query = (url.searchParams.get("q") ?? "").toLowerCase();
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(
+          courses.filter((course) => course.name.toLowerCase().includes(query)),
+        ),
+      });
       return;
     }
     if (!url.hostname.endsWith(".supabase.co")) {
@@ -239,5 +255,5 @@ export async function mockBackend(page: Page) {
       "Unmocked backend request: " + request.method() + " " + url.pathname,
     );
   });
-  return { writes, signIns, courses, memberships };
+  return { writes, signIns, searchRequests, courses, memberships };
 }

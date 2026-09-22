@@ -43,7 +43,7 @@ Avoid “cleanup” of course identities, caches, rank semantics or database his
 
 GitHub Pages currently publishes the built app using GitHub Actions. Feature branches and PRs run verification without deployment. Merging or pushing to `main` triggers the Pages workflow.
 
-**Check the PR's “Verify application” result before an authorized merge.** The Pages workflow runs its own lint, unit tests and build; it does not wait for the separate browser-test workflow. A successful deployment alone is not evidence that browser tests passed.
+**Check the PR's “Verify application” result before an authorized merge.** The Pages workflow runs its own lint, unit tests, build and browser tests before uploading the deployment artifact. Failed browser verification blocks publication, even for a direct push to main. It runs independently of the PR verification workflow.
 
 No Render account or server deployment is needed. Keep the `/the-course-book/` base path and matching Supabase auth redirect unless a hosting change is explicitly part of the task.
 

@@ -58,13 +58,13 @@ The compiler enables strict mode, unchecked-index checks and exact optional prop
 
 The migration preserves the existing Supabase session storage, per-account local storage keys, course identities, published-ranking semantics, personal order and round-count source. Existing CSS was serialized from Chromium's parsed stylesheet rules because the original contains malformed CSS that browsers already ignore. Desktop and mobile layout tests compare the new view directly against the executable legacy fixture.
 
-See [the migration notes](docs/react-migration.md) for preserved quirks, intentional correctness improvements and verification limits. Historical inline-auth tests remain as baseline characterization; new TypeScript and browser tests exercise the replacement.
+Current personal-list hydration uses cloud membership ranks when available; local order remains a fallback when there are no cloud memberships. See [the migration notes](docs/react-migration.md) for the original compatibility baseline and verification limits, and the [cloud-order decision](.planning/decisions/2026-09-22-cloud-order-and-verification.md) for the subsequent change. Historical inline-auth tests remain as baseline characterization; new TypeScript and browser tests exercise the replacement.
 
 ## GitHub Pages
 
 Vite builds static assets into `dist/` with base `/the-course-book/`. Render is not required.
 
-GitHub Pages is configured to use GitHub Actions. The main-only `pages.yml` workflow builds and uploads `dist/` on a push or merge to `main`; repository-root TypeScript is not the production artifact. CI verifies feature branches and pull requests without deploying them. Check the PR verification result before an authorized merge: Pages deployment runs separately and does not wait for the full browser-test workflow.
+GitHub Pages is configured to use GitHub Actions. The main-only `pages.yml` workflow builds and uploads `dist/` on a push or merge to `main`; repository-root TypeScript is not the production artifact. CI verifies feature branches and pull requests without deploying them. Check the PR verification result before an authorized merge: Pages deployment runs its own browser tests and uploads the artifact only if they pass.
 
 Keep the live Auth site URL and email-confirmation redirect at https://serve-tech.github.io/the-course-book/.
 
@@ -80,6 +80,6 @@ Before any database deployment, set `SUPABASE_ACCESS_TOKEN` securely and run:
 node scripts/check-migration-history.mjs
 ```
 
-This read-only check derives its target from the same public JSON configuration and compares the remote migration ledger. Review mismatches before deployment; never repair a live ledger simply to silence an error.
+This read-only check derives its target from the same public JSON configuration and compares the remote migration ledger. Review mismatches before deployment; never repair a live ledger simply to silence an error. If a migration was already applied outside Git, recover its exact version, name and SQL from the target ledger and commit that existing migration; do not invent a placeholder or apply it again. The September 21 backup migration was recovered this way after it caused Supabase Preview to fail.
 
 See the [Incubator migration report](docs/incubator-migration-2026-09-18.md) for historical account/data transfer verification.
