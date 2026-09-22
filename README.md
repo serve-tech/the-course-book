@@ -47,7 +47,14 @@ The application is being rebuilt on the branch `feat/render-clerk-rebuild` per [
 
 ## Deployment and data
 
-`render.yaml` is the Render Blueprint: one Docker web service and one Postgres database. Secret values (`CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY`) are set in the Render dashboard; the database URL is wired from the database resource. Migrations run as the service's pre-deploy command.
+`render.yaml` is the Render Blueprint: one Docker web service (`Dockerfile`, Starter plan) and one Postgres 17 database, both in Oregon. Secret values (`CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY`) are entered in the Render dashboard; the database URL is wired from the database resource; `NODE_ENV` is set by the Blueprint and `PORT` by Render. Migrations run as the service's pre-deploy command (`node app/db/migrate.ts`) inside the built image. Create or update the infrastructure by syncing the Blueprint from the Render dashboard, never by hand-creating services. The service deploys from the branch named in the Blueprint (`feat/render-clerk-rebuild` until cutover, then `main`).
+
+Local check of the production image:
+
+```sh
+docker build -t coursebook-golf:local .
+docker run --rm -p 3000:3000 -e PORT=3000 -e DATABASE_URL=... -e CLERK_PUBLISHABLE_KEY=... -e CLERK_SECRET_KEY=... coursebook-golf:local
+```
 
 The original data lives in the retired Supabase project until it is exported by the maintainer and imported into Postgres by `scripts/import-supabase.ts` (see the [cutover plan](docs/architecture.md#cutover)). The Supabase project is never modified by this repository and is paused, not deleted, after cutover.
 

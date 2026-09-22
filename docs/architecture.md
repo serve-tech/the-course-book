@@ -13,7 +13,7 @@ coursebook.golf is a server-rendered React Router application. One Node process 
 | 5 | Journal transactions and action; My List page, dialogs, drag reorder | landed |
 | 6 | Friends page; delete `src/` and Supabase artifacts | landed |
 | 7 | Browser tests and complete CI | landed |
-| 8 | Dockerfile, `render.yaml`, first deploy from the branch | pending |
+| 8 | Dockerfile, `render.yaml`, first deploy from the branch | image and Blueprint landed; first deploy awaits approval |
 | 9 | Data import, cutover runbook, domain | pending |
 
 Anything marked pending is described below in its intended shape so work lands consistently. Do not treat a pending module as existing.

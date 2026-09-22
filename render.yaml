@@ -1,0 +1,31 @@
+# Render Blueprint for coursebook.golf. This file is the source of truth for
+# Render infrastructure; secret values are entered in the dashboard (sync: false).
+# Schema: https://render.com/schema/render.yaml.json
+databases:
+  - name: coursebook-db
+    plan: basic-256mb
+    region: oregon
+    postgresMajorVersion: "17"
+
+services:
+  - type: web
+    name: coursebook
+    runtime: docker
+    region: oregon
+    plan: starter
+    branch: feat/render-clerk-rebuild # switch to main at cutover
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /healthz
+    preDeployCommand: node app/db/migrate.ts
+    autoDeployTrigger: commit
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: coursebook-db
+          property: connectionString
+      - key: CLERK_PUBLISHABLE_KEY
+        sync: false
+      - key: CLERK_SECRET_KEY
+        sync: false
