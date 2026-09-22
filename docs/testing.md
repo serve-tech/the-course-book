@@ -28,7 +28,7 @@ For documentation-only changes, check referenced paths, links, commands and clai
 
 | Check | Scope and limits |
 | --- | --- |
-| `lint` | Typed ESLint and React hooks rules over `app/`, `scripts/` and config files; `src/` and `tests/` are excluded during the rebuild |
+| `lint` | Typed ESLint and React hooks rules over `app/`, `scripts/` and config files; `tests/e2e` joins once the browser suite is rewritten |
 | `typecheck` | Strict checks for `app/`, `scripts/` and configuration, with generated route types |
 | `pnpm test` | Vitest with three projects: `node` for pure modules, server modules and scripts; `jsdom` for component tests; `db` for `*.db.test.ts` suites against the migrated test database, run serially |
 | `pnpm db:check` and `pnpm db:generate` | Migration drift gate: the snapshot chain is consistent and `app/db/schema.ts` produces no new migration. CI fails if `app/db/migrations` changes |

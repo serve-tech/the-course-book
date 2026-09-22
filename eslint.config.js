@@ -11,8 +11,6 @@ export default tseslint.config(
       "dist/",
       ".react-router/",
       "node_modules/",
-      "src/",
-      "supabase/",
       "docs/",
       "tests/",
       "scripts/**/*.mjs",

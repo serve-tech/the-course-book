@@ -13,9 +13,7 @@ The current code, configuration and active decisions describe today's implementa
 
 ## Rebuild status
 
-The application is being rebuilt from a static Supabase SPA into a server-rendered React Router application per [the rebuild decision](.planning/decisions/2026-09-22-rebuild-on-render-postgres-clerk.md). The `app/` tree is the application. The `src/` tree is the retired implementation kept only as a reference while features are rewired; it is excluded from type checking, linting, tests and builds. Never import from `src/`, never extend it, and do not "fix" it. It is deleted once the last feature moves.
-
-Phases already landed are listed in [docs/architecture.md](docs/architecture.md#rebuild-status). Modules described there as pending do not exist yet; build them in the documented shape rather than inventing an alternative.
+The application was rebuilt from a static Supabase SPA into a server-rendered React Router application per [the rebuild decision](.planning/decisions/2026-09-22-rebuild-on-render-postgres-clerk.md). The `app/` tree is the application; the retired implementation has been removed from the branch and lives only in Git history. Phases still open (browser tests, Docker and Render, data import and cutover) are listed in [docs/architecture.md](docs/architecture.md#rebuild-status). Modules described there as pending do not exist yet; build them in the documented shape rather than inventing an alternative.
 
 ## Architecture rules
 

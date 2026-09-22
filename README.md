@@ -39,7 +39,7 @@ pnpm start
 - `app/db/`: Drizzle schema, committed SQL migrations, seed data and the migration runner.
 - `app/features/<feature>/`: pure domain logic and components for catalog, journal, rounds, friends and auth, with colocated tests.
 - `app/shared/`: shared UI primitives, guarded browser storage, geolocation, geographic data and the preserved stylesheet.
-- `src/`: the retired Supabase implementation, kept as reference during the rebuild and excluded from all tooling. Do not build on it.
+- `scripts/`: the seed builder and, once written, the data import script.
 
 ## Rebuild status
 

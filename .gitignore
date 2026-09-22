@@ -1,7 +1,6 @@
 .planning/STATE-*.md
 .planning/sessions/
 .planning/lessons.md
-supabase/.temp/
 .env
 .env.*
 !.env.example
