@@ -12,7 +12,7 @@ coursebook.golf is a server-rendered React Router application. One Node process 
 | 4 | Server-side catalog, identity resolution and course search; Top 100 page | landed |
 | 5 | Journal transactions and action; My List page, dialogs, drag reorder | landed |
 | 6 | Friends page; delete `src/` and Supabase artifacts | landed |
-| 7 | Browser tests and complete CI | pending |
+| 7 | Browser tests and complete CI | landed |
 | 8 | Dockerfile, `render.yaml`, first deploy from the branch | pending |
 | 9 | Data import, cutover runbook, domain | pending |
 

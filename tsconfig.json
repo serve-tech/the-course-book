@@ -33,6 +33,7 @@
   "include": [
     "app",
     "scripts/**/*.ts",
+    "tests/e2e",
     ".react-router/types/**/*",
     "vite.config.ts",
     "vitest.config.ts",

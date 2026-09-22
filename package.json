@@ -37,6 +37,8 @@
     "zod": "4.6.5"
   },
   "devDependencies": {
+    "@clerk/backend": "^3.18.1",
+    "@clerk/testing": "2.2.36",
     "@eslint/js": "10.0.1",
     "@playwright/test": "1.63.0",
     "@react-router/dev": "8.4.0",

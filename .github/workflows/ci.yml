@@ -5,6 +5,9 @@ on:
   pull_request:
 permissions:
   contents: read
+env:
+  DATABASE_URL: postgres://coursebook:coursebook@localhost:5433/coursebook_test
+  DATABASE_URL_TEST: postgres://coursebook:coursebook@localhost:5433/coursebook_test
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -21,9 +24,6 @@ jobs:
           --health-interval 5s
           --health-timeout 3s
           --health-retries 10
-    env:
-      DATABASE_URL: postgres://coursebook:coursebook@localhost:5433/coursebook_test
-      DATABASE_URL_TEST: postgres://coursebook:coursebook@localhost:5433/coursebook_test
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -42,3 +42,42 @@ jobs:
       - run: pnpm db:migrate
       - run: pnpm test
       - run: pnpm build
+  browser:
+    runs-on: ubuntu-latest
+    needs: verify
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: coursebook
+          POSTGRES_PASSWORD: coursebook
+          POSTGRES_DB: coursebook_test
+        ports: ['5433:5432']
+        options: >-
+          --health-cmd "pg_isready -U coursebook -d coursebook_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      # Clerk development-instance keys and the two test accounts. Without
+      # them only the anonymous scenario runs; nothing is stubbed.
+      CLERK_PUBLISHABLE_KEY: ${{ secrets.E2E_CLERK_PUBLISHABLE_KEY }}
+      CLERK_SECRET_KEY: ${{ secrets.E2E_CLERK_SECRET_KEY }}
+      E2E_OWNER_EMAIL: ${{ secrets.E2E_OWNER_EMAIL }}
+      E2E_FRIEND_EMAIL: ${{ secrets.E2E_FRIEND_EMAIL }}
+      E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: test-results/
