@@ -13,7 +13,7 @@
     "start": "react-router-serve ./build/server/index.js",
     "typegen": "react-router typegen",
     "typecheck": "react-router typegen && tsc --noEmit",
-    "lint": "eslint .",
+    "lint": "react-router typegen && eslint .",
     "test": "vitest run",
     "test:unit": "vitest run --project node --project jsdom",
     "test:watch": "vitest",
