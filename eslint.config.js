@@ -3,19 +3,47 @@ import tseslint from "typescript-eslint";
 import hooks from "eslint-plugin-react-hooks";
 import refresh from "eslint-plugin-react-refresh";
 import globals from "globals";
+
 export default tseslint.config(
-  { ignores: ["src/infrastructure/supabase/database.types.ts"] },
+  {
+    ignores: [
+      "build/",
+      "dist/",
+      ".react-router/",
+      "node_modules/",
+      "src/",
+      "supabase/",
+      "docs/",
+      "tests/",
+      "scripts/**/*.mjs",
+      "playwright.config.ts",
+    ],
+  },
   js.configs.recommended,
   ...tseslint.configs.strictTypeChecked,
   {
-    files: ["src/**/*.{ts,tsx}"],
+    // Plain JavaScript config files have no TypeScript project to type-check.
+    files: ["**/*.js"],
+    extends: [tseslint.configs.disableTypeChecked],
+  },
+  {
+    files: ["**/*.{ts,tsx}"],
     languageOptions: {
-      globals: globals.browser,
       parserOptions: {
         projectService: true,
         tsconfigRootDir: import.meta.dirname,
       },
     },
+    rules: {
+      "@typescript-eslint/restrict-template-expressions": [
+        "error",
+        { allowNumber: true },
+      ],
+    },
+  },
+  {
+    files: ["app/**/*.{ts,tsx}"],
+    languageOptions: { globals: globals.browser },
     plugins: { "react-hooks": hooks, "react-refresh": refresh },
     rules: {
       ...hooks.configs.recommended.rules,
@@ -23,10 +51,21 @@ export default tseslint.config(
         "error",
         { allowConstantExport: true },
       ],
-      "@typescript-eslint/restrict-template-expressions": [
-        "error",
-        { allowNumber: true },
-      ],
     },
+  },
+  {
+    // Route modules export loaders/actions/meta beside components by design.
+    files: ["app/root.tsx", "app/routes/**/*.{ts,tsx}", "app/entry.*.tsx"],
+    rules: { "react-refresh/only-export-components": "off" },
+  },
+  {
+    files: [
+      "app/server/**/*.ts",
+      "app/db/**/*.ts",
+      "app/middleware.ts",
+      "scripts/**/*.ts",
+      "*.config.ts",
+    ],
+    languageOptions: { globals: { ...globals.node } },
   },
 );

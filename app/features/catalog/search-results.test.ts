@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { courseSchema, RegionFilter } from "./course";
 import { combineSearchResults } from "./search-results";
 import { matchesRegion } from "./geography";
-import { parseAPICourse } from "./search-service";
+import { parseAPICourse } from "./opengolf";
 describe("search identity and geography", () => {
   it("uses richer display metadata without replacing local identity", () => {
     const local = courseSchema.parse({

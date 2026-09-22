@@ -5,8 +5,11 @@ supabase/.temp/
 .env
 .env.*
 !.env.example
+.import/
 
 node_modules/
 dist/
+build/
+.react-router/
 playwright-report/
 test-results/
