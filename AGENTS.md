@@ -44,7 +44,7 @@ Read the detailed contracts in [architecture](docs/architecture.md#compatibility
 - Round rows determine play counts; membership, personal order and published rankings are distinct concepts.
 - Logging an existing course or editing its count must not rewrite its personal rank.
 - Keep canonical course identities and mappings. A local course ID is not necessarily a database UUID.
-- Preserve per-account caches, legacy ownership rules and existing local order during hydration.
+- Preserve per-account caches and legacy ownership rules. When cloud memberships exist, their personal ranks are authoritative; local order is the fallback only when memberships are absent. Reject hydration that races a local edit.
 - Capture account ownership for asynchronous operations and recheck after awaits before later writes or commits. A user-ID-only check does not handle A → B → A switches.
 - Never turn cached play counts into invented round history.
 - Preserve hidden courses when reordering a search result. Geographic journal views stay read-only.

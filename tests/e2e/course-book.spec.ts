@@ -21,7 +21,7 @@ test("anonymous navigation, dialogs and mobile layout remain usable", async ({
     ),
   ).toBe(true);
 });
-test("email sign-in restores counts without rewriting ranks, and logging preserves order", async ({
+test("email sign-in restores cloud rank order without rewriting it, and logging preserves order", async ({
   page,
 }) => {
   const backend = await mockBackend(page);
@@ -39,23 +39,29 @@ test("email sign-in restores counts without rewriting ranks, and logging preserv
   ]);
   expect(backend.writes).toEqual([]);
   await expect(page.locator("#mylist .course")).toHaveText([
-    "Test Alpha Links",
     "Test Beta Links",
+    "Test Alpha Links",
   ]);
   await page.locator("#log").click();
   await page.locator("#modalsearch").fill("Test Alpha");
   await page.locator(".result").filter({ hasText: "Test Alpha Links" }).click();
+  expect(backend.searchRequests).toHaveLength(1);
+  expect(backend.searchRequests[0]?.searchParams.get("q")).toBe("Test Alpha");
+  expect(backend.searchRequests[0]?.searchParams.has("state")).toBe(false);
   await page.locator("#timesPlayed").fill("2");
   await page.locator("#confirmLog").click();
   await expect(page.locator("#modal")).toHaveCount(0);
-  await expect(page.locator("#mylist .count").first()).toContainText("3×");
+  const alpha = page.locator("#mylist .rankrow").filter({
+    has: page.getByText("Test Alpha Links", { exact: true }),
+  });
+  await expect(alpha.locator(".count")).toContainText("3×");
   expect(
     backend.writes.filter((write) => write.table === "user_courses"),
   ).toEqual([]);
   await page.reload();
   await expect(page.locator("#mylist .course")).toHaveText([
-    "Test Alpha Links",
     "Test Beta Links",
+    "Test Alpha Links",
   ]);
   await page.locator("#authOpen").click();
   await expect(page.locator("#myCourseCount")).toHaveText("0");
@@ -70,18 +76,22 @@ test("course details moves, count editing and confirmed final-round removal work
   await page.locator("#authPassword").fill("test-password");
   await page.locator("#authSubmit").click();
   await expect(page.locator("#myCourseCount")).toHaveText("2");
+  await expect(page.locator("#mylist .course")).toHaveText([
+    "Test Beta Links",
+    "Test Alpha Links",
+  ]);
   await page
     .locator("#mylist .course")
-    .filter({ hasText: "Test Beta Links" })
+    .filter({ hasText: "Test Alpha Links" })
     .click();
   await page.locator("#moveTop").click();
   await expect(page.locator("#mylist .course").first()).toHaveText(
-    "Test Beta Links",
+    "Test Alpha Links",
   );
   await expect
     .poll(
       () =>
-        backend.memberships.find((row) => row.course_id === "b")?.personal_rank,
+        backend.memberships.find((row) => row.course_id === "a")?.personal_rank,
     )
     .toBe(1);
   await page.locator("#mylist .course").first().click();
@@ -156,10 +166,22 @@ test("touch-handle drag reorders the full list and geographic filters remain rea
   await page.locator("#authPassword").fill("test-password");
   await page.locator("#authSubmit").click();
   await expect(page.locator("#myCourseCount")).toHaveText("3");
+  await expect(page.locator("#mylist .course")).toHaveText([
+    "Test Beta Links",
+    "Test Alpha Links",
+    "Hidden Course",
+  ]);
   await page.locator("#mysearch").fill("Test");
   await page.locator("#mysearch").blur();
-  const source = page.locator("#mylist .rankrow").last().locator(".handle"),
-    target = page.locator("#mylist .rankrow").first();
+  const source = page
+    .locator("#mylist .rankrow")
+    .filter({
+      has: page.getByText("Test Alpha Links", { exact: true }),
+    })
+    .locator(".handle");
+  const target = page.locator("#mylist .rankrow").filter({
+    has: page.getByText("Test Beta Links", { exact: true }),
+  });
   await source.scrollIntoViewIfNeeded();
   const from = await source.boundingBox(),
     to = await target.boundingBox();
@@ -170,32 +192,71 @@ test("touch-handle drag reorders the full list and geographic filters remain rea
     clientX: from.x + 5,
     clientY: from.y + 5,
   });
-  await page
-    .locator("body")
-    .dispatchEvent("pointermove", {
-      ...pointer,
-      clientX: to.x + 20,
-      clientY: to.y + 10,
-    });
+  await page.locator("body").dispatchEvent("pointermove", {
+    ...pointer,
+    clientX: to.x + 20,
+    clientY: to.y + 10,
+  });
   await expect(page.locator(".drag-ghost")).toBeVisible();
-  await page
-    .locator("body")
-    .dispatchEvent("pointerup", {
-      ...pointer,
-      buttons: 0,
-      clientX: to.x + 20,
-      clientY: to.y + 10,
-    });
+  await page.locator("body").dispatchEvent("pointerup", {
+    ...pointer,
+    buttons: 0,
+    clientX: to.x + 20,
+    clientY: to.y + 10,
+  });
   await page.locator("#mysearch").fill("");
   await page.locator("#mysearch").blur();
-  await expect(page.locator("#mylist .course")).toHaveText([
-    "Test Beta Links",
-    "Test Alpha Links",
-    "Hidden Course",
-  ]);
+  const reordered = ["Test Alpha Links", "Test Beta Links", "Hidden Course"];
+  await expect(page.locator("#mylist .course")).toHaveText(reordered);
+  await expect
+    .poll(() =>
+      backend.memberships
+        .filter((row) => row.user_id === "11111111-1111-4111-8111-111111111111")
+        .sort((a, b) => a.personal_rank - b.personal_rank)
+        .map((row) => row.course_id),
+    )
+    .toEqual(["a", "b", "c"]);
+  await page.reload();
+  await expect(page.locator("#mylist .course")).toHaveText(reordered);
   await page
     .locator("#mylistFilter")
     .getByRole("button", { name: "US", exact: true })
     .click();
   await expect(page.locator("#mylist .roundslink").first()).toBeDisabled();
+});
+
+test("course search uses the dataset fallback when the REST API is unavailable", async ({
+  page,
+}) => {
+  await mockBackend(page);
+  await page.route("https://api.opengolfapi.org/v1/courses/search?*", (route) =>
+    route.fulfill({ status: 503, body: "Unavailable" }),
+  );
+  await page.route(
+    "https://raw.githubusercontent.com/opengolfapi/data/main/opengolfapi-us.csv",
+    (route) =>
+      route.fulfill({
+        contentType: "text/csv",
+        body: "id,name,city,state,country\napi-alpha,Test Alpha Links,Detroit,MI,USA\n",
+      }),
+  );
+  await page.goto("./");
+  await page.locator("#authOpen").click();
+  await page.locator("#authIdentity").fill("golfer@example.com");
+  await page.locator("#authPassword").fill("test-password");
+  await page.locator("#authSubmit").click();
+  await expect(page.locator("#myCourseCount")).toHaveText("2");
+  await page.locator("#log").click();
+  await page.locator("#modalsearch").fill("Test Alpha");
+  await page.locator(".result").filter({ hasText: "Test Alpha Links" }).click();
+  await page.locator("#confirmLog").click();
+  await expect(page.locator("#modal")).toHaveCount(0);
+  await expect(
+    page
+      .locator("#mylist .rankrow")
+      .filter({
+        has: page.getByText("Test Alpha Links", { exact: true }),
+      })
+      .locator(".count"),
+  ).toContainText("2×");
 });

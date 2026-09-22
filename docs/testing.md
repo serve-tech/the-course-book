@@ -57,7 +57,7 @@ Mock external dependencies such as Supabase, external course search, storage or 
 | Course matching/search | Canonical identity survives richer labels, aliases and inconsistent geography |
 | Round logging/count/history | Correct count source; existing rank untouched; partial-write compensation; newest history retained on count reduction |
 | Async journal/service operations | Account switch, A → B → A generation change, hydration racing local edits, stale responses |
-| Personal ordering/filtering | Hidden memberships survive filtered moves; geographic filters remain read-only |
+| Personal ordering/filtering | Cloud membership ranks win over stale local order; explicit moves change and persist that order; hidden memberships survive filtered moves; geographic filters remain read-only |
 | Cache/persistence | Existing account isolation, legacy ownership, malformed or unavailable storage |
 | UI/navigation/styles | Existing flows at desktop/mobile sizes, accessible dialog controls, no unintended overflow |
 
@@ -79,6 +79,6 @@ It requires `SUPABASE_ACCESS_TOKEN` supplied securely and checks the project sel
 
 [Verify application](../.github/workflows/ci.yml) runs lint, typecheck, unit/script tests, build and browser tests on configured working branches and PRs. Failure artifacts retain browser traces under `test-results/`.
 
-[Deploy GitHub Pages](../.github/workflows/pages.yml) runs separately on `main` and publishes `dist/`. It runs lint, unit/script tests and build, but does not depend on the full verification workflow. Check PR verification before merging.
+[Deploy GitHub Pages](../.github/workflows/pages.yml) runs separately on `main` and publishes `dist/`. It runs lint, unit/script tests, build and browser tests before uploading the artifact. Its deploy job requires that build job to pass. Failed browser checks therefore block publication; their traces are saved as `pages-playwright-report`. Check PR verification before merging.
 
 Report checks actually run, their outcomes and any remaining gaps. Do not present old characterization tests as new React coverage or Chromium device emulation as a physical iOS test.

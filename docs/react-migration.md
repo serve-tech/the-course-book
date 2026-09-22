@@ -4,7 +4,11 @@ Baseline: `b4b34b4`. Implementation branch: `feat/react-typescript`. The rewrite
 
 **Implemented:** [PR #1](https://github.com/serve-tech/the-course-book/pull/1) merged on 2026-09-18 and the React app is deployed through GitHub Pages. These notes record migration compatibility and verification limits. For current working instructions, see [AGENTS.md](../AGENTS.md) and the [architecture guide](architecture.md).
 
-## Contracts retained
+## Subsequent ordering change
+
+On September 21, commit `0641ed9` made cloud membership ranks authoritative during hydration, with matching unit tests. This supersedes the original local-order precedence and fresh-device round-first ordering described below. The browser tests and current guides were aligned on September 22; see the [decision record](../.planning/decisions/2026-09-22-cloud-order-and-verification.md). Other entries below describe the original migration snapshot, not a fresh audit of later changes.
+
+## Contracts retained at the original migration
 
 - Email/password sign-in and signup confirmation, including the regression that sign-in reads the visible email rather than a hidden signup field.
 - Existing project, session storage, local account caches and legacy one-time cache ownership.

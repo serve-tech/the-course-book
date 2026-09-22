@@ -313,7 +313,7 @@ export class SearchService {
   constructor(
     private readonly catalog: CatalogService,
     private readonly fetcher: typeof fetch =
-      fetch,
+      (input, init) => globalThis.fetch(input, init),
   ) {}
 
   async search(
@@ -353,11 +353,16 @@ export class SearchService {
         error,
       );
 
-      rawCourses =
-        await this.fallbackSearch(
-          text,
-          signal,
+      try {
+        rawCourses = await this.fallbackSearch(text, signal);
+      } catch (fallbackError) {
+        signal.throwIfAborted();
+        console.warn("OpenGolfAPI dataset fallback failed", fallbackError);
+        throw new Error(
+          "Course search is temporarily unavailable. Please try again.",
+          { cause: fallbackError },
         );
+      }
     }
 
     signal.throwIfAborted();
