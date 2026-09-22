@@ -593,7 +593,6 @@ export class SearchService {
                 8000,
               ),
             ]),
-          },
         },
       );
 
