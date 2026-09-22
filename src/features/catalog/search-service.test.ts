@@ -99,4 +99,23 @@ describe("course discovery", () => {
       expect.objectContaining({ headers: { Accept: "text/csv" } }),
     );
   });
+  it("preserves cancellation when the dataset request fails after abort", async () => {
+    const controller = new AbortController();
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response(null, { status: 503 }))
+      .mockImplementationOnce(() => {
+        controller.abort();
+        return Promise.reject(new Error("Request interrupted"));
+      });
+    const report = vi
+      .spyOn(console, "warn")
+      .mockImplementation(() => undefined);
+    const service = new SearchService(fixture().catalog, fetcher);
+
+    await expect(
+      service.search("Alpha", 123, controller.signal),
+    ).rejects.toMatchObject({ name: "AbortError" });
+    expect(report).toHaveBeenCalledTimes(1);
+  });
 });

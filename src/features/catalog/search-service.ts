@@ -97,7 +97,12 @@ function parseCSV(
     index++
   ) {
     const character =
-      text.charAt(index);
+      text[index];
+
+    if (
+      character === undefined
+    )
+      continue;
 
     if (quoted) {
       if (
@@ -349,25 +354,13 @@ export class SearchService {
       );
 
       try {
-        rawCourses =
-          await this.fallbackSearch(
-            text,
-            signal,
-          );
+        rawCourses = await this.fallbackSearch(text, signal);
       } catch (fallbackError) {
         signal.throwIfAborted();
-
-        console.warn(
-          "OpenGolfAPI dataset fallback failed",
-          fallbackError,
-        );
-
+        console.warn("OpenGolfAPI dataset fallback failed", fallbackError);
         throw new Error(
           "Course search is temporarily unavailable. Please try again.",
-          {
-            cause:
-              fallbackError,
-          },
+          { cause: fallbackError },
         );
       }
     }
@@ -467,9 +460,6 @@ export class SearchService {
     const normalizedQuery =
       normalizeName(query);
 
-    if (!normalizedQuery)
-      return [];
-
     const terms =
       normalizedQuery
         .split(" ")
@@ -486,9 +476,6 @@ export class SearchService {
               "title",
             ),
           );
-
-        if (!name)
-          return false;
 
         return terms.every(
           (term) =>
