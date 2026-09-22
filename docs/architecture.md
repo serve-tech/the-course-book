@@ -9,7 +9,7 @@ coursebook.golf is a server-rendered React Router application. One Node process 
 | 1 | Tooling (pnpm, React Router 8, Vitest projects, ESLint), root document, placeholder index and `/healthz`, pure modules moved with tests, Clerk/React Router compatibility smoke test, documentation | landed |
 | 2 | Drizzle schema, migrations, seed catalog, docker-compose Postgres, database-backed tests, CI drift gate | landed |
 | 3 | Clerk middleware, user provisioning, authorization module, layout with auth bar/nav/toast, sign-in dialog | landed |
-| 4 | Server-side catalog, identity resolution and course search; Top 100 page | pending |
+| 4 | Server-side catalog, identity resolution and course search; Top 100 page | landed |
 | 5 | Journal transactions and action; My List page, dialogs, drag reorder | pending |
 | 6 | Friends page; delete `src/` and Supabase artifacts | pending |
 | 7 | Browser tests and complete CI | pending |
@@ -24,9 +24,9 @@ Anything marked pending is described below in its intended shape so work lands c
 | --- | --- | --- |
 | `app/root.tsx` | Document shell, stylesheet link, manifest, error boundary, Clerk provider and middleware export | [root.tsx](../app/root.tsx) |
 | `app/routes.ts`, `app/routes/` | Route configuration; per-route loaders, actions and pages | [routes.ts](../app/routes.ts), [healthz.ts](../app/routes/healthz.ts) |
-| `app/server/*.server.ts` | Environment validation, database handle, auth context and user provisioning, authorization rules, catalog and search, journal transactions, friends reads | [env.server.ts](../app/server/env.server.ts), [db.server.ts](../app/server/db.server.ts) |
+| `app/server/*.server.ts` | Environment validation, database handle, auth context and user provisioning, authorization rules, catalog and search, journal transactions, friends reads | [catalog.server.ts](../app/server/catalog.server.ts), [journal.server.ts](../app/server/journal.server.ts) |
 | `app/db/` | Drizzle schema, committed SQL migrations, seed data, migration runner | [schema.ts](../app/db/schema.ts), [migrate.ts](../app/db/migrate.ts) |
-| `app/features/catalog/` | Course model, identity and geography rules, ranking selectors, OpenGolfAPI parsing, Rankings page | [identity.ts](../app/features/catalog/identity.ts), [opengolf.ts](../app/features/catalog/opengolf.ts) |
+| `app/features/catalog/` | Course model, identity and geography rules, ranking selectors, OpenGolfAPI parsing, row-to-course views, Rankings page | [identity.ts](../app/features/catalog/identity.ts), [course-view.ts](../app/features/catalog/course-view.ts), [RankingsPage.tsx](../app/features/catalog/RankingsPage.tsx) |
 | `app/features/journal/` | Pure personal-order rules, My List page, details and count editing, drag reorder | [reorder.ts](../app/features/journal/reorder.ts) |
 | `app/features/rounds/` | Log Round and Add Course dialogs, round history | pending |
 | `app/features/friends/` | Member directory page | pending |

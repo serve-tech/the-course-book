@@ -1,40 +1,51 @@
-import { useState } from "react";
-import { useJournal, useServices } from "../../app/context";
+import { useEffect, useState } from "react";
+import { useFetcher } from "react-router";
 import { RankingFilter, type RankedCourse } from "./course";
 import { selectRankings } from "./ranking-selectors";
 import { stateName } from "./geography";
 import { StateSelect } from "../../shared/ui/StateSelect";
-import { AddRoundMode } from "../rounds/round-service";
-import { errorMessage } from "../../shared/lib/errors";
+
+/** The journal action's reply shape as seen by fetchers. */
+interface JournalReply {
+  ok?: boolean;
+  message?: string;
+  error?: string;
+}
+
+/**
+ * Published rankings with the member's progress. Data arrives from the
+ * route loader; "Add to my list" posts the `top` intent to the journal
+ * action and the route revalidates.
+ */
 export function RankingsPage({
-  active,
   rows,
+  played,
+  onList,
+  signedIn,
   selectedState,
   onState,
   notify,
   onSearchFocus,
+  openAuth,
 }: {
-  active: boolean;
   rows: readonly RankedCourse[];
+  played: Readonly<Record<string, number>>;
+  onList: readonly string[];
+  signedIn: boolean;
   selectedState: string;
   onState: (value: string) => void;
   notify: (message: string) => void;
   onSearchFocus: (focused: boolean) => void;
+  openAuth: () => void;
 }) {
-  const { rounds } = useServices(),
-    { account, user } = useJournal();
+  const fetcher = useFetcher<JournalReply>();
   const [filter, setFilter] = useState(RankingFilter.State),
     [query, setQuery] = useState(""),
-    [mine, setMine] = useState(false),
-    [adding, setAdding] = useState<string | null>(null);
-  const result = selectRankings(
-    rows,
-    filter,
-    selectedState,
-    query,
-    mine,
-    account.played,
-  );
+    [mine, setMine] = useState(false);
+  const listed = new Set(onList);
+  const adding =
+    fetcher.state !== "idle" ? fetcher.formData?.get("courseId") : null;
+  const result = selectRankings(rows, filter, selectedState, query, mine, played);
   const noState = filter === RankingFilter.State && !selectedState;
   const label =
     filter === RankingFilter.State
@@ -46,25 +57,27 @@ export function RankingsPage({
           : filter === RankingFilter.USA
             ? "USA - All"
             : "USA - Public") + " Top 100";
-  const add = async (id: string) => {
-    if (!user) {
+
+  useEffect(() => {
+    if (fetcher.state !== "idle" || !fetcher.data) return;
+    notify(fetcher.data.error ?? fetcher.data.message ?? "Done");
+  }, [fetcher.state, fetcher.data, notify]);
+
+  const add = (id: string) => {
+    if (!signedIn) {
       notify("Sign in to add courses");
+      openAuth();
       return;
     }
-    const course = rows.find((row) => row.course.id === id)?.course;
-    if (!course || adding) return;
-    setAdding(id);
-    try {
-      await rounds.log(course, 1, AddRoundMode.Top);
-      notify("Added to My List");
-    } catch (error) {
-      notify(errorMessage(error));
-    } finally {
-      setAdding(null);
-    }
+    if (adding) return;
+    void fetcher.submit(
+      { intent: "top", courseId: id },
+      { method: "post", action: "/journal" },
+    );
   };
+
   return (
-    <section id="top" className={"page" + (active ? " active" : "")}>
+    <section id="top" className="page active">
       <div className="hero">
         <div className="copy">
           <div className="eyebrow">The great courses</div>
@@ -118,30 +131,28 @@ export function RankingsPage({
           />
         </div>
         <div className="seg" id="topseg">
-          {[
-            [RankingFilter.World, "World"],
-            [RankingFilter.USA, "USA - All"],
-            [RankingFilter.Public, "USA - Public"],
-            [RankingFilter.State, stateName(selectedState)],
-          ].map(([value, label]) => (
+          {(
+            [
+              [RankingFilter.World, "World"],
+              [RankingFilter.USA, "USA - All"],
+              [RankingFilter.Public, "USA - Public"],
+              [RankingFilter.State, stateName(selectedState)],
+            ] as const
+          ).map(([value, text]) => (
             <button
               key={value}
               className={value === filter ? "active" : ""}
               data-f={value}
               onClick={() => {
-                if (
-                  value &&
-                  Object.values(RankingFilter).includes(value as RankingFilter)
-                )
-                  setFilter(value as RankingFilter);
+                setFilter(value);
                 setQuery("");
                 onSearchFocus(false);
               }}
             >
               {value === RankingFilter.State ? (
-                <span id="stateTopTabLabel">{label}</span>
+                <span id="stateTopTabLabel">{text}</span>
               ) : (
-                label
+                text
               )}
             </button>
           ))}
@@ -187,15 +198,15 @@ export function RankingsPage({
             Select a state to view its Best in State rankings.
           </div>
         ) : !result.complete ? (
-          <div className="empty">Loading rankings…</div>
+          <div className="empty">Rankings for this list are incomplete.</div>
         ) : (
           result.rows.map(({ course, rank }) => {
-            const onList = account.myList.includes(course.id);
+            const listedHere = listed.has(course.id);
             return (
               <div
                 className={
                   "row top-course-row" +
-                  ((account.played[course.id] ?? 0) > 0 ? " played-row" : "")
+                  ((played[course.id] ?? 0) > 0 ? " played-row" : "")
                 }
                 key={course.id}
                 data-course-id={course.id}
@@ -208,12 +219,12 @@ export function RankingsPage({
                 <div>
                   <button
                     className="top-list-action"
-                    disabled={onList || adding === course.id}
+                    disabled={listedHere || adding === course.id}
                     onClick={() => {
-                      void add(course.id);
+                      add(course.id);
                     }}
                   >
-                    {onList
+                    {listedHere
                       ? "On my list"
                       : adding === course.id
                         ? "Adding…"
