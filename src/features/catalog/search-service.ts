@@ -353,15 +353,11 @@ export class SearchService {
         error,
       );
 
-      try {
-        rawCourses =
-          await this.fallbackSearch(
-            text,
-            signal,
-          );
-      } catch (fallbackError) {
-        throw fallbackError;
-      }
+      rawCourses =
+        await this.fallbackSearch(
+          text,
+          signal,
+        );
     }
 
     signal.throwIfAborted();
