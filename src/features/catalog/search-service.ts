@@ -20,6 +20,9 @@ const rawSchema =
 type RawCourse =
   z.infer<typeof rawSchema>;
 
+const FALLBACK_DATA_URL =
+  "https://raw.githubusercontent.com/opengolfapi/data/main/opengolfapi-us.csv";
+
 const string = (
   row: RawCourse,
   ...keys: string[]
@@ -77,6 +80,105 @@ export function extractCourses(
       candidates.find(
         Array.isArray,
       ) ?? [],
+    );
+}
+
+function parseCSV(
+  text: string,
+): RawCourse[] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = "";
+  let quoted = false;
+
+  for (
+    let index = 0;
+    index < text.length;
+    index++
+  ) {
+    const character =
+      text[index];
+
+    if (quoted) {
+      if (
+        character === '"'
+      ) {
+        if (
+          text[index + 1] ===
+          '"'
+        ) {
+          field += '"';
+          index++;
+        } else {
+          quoted = false;
+        }
+      } else {
+        field += character;
+      }
+
+      continue;
+    }
+
+    if (
+      character === '"'
+    ) {
+      quoted = true;
+    } else if (
+      character === ","
+    ) {
+      row.push(field);
+      field = "";
+    } else if (
+      character === "\n"
+    ) {
+      row.push(field);
+      rows.push(row);
+      row = [];
+      field = "";
+    } else if (
+      character !== "\r"
+    ) {
+      field += character;
+    }
+  }
+
+  if (
+    field.length > 0 ||
+    row.length > 0
+  ) {
+    row.push(field);
+    rows.push(row);
+  }
+
+  const headers =
+    rows.shift() ?? [];
+
+  return rows
+    .filter(
+      (values) =>
+        values.some(
+          (value) =>
+            value.length > 0,
+        ),
+    )
+    .map(
+      (values) => {
+        const record: RawCourse =
+          {};
+
+        headers.forEach(
+          (
+            header,
+            index,
+          ) => {
+            record[header] =
+              values[index] ??
+              "";
+          },
+        );
+
+        return record;
+      },
     );
 }
 
@@ -195,6 +297,14 @@ export function parseAPICourse(
 }
 
 export class SearchService {
+  private fallbackCourses:
+    | RawCourse[]
+    | null = null;
+
+  private fallbackPromise:
+    | Promise<RawCourse[]>
+    | null = null;
+
   constructor(
     private readonly catalog: CatalogService,
     private readonly fetcher: typeof fetch =
@@ -214,29 +324,14 @@ export class SearchService {
 
     signal.throwIfAborted();
 
-    /*
-     * OpenGolfAPI is the only discovery source.
-     *
-     * Do not query the local Course Book catalog here.
-     * The Course Book catalog is only used after an API
-     * result exists, to determine whether that API course
-     * corresponds to an existing Course Book identity.
-     *
-     * There is intentionally ONE request for a normal
-     * course search. We do not make a second request with
-     * state=MI, because the Log a Round search has no
-     * Michigan filter.
-     *
-     * A state filter should only be added by a caller that
-     * explicitly asks for one.
-     */
     const url =
       "https://api.opengolfapi.org/v1/courses/search?q=" +
       encodeURIComponent(text) +
       "&limit=50&_cb=" +
       String(session);
 
-    let rawCourses: RawCourse[];
+    let rawCourses:
+      RawCourse[];
 
     try {
       rawCourses =
@@ -249,26 +344,47 @@ export class SearchService {
         throw error;
 
       console.warn(
-        "OpenGolfAPI course search failed",
+        "OpenGolfAPI REST course search failed; trying official dataset fallback",
         error,
       );
 
-      /*
-       * Do not convert an API failure into an empty
-       * search result. An empty result means that the
-       * API successfully searched and found nothing.
-       *
-       * Preserve the original error as the cause so
-       * linting and debugging retain the upstream failure.
-       */
-      throw new Error(
-        "Course search is temporarily unavailable. Please try again.",
-        { cause: error },
-      );
+      try {
+        rawCourses =
+          await this.fallbackSearch(
+            text,
+            signal,
+          );
+      } catch (fallbackError) {
+        if (signal.aborted)
+          throw fallbackError;
+
+        console.warn(
+          "OpenGolfAPI dataset fallback failed",
+          fallbackError,
+        );
+
+        throw new Error(
+          "Course search is temporarily unavailable. Please try again.",
+          {
+            cause:
+              fallbackError,
+          },
+        );
+      }
     }
 
     signal.throwIfAborted();
 
+    return this.buildResults(
+      rawCourses,
+      text,
+    );
+  }
+
+  private buildResults(
+    rawCourses: RawCourse[],
+    text: string,
+  ): SearchResult[] {
     const courses =
       new Map<
         string,
@@ -280,21 +396,6 @@ export class SearchService {
         const apiCourse =
           parseAPICourse(raw);
 
-        /*
-         * The API controls discovery.
-         *
-         * This lookup does NOT decide whether the API
-         * result should exist in the search results.
-         *
-         * It only answers:
-         *
-         * "Is this API course confidently the same
-         * physical course as an existing Course Book
-         * course?"
-         *
-         * resolveAPICourse() is deliberately conservative
-         * about same-name courses such as Cherry Creek.
-         */
         const ranked =
           resolveAPICourse(
             this.catalog.all(),
@@ -305,37 +406,21 @@ export class SearchService {
           ranked
             ? {
                 ...ranked,
-
-                /*
-                 * Preserve useful API location data when
-                 * the existing Course Book record is missing
-                 * one of those fields.
-                 */
                 city:
                   apiCourse.city ||
                   ranked.city,
-
                 state:
                   apiCourse.state ||
                   ranked.state,
-
                 country:
                   apiCourse.country ||
                   ranked.country,
-
                 location:
                   apiCourse.location ||
                   ranked.location,
               }
             : apiCourse;
 
-        /*
-         * If the API result confidently maps to an existing
-         * Course Book course, the Course Book ID becomes the
-         * identity.
-         *
-         * Otherwise the API identity remains untouched.
-         */
         if (!courses.has(course.id))
           courses.set(
             course.id,
@@ -371,6 +456,122 @@ export class SearchService {
       }));
   }
 
+  private async fallbackSearch(
+    query: string,
+    signal: AbortSignal,
+  ): Promise<RawCourse[]> {
+    const courses =
+      await this.loadFallbackCourses(
+        signal,
+      );
+
+    const normalizedQuery =
+      normalizeName(query);
+
+    if (!normalizedQuery)
+      return [];
+
+    const terms =
+      normalizedQuery
+        .split(" ")
+        .filter(Boolean);
+
+    return courses
+      .filter((raw) => {
+        const name =
+          normalizeName(
+            string(
+              raw,
+              "name",
+              "course_name",
+              "title",
+            ),
+          );
+
+        if (!name)
+          return false;
+
+        return terms.every(
+          (term) =>
+            name.includes(term),
+        );
+      })
+      .slice(0, 50);
+  }
+
+  private async loadFallbackCourses(
+    signal: AbortSignal,
+  ): Promise<RawCourse[]> {
+    if (
+      this.fallbackCourses
+    )
+      return this.fallbackCourses;
+
+    if (
+      !this.fallbackPromise
+    ) {
+      this.fallbackPromise =
+        this.fetcher(
+          FALLBACK_DATA_URL,
+          {
+            headers: {
+              Accept:
+                "text/csv",
+            },
+            cache:
+              "no-store",
+            signal:
+              AbortSignal.any([
+                signal,
+                AbortSignal.timeout(
+                  15000,
+                ),
+              ]),
+          },
+        )
+          .then(
+            async (
+              response,
+            ) => {
+              if (
+                !response.ok
+              )
+                throw new Error(
+                  "OpenGolfAPI dataset " +
+                  String(
+                    response.status,
+                  ),
+                );
+
+              const text =
+                await response.text();
+
+              return parseCSV(
+                text,
+              );
+            },
+          )
+          .then(
+            (courses) => {
+              this.fallbackCourses =
+                courses;
+
+              return courses;
+            },
+          )
+          .catch(
+            (error) => {
+              this.fallbackPromise =
+                null;
+
+              throw error;
+            },
+          );
+    }
+
+    return this.fallbackPromise;
+  }
+
   private async endpoint(
     url: string,
     signal: AbortSignal,
@@ -392,6 +593,7 @@ export class SearchService {
                 8000,
               ),
             ]),
+          },
         },
       );
 
