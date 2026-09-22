@@ -97,7 +97,7 @@ function parseCSV(
     index++
   ) {
     const character =
-      text[index];
+      text.charAt(index);
 
     if (quoted) {
       if (
@@ -355,8 +355,7 @@ export class SearchService {
             signal,
           );
       } catch (fallbackError) {
-        if (signal.aborted)
-          throw fallbackError;
+        signal.throwIfAborted();
 
         console.warn(
           "OpenGolfAPI dataset fallback failed",

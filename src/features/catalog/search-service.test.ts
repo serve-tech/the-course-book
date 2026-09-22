@@ -68,7 +68,7 @@ describe("course discovery", () => {
   });
   it("searches and caches the CSV fallback when the REST API fails", async () => {
     const csv =
-      'id,name,city,state,country\r\nalpha,"Alpha, \"\"Old\"\" Links",Detroit,MI,USA\r\nbeta,Beta Links,Detroit,MI,USA\r\n';
+      'id,name,city,state,country\r\nalpha,"Alpha, ""Old"" Links",Detroit,MI,USA\r\nbeta,Beta Links,Detroit,MI,USA\r\n';
     const fetcher = vi
       .fn<typeof fetch>()
       .mockResolvedValueOnce(new Response(null, { status: 503 }))
