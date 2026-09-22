@@ -1,7 +1,16 @@
+import { sql } from "drizzle-orm";
+import { db } from "../server/db.server";
+
 /**
- * Liveness probe for Render's health check. The database round-trip is added
- * together with the schema so a failed connection reports 503.
+ * Health probe for Render. Reports 503 when the database round-trip fails so
+ * a broken connection string never passes a deploy.
  */
-export function loader(): Response {
-  return Response.json({ ok: true });
+export async function loader(): Promise<Response> {
+  try {
+    await db.execute(sql`select 1`);
+    return Response.json({ ok: true });
+  } catch (error) {
+    console.error("Health check failed", error);
+    return Response.json({ ok: false }, { status: 503 });
+  }
 }

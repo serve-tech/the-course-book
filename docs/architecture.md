@@ -8,7 +8,7 @@ coursebook.golf is a server-rendered React Router application. One Node process 
 | --- | --- | --- |
 | 1 | Tooling (pnpm, React Router 8, Vitest projects, ESLint), root document, placeholder index and `/healthz`, pure modules moved with tests, Clerk/React Router compatibility smoke test, documentation | landed |
 | 2 | Drizzle schema, migrations, seed catalog, docker-compose Postgres, database-backed tests, CI drift gate | landed |
-| 3 | Clerk middleware, user provisioning, authorization module, layout with auth bar/nav/toast, sign-in dialog | pending |
+| 3 | Clerk middleware, user provisioning, authorization module, layout with auth bar/nav/toast, sign-in dialog | landed |
 | 4 | Server-side catalog, identity resolution and course search; Top 100 page | pending |
 | 5 | Journal transactions and action; My List page, dialogs, drag reorder | pending |
 | 6 | Friends page; delete `src/` and Supabase artifacts | pending |
@@ -30,7 +30,7 @@ Anything marked pending is described below in its intended shape so work lands c
 | `app/features/journal/` | Pure personal-order rules, My List page, details and count editing, drag reorder | [reorder.ts](../app/features/journal/reorder.ts) |
 | `app/features/rounds/` | Log Round and Add Course dialogs, round history | pending |
 | `app/features/friends/` | Member directory page | pending |
-| `app/features/auth/` | Username rule, sign-in dialog wrapping Clerk components | [username.ts](../app/features/auth/username.ts) |
+| `app/features/auth/` | Username rule, account dialog wrapping Clerk components | [username.ts](../app/features/auth/username.ts), [AuthDialog.tsx](../app/features/auth/AuthDialog.tsx) |
 | `app/shared/` | Modal, StateSelect, SafeStorage, geolocation, error formatting, geographic data, `legacy.css` | [Modal.tsx](../app/shared/ui/Modal.tsx), [storage.ts](../app/shared/lib/storage.ts) |
 
 Feature folders are the organizational unit; avoid global `components/` or `services/` folders that scatter one feature across the project. Server-only files end in `.server.ts` so the framework refuses to bundle them for the browser.
@@ -98,7 +98,16 @@ The seed migration (`0001_seed_catalog.sql`) carries the retired project's publi
 
 ## Authentication and authorization
 
-Clerk holds credentials, Google sign-in, email verification and sessions. The dashboard requires a username, first name and email; the product's stricter username rule is re-checked in `provisionUser` (`app/features/auth/username.ts`). `authz.server.ts` states every rule in code with tests: anonymous reads are limited to the index and Top 100; writes only affect the context user; member lists are readable by any signed-in member. The production Clerk instance needs DNS records on coursebook.golf and the project's own Google OAuth client.
+Clerk holds credentials, Google sign-in, email verification and sessions. [auth.server.ts](../app/server/auth.server.ts) provisions the `users` row on each signed-in request (cached for a minute per identity) and exposes `getAppUser` and `requireUser`; [authz.server.ts](../app/server/authz.server.ts) states the access rules with tests: anonymous reads are limited to the index and Top 100; writes only affect the context user; member lists are readable by any signed-in member; other members are exposed only as username and display name.
+
+Clerk dashboard configuration the code assumes:
+
+- User & authentication: username required, first name required, email required, Google enabled. The product's stricter username rule (`^[A-Za-z0-9_]{3,24}$`) is re-checked by `provisionUser`, which answers 403 for a violating account rather than creating it.
+- Sessions, customize session token: `{"username": "{{user.username}}", "email": "{{user.primary_email_address}}", "name": "{{user.first_name}}", "image_url": "{{user.image_url}}"}`. Without it, provisioning fetches the user from the Backend API once per request.
+- Environment: `CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` are read by `env.server.ts` and passed explicitly to the middleware and root loader.
+- Production instance: DNS records on coursebook.golf and the project's own Google OAuth client.
+
+The account dialog ([AuthDialog.tsx](../app/features/auth/AuthDialog.tsx)) keeps the legacy modal chrome and ids and renders Clerk's `SignIn`/`SignUp` with hash routing; `/sign-in/*` and `/sign-up/*` exist for OAuth callbacks and direct links. Browser preferences use [use-preference.ts](../app/shared/lib/use-preference.ts), a `useSyncExternalStore` wrapper over `SafeStorage`, so hydration renders the empty server value without effects that set state.
 
 ## Types and boundaries
 

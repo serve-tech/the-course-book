@@ -1,12 +1,19 @@
+import { useShell } from "../shared/ui/shell";
+
 /**
- * Placeholder index route. The journal, rankings and friends pages replace it
- * once the server-side data layer exists.
+ * Placeholder index route inside the shell. The journal page replaces it
+ * once the journal transactions exist.
  */
 export default function Home() {
+  const shell = useShell();
   return (
-    <main className="page active">
-      <h1>coursebook.golf</h1>
-      <p>The rebuilt application is under construction on this branch.</p>
-    </main>
+    <section className="page active" id="mine">
+      <h1>Your Top 100 journey.</h1>
+      <p>
+        {shell.selectedState
+          ? "Selected state: " + shell.selectedState
+          : "No state selected."}
+      </p>
+    </section>
   );
 }

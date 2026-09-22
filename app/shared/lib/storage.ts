@@ -51,3 +51,11 @@ export class SafeStorage {
     return this.write(key, JSON.stringify(value));
   }
 }
+
+/**
+ * Browser preference storage. Call only from effects or event handlers; it
+ * touches `window.localStorage`, which does not exist during server rendering.
+ */
+export function preferences(): SafeStorage {
+  return new SafeStorage(window.localStorage);
+}

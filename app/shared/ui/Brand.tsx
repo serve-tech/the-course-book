@@ -1,8 +1,9 @@
+/** Site header with the book-and-ball mark. Markup and classes match legacy.css. */
 export function Brand() {
   return (
     <header>
       <div className="brand">
-        <div className="mark bookmark" aria-label="The Course Book">
+        <div className="mark bookmark" aria-label="coursebook.golf">
           <svg
             viewBox="0 0 96 76"
             xmlns="http://www.w3.org/2000/svg"
@@ -42,7 +43,7 @@ export function Brand() {
           </svg>
         </div>
         <b>
-          The Course <span>Book</span>
+          coursebook<span>.golf</span>
         </b>
       </div>
     </header>

@@ -39,6 +39,16 @@ export default tseslint.config(
         "error",
         { allowNumber: true },
       ],
+      // React Router's convention is to throw Response and data() results.
+      "@typescript-eslint/only-throw-error": [
+        "error",
+        {
+          allow: [
+            { from: "lib", name: "Response" },
+            { from: "package", package: "react-router", name: "DataWithResponseInit" },
+          ],
+        },
+      ],
     },
   },
   {

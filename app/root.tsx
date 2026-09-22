@@ -1,3 +1,5 @@
+import { ClerkProvider } from "@clerk/react-router";
+import { rootAuthLoader } from "@clerk/react-router/server";
 import {
   isRouteErrorResponse,
   Links,
@@ -7,7 +9,17 @@ import {
   ScrollRestoration,
 } from "react-router";
 import type { Route } from "./+types/root";
+import { clerkEnv } from "./server/env.server";
 import legacyStylesheet from "./shared/styles/legacy.css?url";
+
+export { middleware } from "./middleware";
+
+/** Clerk needs the auth state in the root loader data to hydrate the provider. */
+export function loader(args: Route.LoaderArgs) {
+  const { CLERK_PUBLISHABLE_KEY: publishableKey, CLERK_SECRET_KEY: secretKey } =
+    clerkEnv();
+  return rootAuthLoader(args, { publishableKey, secretKey });
+}
 
 export const links: Route.LinksFunction = () => [
   { rel: "stylesheet", href: legacyStylesheet },
@@ -44,8 +56,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function App() {
-  return <Outlet />;
+export default function App({ loaderData }: Route.ComponentProps) {
+  return (
+    <ClerkProvider loaderData={loaderData}>
+      <Outlet />
+    </ClerkProvider>
+  );
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
