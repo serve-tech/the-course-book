@@ -56,6 +56,6 @@ docker build -t coursebook-golf:local .
 docker run --rm -p 3000:3000 -e PORT=3000 -e DATABASE_URL=... -e CLERK_PUBLISHABLE_KEY=... -e CLERK_SECRET_KEY=... coursebook-golf:local
 ```
 
-The original data lives in the retired Supabase project until it is exported by the maintainer and imported into Postgres by `scripts/import-supabase.ts` (see the [cutover plan](docs/architecture.md#cutover)). The Supabase project is never modified by this repository and is paused, not deleted, after cutover.
+The original data lives in the retired Supabase project until it is exported by the maintainer and imported into Postgres with `pnpm import:supabase` (see the [cutover runbook](docs/cutover.md)). The Supabase project is never modified by this repository and is paused, not deleted, after cutover.
 
 Historical reports: [Supabase port](docs/port-2026-09-17.md), [Incubator migration](docs/incubator-migration-2026-09-18.md), [React migration notes](docs/react-migration.md). They describe retired infrastructure and are not current instructions.

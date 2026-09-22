@@ -14,7 +14,7 @@ coursebook.golf is a server-rendered React Router application. One Node process 
 | 6 | Friends page; delete `src/` and Supabase artifacts | landed |
 | 7 | Browser tests and complete CI | landed |
 | 8 | Dockerfile, `render.yaml`, first deploy from the branch | image and Blueprint landed; first deploy awaits approval |
-| 9 | Data import, cutover runbook, domain | pending |
+| 9 | Data import, cutover runbook, domain | import script and [runbook](cutover.md) landed; execution pending |
 
 Anything marked pending is described below in its intended shape so work lands consistently. Do not treat a pending module as existing.
 
@@ -121,4 +121,4 @@ Reuse the existing markup, element ids, shared primitives and `legacy.css`. The 
 
 ## Cutover
 
-The retired Supabase project is read-only for this repository. Cutover order: create the Clerk production instance; rehearse `scripts/import-supabase.ts` against a snapshot; pause the Supabase project; import and verify counts; point coursebook.golf at Render; switch `render.yaml` to `main`; merge; remove `pages.yml` and disable Pages. Keep Supabase paused, not deleted, until a Render database restore has been tested.
+The retired Supabase project is read-only for this repository. [cutover.md](cutover.md) is the step-by-step runbook: Render staging from the branch, the Clerk production instance, an import rehearsal with `pnpm import:supabase --dry-run` (planning rules in `scripts/import/plan.ts`, tested), the freeze and real import, the domain, and the switch of `render.yaml` and the deploy to `main`. Keep Supabase paused, not deleted, until a Render database restore has been tested.

@@ -22,6 +22,7 @@
     "db:check": "drizzle-kit check",
     "db:migrate": "node --env-file-if-exists=.env app/db/migrate.ts",
     "seed:build": "tsx scripts/build-seed.ts",
+    "import:supabase": "tsx scripts/import-supabase.ts",
     "format": "prettier --write app scripts tests/e2e package.json tsconfig.json vite.config.ts vitest.config.ts playwright.config.ts react-router.config.ts eslint.config.js"
   },
   "dependencies": {
