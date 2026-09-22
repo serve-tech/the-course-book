@@ -55,6 +55,8 @@ For a new round-related interaction:
 5. Inject any new dependency in `app/services.ts`; use the existing provider in the UI.
 6. Add service regressions and a browser scenario for user-visible behavior.
 
+Course discovery uses the OpenGolfAPI search endpoint, falling back to its official CSV dataset if that request fails. The local catalog resolves identities after discovery; it does not supply extra search results. Preserve cancellation and visible errors when both external sources fail. See `search-service.test.ts` and the browser fallback scenario.
+
 For a catalog filter, extend the existing pure selectors and their data-driven tests before adding controls. Do not add a new data store to hold a filtered copy.
 
 For a genuinely new feature, create a feature folder and only the modules it needs. A read-only component does not automatically need a service class and repository interface of its own.

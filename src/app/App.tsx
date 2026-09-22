@@ -616,7 +616,7 @@ export function App() {
                 "2-digit",
             },
           )}{" "}
-          · v180
+          · v181
         </span>
       </footer>
 

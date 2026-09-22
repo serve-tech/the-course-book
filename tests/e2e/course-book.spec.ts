@@ -224,3 +224,39 @@ test("touch-handle drag reorders the full list and geographic filters remain rea
     .click();
   await expect(page.locator("#mylist .roundslink").first()).toBeDisabled();
 });
+
+test("course search uses the dataset fallback when the REST API is unavailable", async ({
+  page,
+}) => {
+  await mockBackend(page);
+  await page.route("https://api.opengolfapi.org/v1/courses/search?*", (route) =>
+    route.fulfill({ status: 503, body: "Unavailable" }),
+  );
+  await page.route(
+    "https://raw.githubusercontent.com/opengolfapi/data/main/opengolfapi-us.csv",
+    (route) =>
+      route.fulfill({
+        contentType: "text/csv",
+        body: "id,name,city,state,country\napi-alpha,Test Alpha Links,Detroit,MI,USA\n",
+      }),
+  );
+  await page.goto("./");
+  await page.locator("#authOpen").click();
+  await page.locator("#authIdentity").fill("golfer@example.com");
+  await page.locator("#authPassword").fill("test-password");
+  await page.locator("#authSubmit").click();
+  await expect(page.locator("#myCourseCount")).toHaveText("2");
+  await page.locator("#log").click();
+  await page.locator("#modalsearch").fill("Test Alpha");
+  await page.locator(".result").filter({ hasText: "Test Alpha Links" }).click();
+  await page.locator("#confirmLog").click();
+  await expect(page.locator("#modal")).toHaveCount(0);
+  await expect(
+    page
+      .locator("#mylist .rankrow")
+      .filter({
+        has: page.getByText("Test Alpha Links", { exact: true }),
+      })
+      .locator(".count"),
+  ).toContainText("2×");
+});

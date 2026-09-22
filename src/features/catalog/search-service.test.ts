@@ -66,4 +66,37 @@ describe("course discovery", () => {
     ).rejects.toThrow("Course search is temporarily unavailable");
     expect(report).toHaveBeenCalled();
   });
+  it("searches and caches the CSV fallback when the REST API fails", async () => {
+    const csv =
+      'id,name,city,state,country\r\nalpha,"Alpha, \"\"Old\"\" Links",Detroit,MI,USA\r\nbeta,Beta Links,Detroit,MI,USA\r\n';
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response(null, { status: 503 }))
+      .mockResolvedValueOnce(new Response(csv))
+      .mockResolvedValueOnce(new Response(null, { status: 503 }));
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const service = new SearchService(fixture().catalog, fetcher);
+
+    const first = await service.search(
+      "Alpha",
+      123,
+      new AbortController().signal,
+    );
+    const second = await service.search(
+      "Beta",
+      124,
+      new AbortController().signal,
+    );
+
+    expect(first.map((result) => result.course.name)).toEqual([
+      'Alpha, "Old" Links',
+    ]);
+    expect(second.map((result) => result.course.name)).toEqual(["Beta Links"]);
+    expect(fetcher).toHaveBeenCalledTimes(3);
+    expect(fetcher).toHaveBeenNthCalledWith(
+      2,
+      "https://raw.githubusercontent.com/opengolfapi/data/main/opengolfapi-us.csv",
+      expect.objectContaining({ headers: { Accept: "text/csv" } }),
+    );
+  });
 });
