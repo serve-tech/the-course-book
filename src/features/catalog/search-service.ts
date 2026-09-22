@@ -99,6 +99,11 @@ function parseCSV(
     const character =
       text[index];
 
+    if (
+      character === undefined
+    )
+      continue;
+
     if (quoted) {
       if (
         character === '"'
@@ -355,21 +360,7 @@ export class SearchService {
             signal,
           );
       } catch (fallbackError) {
-        if (signal.aborted)
-          throw fallbackError;
-
-        console.warn(
-          "OpenGolfAPI dataset fallback failed",
-          fallbackError,
-        );
-
-        throw new Error(
-          "Course search is temporarily unavailable. Please try again.",
-          {
-            cause:
-              fallbackError,
-          },
-        );
+        throw fallbackError;
       }
     }
 
@@ -468,9 +459,6 @@ export class SearchService {
     const normalizedQuery =
       normalizeName(query);
 
-    if (!normalizedQuery)
-      return [];
-
     const terms =
       normalizedQuery
         .split(" ")
@@ -487,9 +475,6 @@ export class SearchService {
               "title",
             ),
           );
-
-        if (!name)
-          return false;
 
         return terms.every(
           (term) =>
@@ -560,7 +545,7 @@ export class SearchService {
             },
           )
           .catch(
-            (error) => {
+            (error: unknown) => {
               this.fallbackPromise =
                 null;
 
