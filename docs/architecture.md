@@ -10,7 +10,7 @@ coursebook.golf is a server-rendered React Router application. One Node process 
 | 2 | Drizzle schema, migrations, seed catalog, docker-compose Postgres, database-backed tests, CI drift gate | landed |
 | 3 | Clerk middleware, user provisioning, authorization module, layout with auth bar/nav/toast, sign-in dialog | landed |
 | 4 | Server-side catalog, identity resolution and course search; Top 100 page | landed |
-| 5 | Journal transactions and action; My List page, dialogs, drag reorder | pending |
+| 5 | Journal transactions and action; My List page, dialogs, drag reorder | landed |
 | 6 | Friends page; delete `src/` and Supabase artifacts | pending |
 | 7 | Browser tests and complete CI | pending |
 | 8 | Dockerfile, `render.yaml`, first deploy from the branch | pending |
@@ -27,8 +27,8 @@ Anything marked pending is described below in its intended shape so work lands c
 | `app/server/*.server.ts` | Environment validation, database handle, auth context and user provisioning, authorization rules, catalog and search, journal transactions, friends reads | [catalog.server.ts](../app/server/catalog.server.ts), [journal.server.ts](../app/server/journal.server.ts) |
 | `app/db/` | Drizzle schema, committed SQL migrations, seed data, migration runner | [schema.ts](../app/db/schema.ts), [migrate.ts](../app/db/migrate.ts) |
 | `app/features/catalog/` | Course model, identity and geography rules, ranking selectors, OpenGolfAPI parsing, row-to-course views, Rankings page | [identity.ts](../app/features/catalog/identity.ts), [course-view.ts](../app/features/catalog/course-view.ts), [RankingsPage.tsx](../app/features/catalog/RankingsPage.tsx) |
-| `app/features/journal/` | Pure personal-order rules, My List page, details and count editing, drag reorder | [reorder.ts](../app/features/journal/reorder.ts) |
-| `app/features/rounds/` | Log Round and Add Course dialogs, round history | pending |
+| `app/features/journal/` | Pure personal-order rules, My List page, details and count editing, drag reorder, the journal fetcher hook | [reorder.ts](../app/features/journal/reorder.ts), [JournalPage.tsx](../app/features/journal/JournalPage.tsx), [use-journal-fetcher.ts](../app/features/journal/use-journal-fetcher.ts) |
+| `app/features/rounds/` | Log Round and Add Course dialogs, round history | [LogRoundDialog.tsx](../app/features/rounds/LogRoundDialog.tsx) |
 | `app/features/friends/` | Member directory page | pending |
 | `app/features/auth/` | Username rule, account dialog wrapping Clerk components | [username.ts](../app/features/auth/username.ts), [AuthDialog.tsx](../app/features/auth/AuthDialog.tsx) |
 | `app/shared/` | Modal, StateSelect, SafeStorage, geolocation, error formatting, geographic data, `legacy.css` | [Modal.tsx](../app/shared/ui/Modal.tsx), [storage.ts](../app/shared/lib/storage.ts) |

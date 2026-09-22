@@ -21,7 +21,8 @@ export function testDatabase() {
  */
 export async function resetMemberData(db: Database): Promise<void> {
   await db.execute(sql`TRUNCATE TABLE rounds, user_courses`);
-  await db.execute(sql`DELETE FROM courses WHERE is_custom`);
+  // Member-created courses go before users: deleting a user nulls created_by.
+  await db.execute(sql`DELETE FROM courses WHERE is_custom OR created_by IS NOT NULL`);
   await db.execute(sql`DELETE FROM users`);
 }
 

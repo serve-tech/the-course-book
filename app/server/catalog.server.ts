@@ -15,7 +15,7 @@ import {
   rankSummaries,
   rankedCourses,
 } from "../features/catalog/course-view";
-import { countryFromLocation } from "../features/catalog/geography";
+import { countryFromLocation, stateCode } from "../features/catalog/geography";
 import { aliases, canonicalize } from "../features/catalog/identity";
 
 /**
@@ -98,6 +98,14 @@ async function courseByStableId(
   return row?.id;
 }
 
+/** First location segment as the city, unless it is really a state or country. */
+function cityFromParts(parts: readonly string[], country: string): string | null {
+  const [first] = parts;
+  if (!first || parts.length < 2) return null;
+  if (stateCode(first) || normalizeName(first) === normalizeName(country)) return null;
+  return first;
+}
+
 /** Ensure a course row exists by id; 404 data response otherwise. */
 export async function requireCourse(
   executor: Executor,
@@ -177,7 +185,7 @@ export async function findOrCreateCourse(
     .values({
       name: course.name,
       nameKey: key,
-      city: course.city || (course.state || parts.length < 2 ? null : parts[0]),
+      city: course.city || cityFromParts(parts, wantedCountry),
       state:
         course.state ||
         (wantedCountry === "USA" && last.length === 2 ? last.toUpperCase() : null),

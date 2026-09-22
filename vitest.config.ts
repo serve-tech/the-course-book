@@ -1,4 +1,11 @@
+import { existsSync } from "node:fs";
 import { defineConfig } from "vitest/config";
+
+if (existsSync(".env")) process.loadEnvFile(".env");
+
+const TEST_DATABASE_URL =
+  process.env["DATABASE_URL_TEST"] ??
+  "postgres://coursebook:coursebook@localhost:5433/coursebook_test";
 
 /**
  * Three projects:
@@ -34,6 +41,9 @@ export default defineConfig({
           include: ["app/**/*.db.test.ts"],
           globalSetup: ["app/test/global-setup.ts"],
           fileParallelism: false,
+          // Route modules use the process-wide database handle, so point it
+          // at the test database for this project.
+          env: { DATABASE_URL: TEST_DATABASE_URL, DATABASE_URL_TEST: TEST_DATABASE_URL },
         },
       },
     ],
