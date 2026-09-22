@@ -17,6 +17,8 @@ Use Node 24 (`.nvmrc`) and pnpm (`packageManager` in `package.json`).
 nvm use
 pnpm install --frozen-lockfile
 cp .env.example .env
+docker compose up -d db
+pnpm db:migrate
 pnpm dev
 ```
 

@@ -20,10 +20,14 @@ Use Node 24 through the checked-in `.nvmrc` and pnpm through the `packageManager
 nvm use
 pnpm install --frozen-lockfile
 cp .env.example .env
+docker compose up -d db
+pnpm db:migrate
 pnpm dev
 ```
 
-Open http://localhost:5173/. Fill `.env` with your Clerk development-instance keys before working on anything that signs in. Once the schema phase lands, `docker compose up -d db` starts the local Postgres and `pnpm db:migrate` applies the committed migrations and seed; until then the placeholder routes run without a database.
+Open http://localhost:5173/. `docker compose up -d db` starts the local Postgres (host port 5433) with a development and a test database; `pnpm db:migrate` applies the committed migrations, including the seeded course catalog and published rankings. Fill `.env` with your Clerk development-instance keys before working on anything that signs in.
+
+Schema changes: edit `app/db/schema.ts`, run `pnpm db:generate --name <change>` to produce a migration, review the SQL, then `pnpm db:migrate`. Catalog corrections are new migrations; never edit an applied one. `pnpm seed:build <migration.sql>` regenerates the seed from the retired project's public data and is only for rebuilding that one migration before it has been applied anywhere.
 
 Local development never connects to production data. Automated tests use the local test database and mocked external services.
 

@@ -1,7 +1,11 @@
 {
   "compilerOptions": {
     "target": "ES2023",
-    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "lib": [
+      "ES2023",
+      "DOM",
+      "DOM.Iterable"
+    ],
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "jsx": "react-jsx",
@@ -16,8 +20,15 @@
     "allowImportingTsExtensions": true,
     "noEmit": true,
     "skipLibCheck": true,
-    "rootDirs": [".", "./.react-router/types"],
-    "types": ["@react-router/node", "vite/client", "node"]
+    "rootDirs": [
+      ".",
+      "./.react-router/types"
+    ],
+    "types": [
+      "@react-router/node",
+      "vite/client",
+      "node"
+    ]
   },
   "include": [
     "app",
@@ -26,6 +37,7 @@
     "vite.config.ts",
     "vitest.config.ts",
     "playwright.config.ts",
-    "react-router.config.ts"
+    "react-router.config.ts",
+    "drizzle.config.ts"
   ]
 }

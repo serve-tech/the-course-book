@@ -7,7 +7,7 @@ coursebook.golf is a server-rendered React Router application. One Node process 
 | Phase | Scope | Status |
 | --- | --- | --- |
 | 1 | Tooling (pnpm, React Router 8, Vitest projects, ESLint), root document, placeholder index and `/healthz`, pure modules moved with tests, Clerk/React Router compatibility smoke test, documentation | landed |
-| 2 | Drizzle schema, migrations, seed catalog, docker-compose Postgres, database-backed tests, CI drift gate | pending |
+| 2 | Drizzle schema, migrations, seed catalog, docker-compose Postgres, database-backed tests, CI drift gate | landed |
 | 3 | Clerk middleware, user provisioning, authorization module, layout with auth bar/nav/toast, sign-in dialog | pending |
 | 4 | Server-side catalog, identity resolution and course search; Top 100 page | pending |
 | 5 | Journal transactions and action; My List page, dialogs, drag reorder | pending |
@@ -24,8 +24,8 @@ Anything marked pending is described below in its intended shape so work lands c
 | --- | --- | --- |
 | `app/root.tsx` | Document shell, stylesheet link, manifest, error boundary, Clerk provider and middleware export | [root.tsx](../app/root.tsx) |
 | `app/routes.ts`, `app/routes/` | Route configuration; per-route loaders, actions and pages | [routes.ts](../app/routes.ts), [healthz.ts](../app/routes/healthz.ts) |
-| `app/server/*.server.ts` | Environment validation, database handle, auth context and user provisioning, authorization rules, catalog and search, journal transactions, friends reads | pending; see request flow |
-| `app/db/` | Drizzle schema, committed SQL migrations, seed data, migration runner | pending |
+| `app/server/*.server.ts` | Environment validation, database handle, auth context and user provisioning, authorization rules, catalog and search, journal transactions, friends reads | [env.server.ts](../app/server/env.server.ts), [db.server.ts](../app/server/db.server.ts) |
+| `app/db/` | Drizzle schema, committed SQL migrations, seed data, migration runner | [schema.ts](../app/db/schema.ts), [migrate.ts](../app/db/migrate.ts) |
 | `app/features/catalog/` | Course model, identity and geography rules, ranking selectors, OpenGolfAPI parsing, Rankings page | [identity.ts](../app/features/catalog/identity.ts), [opengolf.ts](../app/features/catalog/opengolf.ts) |
 | `app/features/journal/` | Pure personal-order rules, My List page, details and count editing, drag reorder | [reorder.ts](../app/features/journal/reorder.ts) |
 | `app/features/rounds/` | Log Round and Add Course dialogs, round history | pending |
@@ -79,6 +79,8 @@ Do not add a client store, a cache of loader data or a persisted copy of the per
 | `rounds` | One row per round; composite foreign key to the membership, so a round cannot exist without one. Carries `played_at`, `score`, `tees`, `notes`. |
 
 Play count is always `COUNT(rounds)`; there is no stored counter. All journal mutations take `pg_advisory_xact_lock(hashtext(user_id))` so concurrent moves and logs serialize.
+
+The seed migration (`0001_seed_catalog.sql`) carries the retired project's public catalog with original UUIDs, 281 bundled stable ids matched through the identity rules, and 24 bundled world-list courses the catalog lacked. Two bundled entries are duplicates of other bundled entries and carry no stable id. The catalog itself contains 13 pre-existing same-name, same-location duplicate pairs; the stable id went to the ranked or richer row, and merging duplicates is a separate data task, not a seed concern. Server modules take a `Database` argument (`app/db/client.ts`) so tests can pass the test database.
 
 ## Data rules
 

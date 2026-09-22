@@ -8,6 +8,22 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: coursebook
+          POSTGRES_PASSWORD: coursebook
+          POSTGRES_DB: coursebook_test
+        ports: ['5433:5432']
+        options: >-
+          --health-cmd "pg_isready -U coursebook -d coursebook_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://coursebook:coursebook@localhost:5433/coursebook_test
+      DATABASE_URL_TEST: postgres://coursebook:coursebook@localhost:5433/coursebook_test
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -18,5 +34,11 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm typecheck
+      - name: Migration drift gate
+        run: |
+          pnpm db:check
+          pnpm db:generate
+          git diff --exit-code --stat app/db/migrations
+      - run: pnpm db:migrate
       - run: pnpm test
       - run: pnpm build

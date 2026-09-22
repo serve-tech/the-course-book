@@ -1,9 +1,12 @@
 import { defineConfig } from "vitest/config";
 
 /**
- * Two projects: pure/server modules run under Node; component tests run under
- * jsdom. Database-backed suites (`*.db.test.ts`) join the node project in the
- * schema phase and run serially against the local Postgres.
+ * Three projects:
+ * - node: pure and server modules, no database.
+ * - jsdom: component tests.
+ * - db: `*.db.test.ts` suites against the migrated local test database,
+ *   run serially. `pnpm test:unit` skips this project when no database is
+ *   available.
  */
 export default defineConfig({
   test: {
@@ -14,6 +17,7 @@ export default defineConfig({
           name: "node",
           environment: "node",
           include: ["app/**/*.test.ts", "scripts/**/*.test.ts"],
+          exclude: ["**/*.db.test.ts", "**/node_modules/**"],
         },
       },
       {
@@ -21,6 +25,15 @@ export default defineConfig({
           name: "jsdom",
           environment: "jsdom",
           include: ["app/**/*.test.tsx"],
+        },
+      },
+      {
+        test: {
+          name: "db",
+          environment: "node",
+          include: ["app/**/*.db.test.ts"],
+          globalSetup: ["app/test/global-setup.ts"],
+          fileParallelism: false,
         },
       },
     ],
