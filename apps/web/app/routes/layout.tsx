@@ -1,8 +1,9 @@
-import { useClerk } from "@clerk/react-router";
+import { useAuth, useClerk } from "@clerk/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { NavLink, Outlet } from "react-router";
+import { NavLink, Outlet, useRevalidator } from "react-router";
 import type { Route } from "./+types/layout";
 import { AuthDialog } from "../features/auth/AuthDialog";
+import { useServerWaking } from "../lib/api/server-status";
 import { getAppUser } from "../server/auth.server";
 import { detectState } from "../shared/lib/geolocation";
 import { errorMessage } from "../shared/lib/errors";
@@ -27,6 +28,18 @@ export function loader({ context }: Route.LoaderArgs) {
 export default function Layout({ loaderData }: Route.ComponentProps) {
   const { user } = loaderData;
   const clerk = useClerk();
+  const { userId } = useAuth();
+  const revalidator = useRevalidator();
+  const waking = useServerWaking();
+  const lastUser = useRef<string | null | undefined>(undefined);
+
+  // Signing in or out in the Clerk dialog changes the session without a
+  // navigation; reload every route's data when the Clerk user changes.
+  useEffect(() => {
+    if (userId === undefined) return;
+    if (lastUser.current !== undefined && lastUser.current !== userId) void revalidator.revalidate();
+    lastUser.current = userId;
+  }, [userId, revalidator]);
   const [authOpen, setAuthOpen] = useState(false);
   const [storedState, setStoredState] = usePreference(SELECTED_STATE_KEY);
   const selectedState = storedState.toUpperCase();
@@ -153,6 +166,12 @@ export default function Layout({ loaderData }: Route.ComponentProps) {
       <div className={"toast" + (toast ? " show" : "")} id="toast" role="status">
         {toast}
       </div>
+
+      {waking && !toast && (
+        <div className="toast show" id="wakingNotice" role="status">
+          Waking the server… this can take up to a minute.
+        </div>
+      )}
 
       <footer className="app-footer">
         <button

@@ -10,16 +10,24 @@ const TEST_DATABASE_URL =
   "postgres://coursebook:coursebook@localhost:5433/coursebook_test";
 const STUB = "http://127.0.0.1:3999";
 const APP = "http://127.0.0.1:3000";
+const API = "http://127.0.0.1:3001";
 
 /** A configured value, or undefined when it is the .env.example placeholder. */
 const real = (value: string | undefined) =>
   value && !value.includes("replace_me") ? value : undefined;
 
+const clerkKeys = {
+  CLERK_PUBLISHABLE_KEY:
+    real(process.env["CLERK_PUBLISHABLE_KEY"]) ??
+    "pk_test_" + Buffer.from("example.clerk.accounts.dev$").toString("base64"),
+  CLERK_SECRET_KEY: real(process.env["CLERK_SECRET_KEY"]) ?? "sk_test_" + "0".repeat(48),
+};
+
 /**
- * Browser tests run against the production server bundle bound to the test
- * database, with course discovery pointed at a local OpenGolfAPI stub. The
- * `setup` project migrates the database and prepares Clerk before the
- * browser projects run.
+ * Browser tests run against the production builds: the API bundle and the
+ * web app, both bound to the test database, with course discovery pointed at
+ * a local OpenGolfAPI stub. The `setup` project migrates the database and
+ * prepares Clerk before the browser projects run.
  */
 export default defineConfig({
   testDir: ".",
@@ -50,6 +58,21 @@ export default defineConfig({
       reuseExistingServer: !process.env["CI"],
     },
     {
+      command: "pnpm --filter @coursebook/api build && pnpm --filter @coursebook/api start",
+      url: API + "/healthz",
+      reuseExistingServer: !process.env["CI"],
+      timeout: 120_000,
+      env: {
+        PORT: "3001",
+        NODE_ENV: "production",
+        DATABASE_URL: TEST_DATABASE_URL,
+        WEB_ORIGINS: APP,
+        OPENGOLF_API_URL: STUB + "/v1/courses/search",
+        OPENGOLF_CSV_URL: STUB + "/opengolfapi-us.csv",
+        ...clerkKeys,
+      },
+    },
+    {
       command: "pnpm --filter @coursebook/web build && pnpm --filter @coursebook/web start",
       url: APP + "/healthz",
       reuseExistingServer: !process.env["CI"],
@@ -60,10 +83,8 @@ export default defineConfig({
         DATABASE_URL: TEST_DATABASE_URL,
         OPENGOLF_API_URL: STUB + "/v1/courses/search",
         OPENGOLF_CSV_URL: STUB + "/opengolfapi-us.csv",
-        CLERK_PUBLISHABLE_KEY:
-          real(process.env["CLERK_PUBLISHABLE_KEY"]) ??
-          "pk_test_" + Buffer.from("example.clerk.accounts.dev$").toString("base64"),
-        CLERK_SECRET_KEY: real(process.env["CLERK_SECRET_KEY"]) ?? "sk_test_" + "0".repeat(48),
+        VITE_API_URL: API,
+        ...clerkKeys,
       },
     },
   ],

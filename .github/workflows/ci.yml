@@ -8,6 +8,8 @@ permissions:
 env:
   DATABASE_URL: postgres://coursebook:coursebook@localhost:5433/coursebook_test
   DATABASE_URL_TEST: postgres://coursebook:coursebook@localhost:5433/coursebook_test
+  # The web build inlines the API origin; the browser suite serves the API there.
+  VITE_API_URL: http://127.0.0.1:3001
 jobs:
   verify:
     runs-on: ubuntu-latest
