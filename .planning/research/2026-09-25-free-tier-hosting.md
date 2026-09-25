@@ -29,7 +29,7 @@ Sources: https://neon.com/docs/introduction/plans, https://neon.com/docs/introdu
 
 ## Findings
 
-- Rendering model does not drive cost. A static SPA still needs an API server and the same database; on Render free that server sleeps identically, so data still waits ~1 min. SPA + API adds a second deployable and client state without saving money.
+- Rendering model does not drive cost. A static SPA still needs an API server and the same database; on Render free that server sleeps identically, so data still waits ~1 min. SPA + API adds a second deployable and client state without saving money. (The split happened anyway, later the same day, for a different reason: native iOS and Android clients need a JSON API; see decisions/2026-09-25-split-into-json-api-service-for-web-ios-and-android.md.)
 - The cost drivers are always-on compute and a durable database. Render free covers compute (with sleep); only an external free Postgres avoids the 30-day deletion.
 - Neon fits the workload: plain `pg` over TCP, transaction-scoped advisory locks and deferred constraints work (transaction-mode pooler safe; run migrations over the direct endpoint), same AWS region as Render Oregon (Render does not document its underlying region).
 - Neon caveats: suspend cuts idle connections (handle `pool.on("error")`); a keep-alive that touches the database 24/7 needs ~182 CU-h and exceeds the 100 CU-h cap; restore window is only 6 h, so real data needs our own `pg_dump` routine.

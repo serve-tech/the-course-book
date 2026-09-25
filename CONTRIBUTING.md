@@ -25,7 +25,7 @@ pnpm db:migrate
 pnpm dev
 ```
 
-Open http://localhost:5173/. `docker compose up -d db` starts the local Postgres (host port 5433) with a development and a test database; `pnpm db:migrate` applies the committed migrations, including the seeded course catalog and published rankings. Fill `.env` with your Clerk development-instance keys before working on anything that signs in.
+Open http://localhost:5173/; the API runs on http://localhost:3001. `docker compose up -d db` starts the local Postgres (host port 5433) with a development and a test database; `pnpm db:migrate` applies the committed migrations, including the seeded course catalog and published rankings. Fill `.env` with your Clerk development-instance keys (`CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY` and the same publishable key as `VITE_CLERK_PUBLISHABLE_KEY`); every page needs them, because the web app waits for Clerk before loading data.
 
 Schema changes: edit `apps/api/src/db/schema.ts`, run `pnpm db:generate --name <change>` to produce a migration, review the SQL, then `pnpm db:migrate`. Catalog corrections are new migrations; never edit an applied one. `pnpm seed:build <migration.sql>` regenerates the seed from the retired project's public data and is only for rebuilding that one migration before it has been applied anywhere.
 
@@ -36,7 +36,7 @@ Local development never connects to production data. Automated tests use the loc
 1. Start from current `main` (or the rebuild branch while the rebuild is in progress) on a descriptive `feat/`, `fix/` or `hotfix/` branch.
 2. Read [agent instructions](AGENTS.md), [architecture](docs/architecture.md) and the relevant existing feature/tests.
 3. Identify the behavior to preserve and the acceptance checks for the requested change.
-4. Keep feature code together. Extract pure logic and test it; put database work in `apps/api/src/services/` and expose it to the web app through loaders and actions (via `apps/web/app/server/backend.server.ts`).
+4. Keep feature code together. Extract pure logic and test it; put database work in `apps/api/src/services/`, expose it as an API operation (then `pnpm contract:emit`), and call it from the web app through `app/lib/api` in a `clientLoader` or the journal `clientAction`.
 5. Run the checks in [testing](docs/testing.md), review the diff and update documentation affected by the change.
 6. Commit logical units with Conventional Commits, push the branch and open a PR against `main`. Include what changed, why, test results and remaining limitations.
 
@@ -44,9 +44,9 @@ Avoid "cleanup" of course identities, rank semantics or migration history alongs
 
 ## Preview and release
 
-`pnpm build` produces `build/` (client assets and the server bundle); `pnpm start` serves it the way the Docker image does. The Dockerfile and `render.yaml` describe the production build and infrastructure.
+`pnpm build` produces the API bundle (`apps/api/dist`, what the Docker image runs) and the static web app (`apps/web/build/client`). `apps/api/Dockerfile` and `render.yaml` describe the production build and infrastructure.
 
-Render deploys from the branch named in `render.yaml`. During the rebuild that is `feat/render-clerk-rebuild`, which acts as the staging deployment; at cutover it becomes `main`. Until cutover, `main` still publishes the retired static application to GitHub Pages through `pages.yml` and is frozen to hotfixes.
+Render deploys both services from the branch named in `render.yaml`. During the rebuild that is `feat/render-clerk-rebuild`, which acts as the staging deployment; at cutover it becomes `main`. Until cutover, `main` still publishes the retired static application to GitHub Pages through `pages.yml` and is frozen to hotfixes.
 
 **Check the PR's "Verify application" result before an authorized merge.** Failed verification must not be merged.
 
