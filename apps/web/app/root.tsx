@@ -1,5 +1,4 @@
 import { ClerkProvider } from "@clerk/react-router";
-import { rootAuthLoader } from "@clerk/react-router/server";
 import {
   isRouteErrorResponse,
   Links,
@@ -9,17 +8,7 @@ import {
   ScrollRestoration,
 } from "react-router";
 import type { Route } from "./+types/root";
-import { clerkEnv } from "./server/backend.server";
 import legacyStylesheet from "./shared/styles/legacy.css?url";
-
-export { middleware } from "./middleware";
-
-/** Clerk needs the auth state in the root loader data to hydrate the provider. */
-export function loader(args: Route.LoaderArgs) {
-  const { CLERK_PUBLISHABLE_KEY: publishableKey, CLERK_SECRET_KEY: secretKey } =
-    clerkEnv();
-  return rootAuthLoader(args, { publishableKey, secretKey });
-}
 
 export const links: Route.LinksFunction = () => [
   { rel: "stylesheet", href: legacyStylesheet },
@@ -48,7 +37,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <Links />
       </head>
       <body>
-        {children}
+        {/* In the Layout, not App: route clientLoaders run before App renders and
+            await Clerk's getToken(), which needs the provider mounted. */}
+        <ClerkProvider publishableKey={import.meta.env.VITE_CLERK_PUBLISHABLE_KEY}>{children}</ClerkProvider>
         <ScrollRestoration />
         <Scripts />
       </body>
@@ -56,12 +47,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function App({ loaderData }: Route.ComponentProps) {
-  return (
-    <ClerkProvider loaderData={loaderData}>
-      <Outlet />
-    </ClerkProvider>
-  );
+export default function App() {
+  return <Outlet />;
+}
+
+/** Shown while the first route data loads in the browser. */
+export function HydrateFallback() {
+  return <p className="empty">Loading coursebook.golf…</p>;
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {

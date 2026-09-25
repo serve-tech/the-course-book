@@ -10,7 +10,6 @@
   "scripts": {
     "dev": "pnpm -r --parallel dev",
     "build": "pnpm -r build",
-    "start": "pnpm --filter @coursebook/web start",
     "typegen": "pnpm --filter @coursebook/web typegen",
     "typecheck": "tsc --noEmit && pnpm -r typecheck",
     "lint": "pnpm --filter @coursebook/web typegen && eslint .",

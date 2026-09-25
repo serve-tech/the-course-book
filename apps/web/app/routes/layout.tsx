@@ -30,21 +30,12 @@ export async function clientLoader() {
     throw error;
   }
 }
-clientLoader.hydrate = true as const;
 
 /** Journal changes never change who is signed in. */
 export function shouldRevalidate({ formAction, defaultShouldRevalidate }: ShouldRevalidateFunctionArgs) {
   return formAction === "/journal" ? false : defaultShouldRevalidate;
 }
 
-export function HydrateFallback() {
-  return (
-    <div className="app">
-      <Brand />
-      <p className="empty">Loading coursebook.golf…</p>
-    </div>
-  );
-}
 
 /**
  * Application shell: header, account bar, tab navigation, the routed page,

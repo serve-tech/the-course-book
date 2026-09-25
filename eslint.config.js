@@ -98,10 +98,8 @@ export default tseslint.config(
     },
   },
   {
-    // Outside app/server the web app reaches the API package only through
-    // app/server/backend.server.ts, and never touches the database directly.
+    // The web app is an API client: it talks to the API over HTTP only.
     files: ["apps/web/app/**/*.{ts,tsx}"],
-    ignores: ["apps/web/app/server/**", "apps/web/app/**/*.test.ts"],
     rules: {
       "no-restricted-imports": [
         "error",
@@ -109,7 +107,7 @@ export default tseslint.config(
           patterns: [
             {
               group: ["@coursebook/api", "@coursebook/api/*", "drizzle-orm", "drizzle-orm/*", "pg", "@clerk/backend"],
-              message: "Import services from app/server/backend.server.ts; the browser never touches the database.",
+              message: "The web app calls the API through app/lib/api; it never imports server code or touches the database.",
             },
           ],
         },
@@ -118,8 +116,6 @@ export default tseslint.config(
   },
   {
     files: [
-      "apps/web/app/server/**/*.ts",
-      "apps/web/app/middleware.ts",
       "apps/api/**/*.ts",
       "tests/e2e/**/*.ts",
       "**/*.config.ts",

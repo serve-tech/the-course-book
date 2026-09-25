@@ -24,9 +24,9 @@ const clerkKeys = {
 };
 
 /**
- * Browser tests run against the production builds: the API bundle and the
- * web app, both bound to the test database, with course discovery pointed at
- * a local OpenGolfAPI stub. The `setup` project migrates the database and
+ * Browser tests run against the production builds: the API bundle bound to
+ * the test database, with course discovery pointed at a local OpenGolfAPI
+ * stub, and the static web app pointed at that API. The `setup` project migrates the database and
  * prepares Clerk before the browser projects run.
  */
 export default defineConfig({
@@ -73,18 +73,15 @@ export default defineConfig({
       },
     },
     {
-      command: "pnpm --filter @coursebook/web build && pnpm --filter @coursebook/web start",
-      url: APP + "/healthz",
+      // The static build served like the Render static site (static-server.ts).
+      command: "pnpm --filter @coursebook/web build && pnpm exec tsx static-server.ts",
+      url: APP + "/",
       reuseExistingServer: !process.env["CI"],
       timeout: 120_000,
       env: {
         PORT: "3000",
-        NODE_ENV: "production",
-        DATABASE_URL: TEST_DATABASE_URL,
-        OPENGOLF_API_URL: STUB + "/v1/courses/search",
-        OPENGOLF_CSV_URL: STUB + "/opengolfapi-us.csv",
         VITE_API_URL: API,
-        ...clerkKeys,
+        VITE_CLERK_PUBLISHABLE_KEY: clerkKeys.CLERK_PUBLISHABLE_KEY,
       },
     },
   ],

@@ -1,9 +1,9 @@
 /**
  * Clerk availability for browser tests. Every scenario needs a real Clerk
- * development instance: Clerk's middleware sends browsers through its
- * handshake on a dev instance, so placeholder keys break even anonymous
- * pages. Authenticated scenarios additionally need two test users, found by
- * email. There is deliberately no stubbed-auth mode.
+ * development instance: every route's loader waits for Clerk to load before
+ * asking for a session token, and with placeholder keys Clerk never loads,
+ * so even anonymous pages fail. Authenticated scenarios additionally need
+ * two test users, found by email. There is deliberately no stubbed-auth mode.
  */
 import type { Page } from "@playwright/test";
 import { clerk } from "@clerk/testing/playwright";

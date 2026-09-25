@@ -10,6 +10,8 @@ env:
   DATABASE_URL_TEST: postgres://coursebook:coursebook@localhost:5433/coursebook_test
   # The web build inlines the API origin; the browser suite serves the API there.
   VITE_API_URL: http://127.0.0.1:3001
+  # Placeholder for builds that only compile; the browser suite injects the real key.
+  VITE_CLERK_PUBLISHABLE_KEY: pk_test_ZXhhbXBsZS5jbGVyay5hY2NvdW50cy5kZXYk
 jobs:
   verify:
     runs-on: ubuntu-latest

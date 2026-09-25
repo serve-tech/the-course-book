@@ -16,5 +16,4 @@ export default [
     route("sign-up/*", "routes/sign-up.$.tsx"),
   ]),
   route("journal", "routes/journal.ts"),
-  route("healthz", "routes/healthz.ts"),
 ] satisfies RouteConfig;

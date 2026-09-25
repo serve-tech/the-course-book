@@ -5,6 +5,7 @@ import type { Route } from "./+types/friends";
 import { FriendsPage } from "../features/friends/FriendsPage";
 import { api, ApiError, unwrap, type ApiSchemas } from "../lib/api";
 import { fromMemberList } from "../lib/api/mappers";
+import { RouteError } from "../shared/ui/RouteError";
 import { useShell } from "../shared/ui/shell";
 
 export const meta: Route.MetaFunction = () => [{ title: "Friends · coursebook.golf" }];
@@ -42,11 +43,7 @@ export async function clientLoader({ params }: Route.ClientLoaderArgs) {
   ]);
   return { signedIn: true as const, members, selected };
 }
-clientLoader.hydrate = true as const;
 
-export function HydrateFallback() {
-  return <p className="empty">Loading members…</p>;
-}
 
 export default function Friends({ loaderData }: Route.ComponentProps) {
   const shell = useShell();
@@ -58,4 +55,8 @@ export default function Friends({ loaderData }: Route.ComponentProps) {
       notify={shell.notify}
     />
   );
+}
+
+export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
+  return <RouteError error={error} />;
 }

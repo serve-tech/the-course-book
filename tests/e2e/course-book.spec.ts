@@ -1,4 +1,8 @@
+import { randomBytes } from "node:crypto";
+import { createClerkClient } from "@clerk/backend";
+import { users } from "@coursebook/api/db/schema";
 import { expect, test, type Page } from "@playwright/test";
+import { eq } from "drizzle-orm";
 import { authAvailable, clerkAvailable, signInAs } from "./auth";
 import {
   addHiddenCourse,
@@ -181,5 +185,38 @@ test.describe("signed in", () => {
     await page.locator("#confirmLog").click();
     await expect(page.locator("#modal")).toHaveCount(0);
     await expect(row(page, "Fallback Test Links").locator(".count")).toContainText("2×");
+  });
+});
+
+test.describe("account deletion", () => {
+  test.skip(!clerkAvailable, "Clerk development instance keys are not configured");
+
+  test("a member deletes their account from the Account page", async ({ page }) => {
+    // A throwaway development-instance user, so the shared test users survive.
+    const clerkClient = createClerkClient({ secretKey: process.env["CLERK_SECRET_KEY"] ?? "" });
+    const suffix = randomBytes(4).toString("hex");
+    const email = `coursebook-e2e-${suffix}+clerk_test@example.com`;
+    const created = await clerkClient.users.createUser({
+      emailAddress: [email],
+      username: "e2e_del_" + suffix,
+      firstName: "Leaving",
+      skipPasswordRequirement: true,
+    });
+    try {
+      await signInAs(page, { id: created.id, username: "e2e_del_" + suffix, displayName: "Leaving", email });
+      await expect(page.locator("#authLabel")).toHaveText("e2e_del_" + suffix);
+      await page.getByRole("link", { name: "Account", exact: true }).click();
+      await page.locator("#deleteAccount").click();
+      await page.locator("#confirmDeleteAccount").click();
+      await expect(page.locator("#authLabel")).toHaveText("Not signed in");
+      await expect
+        .poll(async () => (await clerkClient.users.getUserList({ userId: [created.id] })).data.length)
+        .toBe(0);
+      const [row] = await db.select().from(users).where(eq(users.id, created.id));
+      expect(row?.deletedAt).not.toBeNull();
+      expect(row?.email).toBeNull();
+    } finally {
+      await clerkClient.users.deleteUser(created.id).catch(() => undefined);
+    }
   });
 });

@@ -3,6 +3,7 @@ import type { Route } from "./+types/top-100";
 import { RankingsPage } from "../features/catalog/RankingsPage";
 import { api, unwrap } from "../lib/api";
 import { fromRankingEntry } from "../lib/api/mappers";
+import { RouteError } from "../shared/ui/RouteError";
 import { useShell } from "../shared/ui/shell";
 
 export const meta: Route.MetaFunction = () => [{ title: "Top 100 · coursebook.golf" }];
@@ -25,11 +26,7 @@ export async function clientLoader() {
     signedIn,
   };
 }
-clientLoader.hydrate = true as const;
 
-export function HydrateFallback() {
-  return <p className="empty">Loading the rankings…</p>;
-}
 
 export default function Top100({ loaderData }: Route.ComponentProps) {
   const shell = useShell();
@@ -46,4 +43,8 @@ export default function Top100({ loaderData }: Route.ComponentProps) {
       openAuth={shell.openAuth}
     />
   );
+}
+
+export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
+  return <RouteError error={error} />;
 }
