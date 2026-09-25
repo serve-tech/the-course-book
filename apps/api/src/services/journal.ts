@@ -1,6 +1,6 @@
 import { and, count, desc, eq, inArray, sql } from "drizzle-orm";
 import type { Database, Executor, Transaction } from "../db/client";
-import { courses, rounds, userCourses } from "../db/schema";
+import { courses, rounds, userCourses, users } from "../db/schema";
 import { courseView } from "../domain/course-view";
 import { insertAt, reorder } from "@coursebook/domain/journal/reorder";
 import type { ListEntry, ListSummary, RoundEntry } from "@coursebook/domain/journal/types";
@@ -84,7 +84,16 @@ export async function roundHistory(
   return rows;
 }
 
-/** Run `work` in one transaction that holds the member's journal lock. */
+/**
+ * Run `work` in one transaction that holds the member's journal lock.
+ *
+ * Account deletion takes the same lock, so after acquiring it a deleted
+ * account is rejected: a request that raced the deletion cannot recreate
+ * rows for it.
+ *
+ * Raises:
+ *     AppError: 401 `account_deleted` when the account was deleted.
+ */
 export function withJournalLock<T>(
   db: Database,
   userId: string,
@@ -92,6 +101,11 @@ export function withJournalLock<T>(
 ): Promise<T> {
   return db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${userId}))`);
+    const [account] = await tx
+      .select({ deletedAt: users.deletedAt })
+      .from(users)
+      .where(eq(users.id, userId));
+    if (account?.deletedAt) throw new AppError(401, ErrorCode.AccountDeleted, "This account was deleted.");
     return work(tx);
   });
 }
@@ -208,15 +222,81 @@ export async function logRounds(
   input: CourseInput,
   quantity: number,
   playedAt?: string,
-): Promise<{ courseId: string; count: number }> {
+): Promise<{ courseId: string; count: number; courses: ListEntry[] }> {
+  const count = Math.max(1, quantity);
+  if (!("courseId" in input)) {
+    const added = await addCourseByDetails(db, userId, input, { rank: null, quantity: count, playedOn: playedAt });
+    return { courseId: added.courseId, count, courses: added.courses };
+  }
+  return withJournalLock(db, userId, async (tx) => {
+    const courseId = await requireCourse(tx, input.courseId);
+    await ensureMembership(tx, userId, courseId);
+    const inserted = await insertRounds(tx, userId, courseId, count, playedAt);
+    return { courseId, count: inserted.length, courses: await personalList(tx, userId) };
+  });
+}
+
+/**
+ * Add a course described by its details: resolve or create the catalog row,
+ * put it on the list at `rank` if it is not there yet (clamped to [1, N+1],
+ * bottom when null; an existing membership keeps its rank), and log
+ * `quantity` rounds on `playedOn`.
+ *
+ * This is both "log a searched course" (`isCustom` false, bottom) and "add a
+ * hand-entered course" (`isCustom` true, requested rank).
+ *
+ * Args:
+ *     db: Database handle.
+ *     userId: The acting member.
+ *     input: Course details; `isCustom` marks hand-entered courses.
+ *     options: `rank` for a new membership, `quantity` (at least 1) and an
+ *         optional ISO `playedOn` date (database date when absent).
+ *
+ * Returns:
+ *     The course id, its rank on the list and the whole updated list.
+ */
+export async function addCourseByDetails(
+  db: Database,
+  userId: string,
+  input: Exclude<CourseInput, { courseId: string }>,
+  options: { rank: number | null; quantity: number; playedOn?: string | undefined },
+): Promise<{ courseId: string; rank: number; courses: ListEntry[] }> {
   const result = await withJournalLock(db, userId, async (tx) => {
     const course = await findOrCreateCourse(tx, input, userId);
-    await ensureMembership(tx, userId, course.id);
-    const inserted = await insertRounds(tx, userId, course.id, Math.max(1, quantity), playedAt);
-    return { courseId: course.id, count: inserted.length, created: course.created };
+    let rank = await membershipRank(tx, userId, course.id);
+    if (rank === undefined) {
+      await ensureMembership(tx, userId, course.id);
+      const order = insertAt(await orderedCourseIds(tx, userId), course.id, options.rank);
+      await renumber(tx, userId, order);
+      rank = order.indexOf(course.id) + 1;
+    }
+    await insertRounds(tx, userId, course.id, Math.max(1, options.quantity), options.playedOn);
+    return { courseId: course.id, rank, created: course.created, courses: await personalList(tx, userId) };
   });
   if (result.created) invalidateCatalog();
-  return { courseId: result.courseId, count: result.count };
+  return { courseId: result.courseId, rank: result.rank, courses: result.courses };
+}
+
+/**
+ * "Add to my list" for a catalog course, from any client: add the
+ * membership at the bottom if missing and log one round when the course has
+ * none. Adding twice is harmless.
+ *
+ * Returns:
+ *     Whether a membership was created, and the updated list.
+ */
+export async function addToList(
+  db: Database,
+  userId: string,
+  courseId: string,
+  playedOn?: string,
+): Promise<{ added: boolean; courses: ListEntry[] }> {
+  return withJournalLock(db, userId, async (tx) => {
+    await requireCourse(tx, courseId);
+    const { created } = await ensureMembership(tx, userId, courseId);
+    if ((await roundCount(tx, userId, courseId)) === 0) await insertRounds(tx, userId, courseId, 1, playedOn);
+    return { added: created, courses: await personalList(tx, userId) };
+  });
 }
 
 /**
@@ -255,23 +335,8 @@ export async function addCustomCourse(
   userId: string,
   input: Exclude<CourseInput, { courseId: string }>,
   requestedRank: number | null,
-): Promise<{ courseId: string; rank: number }> {
-  const result = await withJournalLock(db, userId, async (tx) => {
-    const course = await findOrCreateCourse(tx, { ...input, isCustom: true }, userId);
-    const courseId = course.id;
-    const existing = await membershipRank(tx, userId, courseId);
-    let rank = existing;
-    if (rank === undefined) {
-      await ensureMembership(tx, userId, courseId);
-      const order = insertAt(await orderedCourseIds(tx, userId), courseId, requestedRank);
-      await renumber(tx, userId, order);
-      rank = order.indexOf(courseId) + 1;
-    }
-    await insertRounds(tx, userId, courseId, 1);
-    return { courseId, rank, created: course.created };
-  });
-  if (result.created) invalidateCatalog();
-  return { courseId: result.courseId, rank: result.rank };
+): Promise<{ courseId: string; rank: number; courses: ListEntry[] }> {
+  return addCourseByDetails(db, userId, { ...input, isCustom: true }, { rank: requestedRank, quantity: 1 });
 }
 
 /** Move a course to a rank; the whole list is renumbered from its full order. */
@@ -280,13 +345,13 @@ export async function moveCourse(
   userId: string,
   courseId: string,
   rank: number,
-): Promise<{ rank: number }> {
+): Promise<{ rank: number; courses: ListEntry[] }> {
   return withJournalLock(db, userId, async (tx) => {
     const ids = await orderedCourseIds(tx, userId);
     if (!ids.includes(courseId)) throw new AppError(404, ErrorCode.NotOnList, "That course is not on your list.");
     const order = reorder(ids, courseId, rank);
     await renumber(tx, userId, order);
-    return { rank: order.indexOf(courseId) + 1 };
+    return { rank: order.indexOf(courseId) + 1, courses: await personalList(tx, userId) };
   });
 }
 
@@ -300,14 +365,14 @@ export async function setCount(
   userId: string,
   courseId: string,
   requested: number,
-): Promise<{ count: number; removed: boolean }> {
+): Promise<{ count: number; removed: boolean; courses: ListEntry[] }> {
   return withJournalLock(db, userId, async (tx) => {
     if ((await membershipRank(tx, userId, courseId)) === undefined)
       throw new AppError(404, ErrorCode.NotOnList, "That course is not on your list.");
     const target = Math.max(0, Math.floor(requested));
     if (target === 0) {
       await removeMembership(tx, userId, courseId);
-      return { count: 0, removed: true };
+      return { count: 0, removed: true, courses: await personalList(tx, userId) };
     }
     const existing = await tx
       .select({ id: rounds.id })
@@ -322,7 +387,7 @@ export async function setCount(
     } else if (existing.length < target) {
       await insertRounds(tx, userId, courseId, target - existing.length);
     }
-    return { count: target, removed: false };
+    return { count: target, removed: false, courses: await personalList(tx, userId) };
   });
 }
 
@@ -331,7 +396,7 @@ export async function deleteRound(
   db: Database,
   userId: string,
   roundId: string,
-): Promise<{ removedCourse: boolean; courseId: string }> {
+): Promise<{ removedCourse: boolean; courseId: string; courses: ListEntry[] }> {
   return withJournalLock(db, userId, async (tx) => {
     const [round] = await tx
       .select({ courseId: rounds.courseId })
@@ -341,15 +406,20 @@ export async function deleteRound(
     await tx.delete(rounds).where(and(eq(rounds.userId, userId), eq(rounds.id, roundId)));
     const remaining = await roundCount(tx, userId, round.courseId);
     if (remaining === 0) await removeMembership(tx, userId, round.courseId);
-    return { removedCourse: remaining === 0, courseId: round.courseId };
+    return { removedCourse: remaining === 0, courseId: round.courseId, courses: await personalList(tx, userId) };
   });
 }
 
 /** Remove a course from the list along with all its rounds. */
-export async function deleteCourse(db: Database, userId: string, courseId: string): Promise<void> {
-  await withJournalLock(db, userId, async (tx) => {
+export async function deleteCourse(
+  db: Database,
+  userId: string,
+  courseId: string,
+): Promise<{ courses: ListEntry[] }> {
+  return withJournalLock(db, userId, async (tx) => {
     if ((await membershipRank(tx, userId, courseId)) === undefined)
       throw new AppError(404, ErrorCode.NotOnList, "That course is not on your list.");
     await removeMembership(tx, userId, courseId);
+    return { courses: await personalList(tx, userId) };
   });
 }

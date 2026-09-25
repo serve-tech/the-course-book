@@ -1,4 +1,4 @@
-import { sql } from "drizzle-orm";
+import { isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Database } from "../db/client";
 import { users } from "../db/schema";
@@ -84,7 +84,10 @@ export function identityFromClerkUser(user: ClerkUserFields): Identity {
  * Raises:
  *     AppError: 403 `username_invalid` when the username violates the
  *         product rule, so a misconfigured Clerk instance cannot create
- *         unusable accounts.
+ *         unusable accounts; 401 `account_deleted` when the account was
+ *         deleted. A deleted account's tombstone row is never refreshed, so
+ *         a session token that outlives the deletion (up to a minute)
+ *         cannot bring its personal data back.
  */
 export async function provisionUser(
   database: Database,
@@ -111,15 +114,16 @@ export async function provisionUser(
         email: identity.email,
         avatarUrl: identity.avatarUrl,
         updatedAt: sql`now()`,
-        deletedAt: null,
       },
+      setWhere: isNull(users.deletedAt),
     })
     .returning({
       id: users.id,
       username: users.username,
       displayName: users.displayName,
     });
-  if (!row) throw new Error("User provisioning returned no row");
+  // The conflict update is skipped only for a deleted account.
+  if (!row) throw new AppError(401, ErrorCode.AccountDeleted, "This account was deleted.");
   return row;
 }
 

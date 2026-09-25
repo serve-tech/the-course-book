@@ -17,7 +17,9 @@
 export enum ErrorCode {
   BadRequest = "bad_request",
   ValidationFailed = "validation_failed",
+  UsStateRequired = "us_state_required",
   Unauthenticated = "unauthenticated",
+  AccountDeleted = "account_deleted",
   UsernameInvalid = "username_invalid",
   NotFound = "not_found",
   CourseNotFound = "course_not_found",
@@ -26,6 +28,7 @@ export enum ErrorCode {
   MemberNotFound = "member_not_found",
   PayloadTooLarge = "payload_too_large",
   UnsupportedMediaType = "unsupported_media_type",
+  AccountDeletionIncomplete = "account_deletion_incomplete",
   SearchUnavailable = "search_unavailable",
   Internal = "internal",
 }

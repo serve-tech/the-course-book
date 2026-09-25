@@ -30,13 +30,19 @@ describe("user provisioning", () => {
     expect(row?.email).toBe("golfer@example.com");
   });
 
-  it("refreshes changed fields and clears a soft delete", async () => {
+  it("refreshes changed fields", async () => {
     await provisionUser(db, "user_1", identity);
-    await db.update(users).set({ deletedAt: new Date() }).where(eq(users.id, "user_1"));
     const user = await provisionUser(db, "user_1", { ...identity, displayName: "G. One" });
     expect(user.displayName).toBe("G. One");
+  });
+
+  it("keeps a deleted account deleted and untouched", async () => {
+    await provisionUser(db, "user_1", identity);
+    await db.update(users).set({ deletedAt: new Date(), email: null }).where(eq(users.id, "user_1"));
+    await expect(provisionUser(db, "user_1", identity)).rejects.toMatchObject({ status: 401, code: ErrorCode.AccountDeleted });
     const [row] = await db.select().from(users).where(eq(users.id, "user_1"));
-    expect(row?.deletedAt).toBeNull();
+    expect(row?.deletedAt).not.toBeNull();
+    expect(row?.email).toBeNull();
   });
 
   it("falls back to the username as display name", async () => {

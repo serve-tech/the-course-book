@@ -3,9 +3,11 @@ import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { courses, rounds, userCourses, users } from "../db/schema";
 import { resetMemberData, testDatabase } from "../test/db";
 import {
+  addCourseByDetails,
   addCustomCourse,
   addFromFriend,
   addFromRankings,
+  addToList,
   deleteCourse,
   deleteRound,
   listSummary,
@@ -145,9 +147,12 @@ describe("moving", () => {
     const ids = await Promise.all(["usa1", "usa2", "usa3", "usa4"].map(seeded));
     for (const id of ids) await logRounds(db, USER, { courseId: id }, 1);
     const [a, b, c, d] = ids as [string, string, string, string];
-    expect(await moveCourse(db, USER, d, 2)).toEqual({ rank: 2 });
+    const moved = await moveCourse(db, USER, d, 2);
+    expect(moved.rank).toBe(2);
     expect(await ranks()).toEqual([[a, 1], [d, 2], [b, 3], [c, 4]]);
-    expect(await moveCourse(db, USER, a, 99)).toEqual({ rank: 4 });
+    // The returned list is read in the same transaction, after the move.
+    expect(moved.courses.map((entry) => [entry.course.id, entry.rank])).toEqual(await ranks());
+    expect(await moveCourse(db, USER, a, 99)).toMatchObject({ rank: 4 });
     expect(await ranks()).toEqual([[d, 1], [b, 2], [c, 3], [a, 4]]);
   });
 
@@ -175,11 +180,15 @@ describe("counts and deletion", () => {
     await logRounds(db, USER, { courseId: a }, 1, "2026-03-01");
     await logRounds(db, USER, { courseId: a }, 1, "2026-02-01");
     await logRounds(db, USER, { courseId: b }, 1);
-    expect(await setCount(db, USER, a, 2)).toEqual({ count: 2, removed: false });
+    expect(await setCount(db, USER, a, 2)).toMatchObject({ count: 2, removed: false });
     expect((await roundHistory(db, USER, a)).map((row) => row.playedAt)).toEqual(["2026-03-01", "2026-02-01"]);
-    expect(await setCount(db, USER, a, 4)).toEqual({ count: 4, removed: false });
+    const raised = await setCount(db, USER, a, 4);
+    expect(raised).toMatchObject({ count: 4, removed: false });
+    expect(raised.courses.find((entry) => entry.course.id === a)?.played).toBe(4);
     expect(await roundHistory(db, USER, a)).toHaveLength(4);
-    expect(await setCount(db, USER, a, 0)).toEqual({ count: 0, removed: true });
+    const removed = await setCount(db, USER, a, 0);
+    expect(removed).toMatchObject({ count: 0, removed: true });
+    expect(removed.courses.map((entry) => entry.course.id)).toEqual([b]);
     expect(await ranks()).toEqual([[b, 1]]);
     expect((await roundsFor(a)).filter((row) => row.userId === USER)).toHaveLength(0);
   });
@@ -190,8 +199,10 @@ describe("counts and deletion", () => {
     await logRounds(db, USER, { courseId: a }, 2);
     await logRounds(db, USER, { courseId: b }, 1);
     const [first, second] = await roundHistory(db, USER, a);
-    expect(await deleteRound(db, USER, first?.id ?? "")).toEqual({ removedCourse: false, courseId: a });
-    expect(await deleteRound(db, USER, second?.id ?? "")).toEqual({ removedCourse: true, courseId: a });
+    expect(await deleteRound(db, USER, first?.id ?? "")).toMatchObject({ removedCourse: false, courseId: a });
+    const last = await deleteRound(db, USER, second?.id ?? "");
+    expect(last).toMatchObject({ removedCourse: true, courseId: a });
+    expect(last.courses.map((entry) => entry.course.id)).toEqual([b]);
     expect(await ranks()).toEqual([[b, 1]]);
     await expect(deleteRound(db, USER, second?.id ?? "")).rejects.toMatchObject({ status: 404, code: ErrorCode.RoundNotFound });
   });
@@ -247,5 +258,54 @@ describe("catalog cache after creating a course", () => {
     } finally {
       blocker.release();
     }
+  });
+});
+
+describe("adding for API clients", () => {
+  it("adds a catalog course with one round, and adding again changes nothing", async () => {
+    const a = await seeded("usa1");
+    const first = await addToList(db, USER, a, "2026-06-01");
+    expect(first.added).toBe(true);
+    expect(first.courses).toMatchObject([{ rank: 1, played: 1 }]);
+    expect((await roundHistory(db, USER, a)).map((row) => row.playedAt)).toEqual(["2026-06-01"]);
+    const again = await addToList(db, USER, a);
+    expect(again.added).toBe(false);
+    expect(again.courses).toMatchObject([{ rank: 1, played: 1 }]);
+  });
+
+  it("logs a round for a listed course that has none", async () => {
+    const a = await seeded("usa1");
+    // Imported memberships can exist without rounds.
+    await db.insert(userCourses).values({ userId: USER, courseId: a, personalRank: 1 });
+    const result = await addToList(db, USER, a);
+    expect(result).toMatchObject({ added: false, courses: [{ played: 1 }] });
+  });
+
+  it("adds a course by details at a requested rank with several rounds on a date", async () => {
+    const ids = await Promise.all(["usa1", "usa2"].map(seeded));
+    for (const id of ids) await logRounds(db, USER, { courseId: id }, 1);
+    const result = await addCourseByDetails(
+      db,
+      USER,
+      { ...blob("Brand New Links", "Hometown, OH, USA", { city: "Hometown", state: "OH", country: "USA" }), isCustom: true },
+      { rank: 1, quantity: 3, playedOn: "2026-06-02" },
+    );
+    expect(result.rank).toBe(1);
+    expect(result.courses.map((entry) => [entry.course.name, entry.rank, entry.played])).toEqual([
+      ["Brand New Links", 1, 3],
+      [expect.any(String), 2, 1],
+      [expect.any(String), 3, 1],
+    ]);
+    expect(new Set((await roundHistory(db, USER, result.courseId)).map((row) => row.playedAt))).toEqual(new Set(["2026-06-02"]));
+  });
+
+  it("keeps an existing membership's rank when adding by details again", async () => {
+    const details = { ...blob("Brand New Links", "Hometown, OH, USA", { city: "Hometown", state: "OH", country: "USA" }), isCustom: true };
+    await logRounds(db, USER, { courseId: await seeded("usa1") }, 1);
+    const first = await addCourseByDetails(db, USER, details, { rank: null, quantity: 1 });
+    expect(first.rank).toBe(2);
+    const second = await addCourseByDetails(db, USER, details, { rank: 1, quantity: 1 });
+    expect(second).toMatchObject({ courseId: first.courseId, rank: 2 });
+    expect(second.courses.find((entry) => entry.course.id === first.courseId)?.played).toBe(2);
   });
 });
