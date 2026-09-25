@@ -34,12 +34,12 @@ pnpm start
 
 ## Organization
 
-- `app/root.tsx`, `app/routes.ts`, `app/routes/`: document shell, route configuration and route modules (loaders, actions, pages).
-- `app/server/`: server-only modules (`*.server.ts`) for environment, database access, authentication, authorization, catalog, search and journal transactions.
-- `app/db/`: Drizzle schema, committed SQL migrations, seed data and the migration runner.
-- `app/features/<feature>/`: pure domain logic and components for catalog, journal, rounds, friends and auth, with colocated tests.
-- `app/shared/`: shared UI primitives, guarded browser storage, geolocation, geographic data and the preserved stylesheet.
-- `scripts/`: the seed builder and, once written, the data import script.
+A pnpm workspace; the split into an API and API clients is in progress (see [AGENTS.md](AGENTS.md#rebuild-status)).
+
+- `apps/api`: Drizzle schema, committed SQL migrations and seed (`src/db`); framework-free services for environment, provisioning, catalog, search, journal transactions and friends (`src/services`); API-only rules such as course identity (`src/domain`); the seed builder and Supabase import (`scripts`).
+- `packages/domain`: pure rules shared by the API and the web app (course model, geography, ranking selectors, list reorder, shared types).
+- `apps/web`: the React Router app: document shell, route configuration and route modules (`app/root.tsx`, `app/routes.ts`, `app/routes/`), server-only glue (`app/server/`), feature pages and dialogs (`app/features/<feature>/`) and shared UI, browser storage, geolocation and the preserved stylesheet (`app/shared/`).
+- `tests/e2e`: the Playwright suite.
 
 ## Rebuild status
 
@@ -47,7 +47,7 @@ The application is being rebuilt on the branch `feat/render-clerk-rebuild` per [
 
 ## Deployment and data
 
-`render.yaml` is the Render Blueprint: one Docker web service (`Dockerfile`, Starter plan) and one Postgres 17 database, both in Oregon. Secret values (`CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY`) are entered in the Render dashboard; the database URL is wired from the database resource; `NODE_ENV` is set by the Blueprint and `PORT` by Render. Migrations run as the service's pre-deploy command (`node app/db/migrate.ts`) inside the built image. Create or update the infrastructure by syncing the Blueprint from the Render dashboard, never by hand-creating services. The service deploys from the branch named in the Blueprint (`feat/render-clerk-rebuild` until cutover, then `main`).
+`render.yaml` is the Render Blueprint: one Docker web service (`Dockerfile`, Starter plan) and one Postgres 17 database, both in Oregon. Secret values (`CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY`) are entered in the Render dashboard; the database URL is wired from the database resource; `NODE_ENV` is set by the Blueprint and `PORT` by Render. Migrations run as the service's pre-deploy command (`node apps/api/src/db/migrate.ts`) inside the built image. Create or update the infrastructure by syncing the Blueprint from the Render dashboard, never by hand-creating services. The service deploys from the branch named in the Blueprint (`feat/render-clerk-rebuild` until cutover, then `main`).
 
 Local check of the production image:
 

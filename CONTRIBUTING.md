@@ -27,7 +27,7 @@ pnpm dev
 
 Open http://localhost:5173/. `docker compose up -d db` starts the local Postgres (host port 5433) with a development and a test database; `pnpm db:migrate` applies the committed migrations, including the seeded course catalog and published rankings. Fill `.env` with your Clerk development-instance keys before working on anything that signs in.
 
-Schema changes: edit `app/db/schema.ts`, run `pnpm db:generate --name <change>` to produce a migration, review the SQL, then `pnpm db:migrate`. Catalog corrections are new migrations; never edit an applied one. `pnpm seed:build <migration.sql>` regenerates the seed from the retired project's public data and is only for rebuilding that one migration before it has been applied anywhere.
+Schema changes: edit `apps/api/src/db/schema.ts`, run `pnpm db:generate --name <change>` to produce a migration, review the SQL, then `pnpm db:migrate`. Catalog corrections are new migrations; never edit an applied one. `pnpm seed:build <migration.sql>` regenerates the seed from the retired project's public data and is only for rebuilding that one migration before it has been applied anywhere.
 
 Local development never connects to production data. Automated tests use the local test database and mocked external services.
 
@@ -36,7 +36,7 @@ Local development never connects to production data. Automated tests use the loc
 1. Start from current `main` (or the rebuild branch while the rebuild is in progress) on a descriptive `feat/`, `fix/` or `hotfix/` branch.
 2. Read [agent instructions](AGENTS.md), [architecture](docs/architecture.md) and the relevant existing feature/tests.
 3. Identify the behavior to preserve and the acceptance checks for the requested change.
-4. Keep feature code together. Extract pure logic and test it; put database work in `app/server/` modules and expose it through loaders and actions.
+4. Keep feature code together. Extract pure logic and test it; put database work in `apps/api/src/services/` and expose it to the web app through loaders and actions (via `apps/web/app/server/backend.server.ts`).
 5. Run the checks in [testing](docs/testing.md), review the diff and update documentation affected by the change.
 6. Commit logical units with Conventional Commits, push the branch and open a PR against `main`. Include what changed, why, test results and remaining limitations.
 

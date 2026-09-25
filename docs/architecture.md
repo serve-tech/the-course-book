@@ -22,22 +22,22 @@ Anything marked pending is described below in its intended shape so work lands c
 
 | Location | Owns | Starting example |
 | --- | --- | --- |
-| `app/root.tsx` | Document shell, stylesheet link, manifest, error boundary, Clerk provider and middleware export | [root.tsx](../app/root.tsx) |
-| `app/routes.ts`, `app/routes/` | Route configuration; per-route loaders, actions and pages | [routes.ts](../app/routes.ts), [healthz.ts](../app/routes/healthz.ts) |
-| `app/server/*.server.ts` | Environment validation, database handle, auth context and user provisioning, authorization rules, catalog and search, journal transactions, friends reads | [catalog.server.ts](../app/server/catalog.server.ts), [journal.server.ts](../app/server/journal.server.ts) |
-| `app/db/` | Drizzle schema, committed SQL migrations, seed data, migration runner | [schema.ts](../app/db/schema.ts), [migrate.ts](../app/db/migrate.ts) |
-| `app/features/catalog/` | Course model, identity and geography rules, ranking selectors, OpenGolfAPI parsing, row-to-course views, Rankings page | [identity.ts](../app/features/catalog/identity.ts), [course-view.ts](../app/features/catalog/course-view.ts), [RankingsPage.tsx](../app/features/catalog/RankingsPage.tsx) |
-| `app/features/journal/` | Pure personal-order rules, My List page, details and count editing, drag reorder, the journal fetcher hook | [reorder.ts](../app/features/journal/reorder.ts), [JournalPage.tsx](../app/features/journal/JournalPage.tsx), [use-journal-fetcher.ts](../app/features/journal/use-journal-fetcher.ts) |
-| `app/features/rounds/` | Log Round and Add Course dialogs, round history | [LogRoundDialog.tsx](../app/features/rounds/LogRoundDialog.tsx) |
-| `app/features/friends/` | Member directory page | [FriendsPage.tsx](../app/features/friends/FriendsPage.tsx), [friends.server.ts](../app/server/friends.server.ts) |
-| `app/features/auth/` | Username rule, account dialog wrapping Clerk components | [username.ts](../app/features/auth/username.ts), [AuthDialog.tsx](../app/features/auth/AuthDialog.tsx) |
-| `app/shared/` | Modal, StateSelect, SafeStorage, geolocation, error formatting, geographic data, `legacy.css` | [Modal.tsx](../app/shared/ui/Modal.tsx), [storage.ts](../app/shared/lib/storage.ts) |
+| `apps/api/src/db/` | Drizzle schema, committed SQL migrations, seed data, migration runner | [schema.ts](../apps/api/src/db/schema.ts), [migrate.ts](../apps/api/src/db/migrate.ts) |
+| `apps/api/src/services/` | Environment validation, user provisioning, the public member projection, catalog and search, journal transactions, friends reads, the database health check. Framework-free; expected failures throw `AppError` | [catalog.ts](../apps/api/src/services/catalog.ts), [journal.ts](../apps/api/src/services/journal.ts), [provisioning.ts](../apps/api/src/services/provisioning.ts) |
+| `apps/api/src/domain/` | API-only pure rules: course identity, OpenGolfAPI parsing, row-to-course views, the username rule | [identity.ts](../apps/api/src/domain/identity.ts), [course-view.ts](../apps/api/src/domain/course-view.ts) |
+| `apps/api/scripts/` | Seed builder and Supabase import | [plan.ts](../apps/api/scripts/import/plan.ts) |
+| `packages/domain/src/` | Pure rules both sides run: course model, geography, ranking selectors, list reorder, shared list and member types | [course.ts](../packages/domain/src/catalog/course.ts), [reorder.ts](../packages/domain/src/journal/reorder.ts) |
+| `apps/web/app/root.tsx`, `routes.ts`, `routes/` | Document shell, route configuration, per-route loaders, actions and pages | [root.tsx](../apps/web/app/root.tsx), [routes.ts](../apps/web/app/routes.ts) |
+| `apps/web/app/server/` | React Router auth middleware and context, the process-wide database handle, and `backend.server.ts`, the only doorway to `@coursebook/api` until the web app becomes an API client | [auth.server.ts](../apps/web/app/server/auth.server.ts), [backend.server.ts](../apps/web/app/server/backend.server.ts) |
+| `apps/web/app/features/<feature>/` | Pages, dialogs and hooks for catalog (Rankings), journal (My List), rounds, friends and auth | [JournalPage.tsx](../apps/web/app/features/journal/JournalPage.tsx), [RankingsPage.tsx](../apps/web/app/features/catalog/RankingsPage.tsx), [LogRoundDialog.tsx](../apps/web/app/features/rounds/LogRoundDialog.tsx) |
+| `apps/web/app/shared/` | Modal, StateSelect, SafeStorage, geolocation, error formatting, country data, `legacy.css` | [Modal.tsx](../apps/web/app/shared/ui/Modal.tsx), [storage.ts](../apps/web/app/shared/lib/storage.ts) |
+| `tests/e2e/` | Playwright user flows | [course-book.spec.ts](../tests/e2e/course-book.spec.ts) |
 
-Feature folders are the organizational unit; avoid global `components/` or `services/` folders that scatter one feature across the project. Server-only files end in `.server.ts` so the framework refuses to bundle them for the browser.
+In the web app, feature folders are the organizational unit; avoid global `components/` folders that scatter one feature across the project. Web server-only files end in `.server.ts` so the framework refuses to bundle them for the browser.
 
 ## Request flow
 
-1. `app/middleware.ts` exports `[clerkMiddleware(), appUserMiddleware]`. Clerk verifies the session; `appUserMiddleware` reads `getAuth(args)` and, for a signed-in user, resolves the `users` row through the framework-free provisioner in `provisioning.server.ts` (identity from session claims, upsert, per-user cache) and stores the app user in a router context (`userContext`). `root.tsx` re-exports the middleware and its loader returns `rootAuthLoader(args)` so `<ClerkProvider>` can hydrate.
+1. `apps/web/app/middleware.ts` exports `[clerkMiddleware(), appUserMiddleware]`. Clerk verifies the session; `appUserMiddleware` reads `getAuth(args)` and, for a signed-in user, resolves the `users` row through the framework-free provisioner in `provisioning.server.ts` (identity from session claims, upsert, per-user cache) and stores the app user in a router context (`userContext`). `root.tsx` re-exports the middleware and its loader returns `rootAuthLoader(args)` so `<ClerkProvider>` can hydrate.
 2. A route loader reads `context.get(userContext)` and calls one server module. Anonymous access is allowed on the index, Top 100 and Friends routes and returns empty personal data (Friends shows a sign-in prompt); search and the journal call `requireUser`, which throws a 401 `data()` response. Server modules throw `AppError` (`errors.server.ts`) with a status and a stable code; the journal action returns it as a reply.
 3. Every mutation posts to the `/journal` action with an `intent` field. The action requires a user, parses the form with Zod, and runs one server function inside a single transaction. The user id always comes from the context.
 4. After a fetcher submission React Router revalidates the current route's loader, so pages never hold a second copy of server data.
@@ -64,7 +64,7 @@ Routes:
 | Course identity mapping | `courses.stable_id` and `courses.name_key` columns, resolved in `catalog.server.ts` |
 | Selected state for Best-in-State and My List filtering, geolocation prompt version | Browser storage through `SafeStorage` (keys `theCourseBookSelectedState`, `theCourseBookLocationPromptVersion`) |
 | Session | Clerk cookies; app user resolved per request into `userContext` |
-| Derived filtering, ordering and display values | Pure functions in `app/features/` |
+| Derived filtering, ordering and display values | Pure functions in `packages/domain` (shared) or the package that uses them |
 
 Do not add a client store, a cache of loader data or a persisted copy of the personal list. Optimistic UI during a pending fetcher may apply `reorder()` locally; revalidation replaces it.
 
@@ -80,12 +80,12 @@ Do not add a client store, a cache of loader data or a persisted copy of the per
 
 Play count is always `COUNT(rounds)`; there is no stored counter. All journal mutations take `pg_advisory_xact_lock(hashtext(user_id))` so concurrent moves and logs serialize.
 
-The seed migration (`0001_seed_catalog.sql`) carries the retired project's public catalog with original UUIDs, 281 bundled stable ids matched through the identity rules, and 24 bundled world-list courses the catalog lacked. Two bundled entries are duplicates of other bundled entries and carry no stable id. The catalog itself contains 13 pre-existing same-name, same-location duplicate pairs; the stable id went to the ranked or richer row, and merging duplicates is a separate data task, not a seed concern. Server modules take a `Database` argument (`app/db/client.ts`) so tests can pass the test database.
+The seed migration (`0001_seed_catalog.sql`) carries the retired project's public catalog with original UUIDs, 281 bundled stable ids matched through the identity rules, and 24 bundled world-list courses the catalog lacked. Two bundled entries are duplicates of other bundled entries and carry no stable id. The catalog itself contains 13 pre-existing same-name, same-location duplicate pairs; the stable id went to the ranked or richer row, and merging duplicates is a separate data task, not a seed concern. Server modules take a `Database` argument (`apps/api/src/db/client.ts`) so tests can pass the test database.
 
 ## Data rules
 
 - **Counts:** the number of round rows is the play count. Never synthesize rounds from a count.
-- **Order:** published rankings and personal rank are separate. Logging, count edits and adds from Rankings or Friends never change an existing membership's rank. Only `move` renumbers, and it renumbers the complete list from the full order so courses hidden by a filter keep their positions (`reorder()` in `app/features/journal/reorder.ts`).
+- **Order:** published rankings and personal rank are separate. Logging, count edits and adds from Rankings or Friends never change an existing membership's rank. Only `move` renumbers, and it renumbers the complete list from the full order so courses hidden by a filter keep their positions (`reorder()` in `packages/domain/src/journal/reorder.ts`).
 - **Log Round intents:** `log` inserts N rounds (minimum 1) sharing one `played_at` and creates the membership at the bottom if missing. `top` adds the membership if missing and inserts a round only when none exists. `friend` is a no-op when the membership exists, else one round plus a membership at the bottom. `add-course` creates the course, inserts at the requested rank clamped to [1, N+1] (default bottom) and logs one round.
 - **Counts and deletes:** `set-count` diffs against actual rounds (delete the oldest surplus so the newest history is kept, insert shortfall), as the original application did; zero deletes the membership. Deleting the last round deletes the membership. Deleting a course deletes the membership and cascades its rounds. All of these renumber remaining ranks.
 - **Identity:** resolve a course through `identity.ts` before creating a row: explicit uuid, alias to `stable_id`, canonical Scottish geography, then `name_key` plus country with an exact normalized-location match, else insert under an advisory lock on `name_key`. External search ids are never stored as course ids.
@@ -98,7 +98,7 @@ The seed migration (`0001_seed_catalog.sql`) carries the retired project's publi
 
 ## Authentication and authorization
 
-Clerk holds credentials, Google sign-in, email verification and sessions. [provisioning.server.ts](../app/server/provisioning.server.ts) resolves the `users` row for each signed-in request (cached for a minute per user) and [auth.server.ts](../app/server/auth.server.ts) exposes it through `getAppUser` and `requireUser`; [authz.server.ts](../app/server/authz.server.ts) states the access rules with tests: anonymous reads are limited to the index and Top 100; writes only affect the context user; member lists are readable by any signed-in member; other members are exposed only as username and display name.
+Clerk holds credentials, Google sign-in, email verification and sessions. [provisioning.server.ts](../apps/api/src/services/provisioning.ts) resolves the `users` row for each signed-in request (cached for a minute per user) and [auth.server.ts](../apps/web/app/server/auth.server.ts) exposes it through `getAppUser` and `requireUser`; [authz.server.ts](../apps/api/src/services/authz.ts) states the access rules with tests: anonymous reads are limited to the index and Top 100; writes only affect the context user; member lists are readable by any signed-in member; other members are exposed only as username and display name.
 
 Clerk dashboard configuration the code assumes:
 
@@ -107,13 +107,13 @@ Clerk dashboard configuration the code assumes:
 - Environment: `CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` are read by `env.server.ts` and passed explicitly to the middleware and root loader.
 - Production instance: DNS records on coursebook.golf and the project's own Google OAuth client.
 
-The account dialog ([AuthDialog.tsx](../app/features/auth/AuthDialog.tsx)) keeps the legacy modal chrome and ids and renders Clerk's `SignIn`/`SignUp` with hash routing; `/sign-in/*` and `/sign-up/*` exist for OAuth callbacks and direct links. Browser preferences use [use-preference.ts](../app/shared/lib/use-preference.ts), a `useSyncExternalStore` wrapper over `SafeStorage`, so hydration renders the empty server value without effects that set state.
+The account dialog ([AuthDialog.tsx](../apps/web/app/features/auth/AuthDialog.tsx)) keeps the legacy modal chrome and ids and renders Clerk's `SignIn`/`SignUp` with hash routing; `/sign-in/*` and `/sign-up/*` exist for OAuth callbacks and direct links. Browser preferences use [use-preference.ts](../apps/web/app/shared/lib/use-preference.ts), a `useSyncExternalStore` wrapper over `SafeStorage`, so hydration renders the empty server value without effects that set state.
 
 ## Types and boundaries
 
-[course.ts](../app/features/catalog/course.ts) defines the application course model with Zod. Drizzle infers row types from `app/db/schema.ts`. Keep these separate: a domain course is not a database row.
+[course.ts](../packages/domain/src/catalog/course.ts) defines the application course model with Zod. Drizzle infers row types from `apps/api/src/db/schema.ts`. Keep these separate: a domain course is not a database row.
 
-Validate untrusted form, environment, API and claim input at boundaries. Use `unknown` until validated. Use [errors.ts](../app/shared/lib/errors.ts) for error presentation. Noncritical failures (geolocation, search fallback) log and degrade; failed mutations show a visible failure and leave controls usable.
+Validate untrusted form, environment, API and claim input at boundaries. Use `unknown` until validated. Use [errors.ts](../apps/web/app/shared/lib/errors.ts) for error presentation. Noncritical failures (geolocation, search fallback) log and degrade; failed mutations show a visible failure and leave controls usable.
 
 ## Appearance
 
@@ -121,4 +121,4 @@ Reuse the existing markup, element ids, shared primitives and `legacy.css`. The 
 
 ## Cutover
 
-The retired Supabase project is read-only for this repository. [cutover.md](cutover.md) is the step-by-step runbook: Render staging from the branch, the Clerk production instance, an import rehearsal with `pnpm import:supabase --dry-run` (planning rules in `scripts/import/plan.ts`, tested), the freeze and real import, the domain, and the switch of `render.yaml` and the deploy to `main`. Keep Supabase paused, not deleted, until a Render database restore has been tested.
+The retired Supabase project is read-only for this repository. [cutover.md](cutover.md) is the step-by-step runbook: Render staging from the branch, the Clerk production instance, an import rehearsal with `pnpm import:supabase --dry-run` (planning rules in `apps/api/scripts/import/plan.ts`, tested), the freeze and real import, the domain, and the switch of `render.yaml` and the deploy to `main`. Keep Supabase paused, not deleted, until a Render database restore has been tested.

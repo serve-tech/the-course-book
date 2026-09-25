@@ -30,10 +30,10 @@ For documentation-only changes, check referenced paths, links, commands and clai
 
 | Check | Scope and limits |
 | --- | --- |
-| `lint` | Typed ESLint and React hooks rules over `app/`, `scripts/` and config files; `tests/e2e` joins once the browser suite is rewritten |
-| `typecheck` | Strict checks for `app/`, `scripts/` and configuration, with generated route types |
-| `pnpm test` | Vitest with three projects: `node` for pure modules, server modules and scripts; `jsdom` for component tests; `db` for `*.db.test.ts` suites against the migrated test database, run serially |
-| `pnpm db:check` and `pnpm db:generate` | Migration drift gate: the snapshot chain is consistent and `app/db/schema.ts` produces no new migration. CI fails if `app/db/migrations` changes |
+| `lint` | Typed ESLint across every workspace package, React hooks rules for the web app, and import boundaries (the domain package stays framework-free; web code outside `app/server` reaches the API package only through `backend.server.ts`) |
+| `typecheck` | `tsc` in every workspace package (`pnpm -r typecheck`), with generated route types for the web app; the domain package checks without DOM or Node types |
+| `pnpm test` | Vitest across the packages' projects: `domain`; `@coursebook/api (node)` and `(db)`; `@coursebook/web (node)`, `(jsdom)` and `(db)`. `*.db.test.ts` suites use the migrated test database, run serially, and the two db projects run in separate sequence groups |
+| `pnpm db:check` and `pnpm db:generate` | Migration drift gate: the snapshot chain is consistent and `apps/api/src/db/schema.ts` produces no new migration. CI fails if `apps/api/src/db/migrations` changes |
 | `build` | Client and server bundles under `build/` |
 | `test:e2e` | Playwright user flows against the built server, the migrated test database, the local OpenGolfAPI stub ([tests/e2e/opengolf-stub.ts](../tests/e2e/opengolf-stub.ts)) and Clerk testing tokens; desktop Chromium and Chromium emulating an iPhone viewport, one test at a time because every scenario shares the two test users |
 
@@ -41,11 +41,11 @@ A green suite does not verify Clerk's production instance, Render's environment 
 
 ## Add tests in the right place
 
-- **Pure logic:** colocate `*.test.ts` with the module. Use data-driven cases. See [identity.test.ts](../app/features/catalog/identity.test.ts) and [reorder.test.ts](../app/features/journal/reorder.test.ts).
-- **Schema, loaders and actions:** `*.db.test.ts` suites use `testDatabase()` and `resetMemberData()` from [app/test/db.ts](../app/test/db.ts) in `beforeEach`; the seeded catalog stays. Call exported `loader`/`action` functions with a `Request` and a `RouterContextProvider` carrying a test user. Assert on rows, not on mocks; use `expectDbError` to match constraint names in the driver's cause chain, and assert expected service failures with `rejects.toMatchObject({ status, code })` on the thrown `AppError`. Cover `requireUser` with a null context. See [schema.db.test.ts](../app/db/schema.db.test.ts).
+- **Pure logic:** colocate `*.test.ts` with the module. Use data-driven cases. See [identity.test.ts](../apps/api/src/domain/identity.test.ts) and [reorder.test.ts](../packages/domain/src/journal/reorder.test.ts).
+- **Schema, loaders and actions:** `*.db.test.ts` suites use `testDatabase()` and `resetMemberData()` from [apps/api/src/test/db.ts](../apps/api/src/test/db.ts) in `beforeEach`; the seeded catalog stays. Call exported `loader`/`action` functions with a `Request` and a `RouterContextProvider` carrying a test user. Assert on rows, not on mocks; use `expectDbError` to match constraint names in the driver's cause chain, and assert expected service failures with `rejects.toMatchObject({ status, code })` on the thrown `AppError`. Cover `requireUser` with a null context. See [schema.db.test.ts](../apps/api/src/db/schema.db.test.ts).
 - **Components:** colocated `*.test.tsx` with Testing Library when a focused UI test is useful. Assert accessible, user-visible behavior.
 - **Browser flows:** extend [course-book.spec.ts](../tests/e2e/course-book.spec.ts). Mock only external boundaries: the OpenGolfAPI stub server and Clerk testing tokens. The database is real; [tests/e2e/db.ts](../tests/e2e/db.ts) seeds the fixture courses and resets both test members to the baseline scenario before each authenticated test. Assert persisted outcomes through it.
-- **Compatibility:** `app/server/clerk.smoke.test.ts` proves the Clerk middleware and `getAuth` work under React Router's middleware. Keep it passing across dependency updates.
+- **Compatibility:** `apps/web/app/server/clerk.smoke.test.ts` proves the Clerk middleware and `getAuth` work under React Router's middleware. Keep it passing across dependency updates.
 
 Mock external services, not the domain or server logic whose behavior the test claims to verify.
 
