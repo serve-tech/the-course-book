@@ -5,6 +5,7 @@ import { compress } from "hono/compress";
 import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
 import { requestId } from "hono/request-id";
+import type { AccountDirectory } from "./auth/accounts";
 import { sessionMiddleware } from "./auth/middleware";
 import type { SessionVerifier } from "./auth/session";
 import { documentConfig, SECURITY_SCHEME } from "./contract/document";
@@ -15,6 +16,7 @@ import { errorHandler, notFoundHandler, validationHook } from "./http/errors";
 import { registerAccountRoutes } from "./routes/account";
 import { registerCatalogRoutes } from "./routes/catalog";
 import { registerClientRoutes } from "./routes/clients";
+import { registerJournalRoutes } from "./routes/journal";
 import { registerMemberRoutes } from "./routes/members";
 import { checkDatabase } from "./services/health";
 import type { Provisioner } from "./services/provisioning";
@@ -39,6 +41,8 @@ export interface AppDependencies {
   db: Database;
   verifySession: SessionVerifier;
   provisioner: Provisioner;
+  /** Clerk's side of account deletion. */
+  accounts: AccountDirectory;
   search: CourseSearch;
   /** Exact origins of the web app, used for CORS and the token `azp` check. */
   webOrigins: readonly string[];
@@ -121,6 +125,7 @@ export function createApp(deps: AppDependencies): OpenAPIHono<AppEnv> {
   });
 
   registerAccountRoutes(app, deps);
+  registerJournalRoutes(app, deps);
   registerCatalogRoutes(app, deps);
   registerMemberRoutes(app, deps);
   registerClientRoutes(app, deps);

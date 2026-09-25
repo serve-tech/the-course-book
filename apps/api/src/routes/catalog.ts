@@ -6,6 +6,7 @@ import { requireUser } from "../auth/middleware";
 import { toRankingEntry, toSearchHit } from "../contract/mappers";
 import { listRankings, searchCourses } from "../contract/routes";
 import type { AppEnv } from "../http/env";
+import { guarded } from "./guard";
 import { etagMatches } from "../http/etag";
 import { publishedRankings } from "../services/catalog";
 import { AppError, ErrorCode } from "../services/errors";
@@ -33,7 +34,7 @@ const isAbort = (error: unknown) => error instanceof Error && error.name === "Ab
 
 /** Published rankings and course search. */
 export function registerCatalogRoutes(app: OpenAPIHono<AppEnv>, deps: AppDependencies): void {
-  app.openapi(listRankings, async (c) => {
+  app.openapi(guarded(listRankings), async (c) => {
     const { body, etag } = rankingsBody(await publishedRankings(deps.db));
     c.header("ETag", etag);
     c.header("Cache-Control", "public, max-age=3600, stale-while-revalidate=86400");
@@ -41,7 +42,7 @@ export function registerCatalogRoutes(app: OpenAPIHono<AppEnv>, deps: AppDepende
     return c.json(body, 200);
   });
 
-  app.openapi(searchCourses, async (c) => {
+  app.openapi(guarded(searchCourses), async (c) => {
     await requireUser(c, deps.provisioner);
     const { q } = c.req.valid("query");
     try {

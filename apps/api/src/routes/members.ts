@@ -4,6 +4,7 @@ import { requireUser } from "../auth/middleware";
 import { toMemberList } from "../contract/mappers";
 import { getMemberList, listMembers } from "../contract/routes";
 import type { AppEnv } from "../http/env";
+import { guarded } from "./guard";
 import { AppError, ErrorCode } from "../services/errors";
 import { memberList, memberPage } from "../services/friends";
 
@@ -11,7 +12,7 @@ const DEFAULT_PAGE_SIZE = 50;
 
 /** The member directory and other members' lists. */
 export function registerMemberRoutes(app: OpenAPIHono<AppEnv>, deps: AppDependencies): void {
-  app.openapi(listMembers, async (c) => {
+  app.openapi(guarded(listMembers), async (c) => {
     const user = await requireUser(c, deps.provisioner);
     const { cursor, limit } = c.req.valid("query");
     const page = await memberPage(deps.db, user.id, {
@@ -21,7 +22,7 @@ export function registerMemberRoutes(app: OpenAPIHono<AppEnv>, deps: AppDependen
     return c.json(page, 200);
   });
 
-  app.openapi(getMemberList, async (c) => {
+  app.openapi(guarded(getMemberList), async (c) => {
     const user = await requireUser(c, deps.provisioner);
     const { username } = c.req.valid("param");
     const list = await memberList(deps.db, user.id, username);

@@ -26,6 +26,16 @@ export function sessionMiddleware(verify: SessionVerifier): MiddlewareHandler<Ap
 }
 
 /**
+ * Reject anonymous requests before the route validates its input, so a
+ * secured operation answers 401 rather than 400 to a client without a
+ * session. Attached to every secured operation by `guarded`.
+ */
+export const memberOnly: MiddlewareHandler<AppEnv> = async (c, next) => {
+  if (!c.get("session")) throw new AppError(401, ErrorCode.Unauthenticated, "Sign in to continue.");
+  await next();
+};
+
+/**
  * The signed-in member for a secured operation, provisioned on first use.
  *
  * Raises:

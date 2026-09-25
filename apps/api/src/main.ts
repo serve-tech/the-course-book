@@ -1,6 +1,7 @@
 import { createClerkClient } from "@clerk/backend";
 import { serve } from "@hono/node-server";
 import { createApp } from "./app";
+import { createClerkAccountDirectory } from "./auth/accounts";
 import { createClerkSessionVerifier } from "./auth/session";
 import { createDatabase } from "./db/client";
 import { runMigrations } from "./db/migrate";
@@ -42,6 +43,7 @@ const app = createApp({
     jwtKey: api.CLERK_JWT_KEY,
     webOrigins: api.WEB_ORIGINS,
   }),
+  accounts: createClerkAccountDirectory(clerkClient),
   provisioner: createProvisioner({
     provision: (clerkId, identity) => provisionUser(db, clerkId, identity),
     fetchIdentity: async (clerkId) => identityFromClerkUser(await clerkClient.users.getUser(clerkId)),

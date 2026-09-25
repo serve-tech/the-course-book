@@ -51,7 +51,7 @@
         "properties": {
           "code": {
             "type": "string",
-            "description": "Stable machine-readable code. Current values: bad_request, validation_failed, unauthenticated, username_invalid, not_found, course_not_found, not_on_list, round_not_found, member_not_found, payload_too_large, unsupported_media_type, search_unavailable, internal. New codes may appear; treat unknown codes by HTTP status.",
+            "description": "Stable machine-readable code. Current values: bad_request, validation_failed, us_state_required, unauthenticated, account_deleted, username_invalid, not_found, course_not_found, not_on_list, round_not_found, member_not_found, payload_too_large, unsupported_media_type, account_deletion_incomplete, search_unavailable, internal. New codes may appear; treat unknown codes by HTTP status.",
             "example": "not_on_list"
           },
           "message": {
@@ -243,6 +243,278 @@
         "required": [
           "id",
           "playedOn"
+        ]
+      },
+      "AddedToList": {
+        "type": "object",
+        "properties": {
+          "added": {
+            "type": "boolean",
+            "description": "False when the course was already on the list."
+          },
+          "courses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MyCourse"
+            },
+            "description": "The member's whole list after the change, read in the same transaction."
+          }
+        },
+        "required": [
+          "added",
+          "courses"
+        ]
+      },
+      "AddToListRequest": {
+        "type": "object",
+        "properties": {
+          "playedOn": {
+            "type": "string",
+            "nullable": true,
+            "format": "date",
+            "description": "Date played (YYYY-MM-DD) in the member's time zone. The server's date (UTC) when omitted, so clients should send it."
+          }
+        }
+      },
+      "AddedCourse": {
+        "type": "object",
+        "properties": {
+          "courseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "rank": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "courses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MyCourse"
+            },
+            "description": "The member's whole list after the change, read in the same transaction."
+          }
+        },
+        "required": [
+          "courseId",
+          "rank",
+          "courses"
+        ]
+      },
+      "AddCourseRequest": {
+        "type": "object",
+        "properties": {
+          "course": {
+            "$ref": "#/components/schemas/CourseDetailsRequest"
+          },
+          "source": {
+            "$ref": "#/components/schemas/CourseSource"
+          },
+          "rank": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 1,
+            "description": "Position for a course not yet on the list; the bottom when omitted. A course already on the list keeps its rank."
+          },
+          "quantity": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Rounds to log; 1 when omitted."
+          },
+          "playedOn": {
+            "type": "string",
+            "nullable": true,
+            "format": "date",
+            "description": "Date played (YYYY-MM-DD) in the member's time zone. The server's date (UTC) when omitted, so clients should send it."
+          }
+        },
+        "required": [
+          "course",
+          "source"
+        ]
+      },
+      "CourseDetailsRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "location": {
+            "type": "string",
+            "nullable": true
+          },
+          "city": {
+            "type": "string",
+            "nullable": true
+          },
+          "state": {
+            "type": "string",
+            "nullable": true,
+            "description": "Required, as a two-letter code, for U.S. courses whose location does not name the state."
+          },
+          "country": {
+            "type": "string",
+            "minLength": 1
+          },
+          "logoUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "websiteUrl": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "name",
+          "country"
+        ]
+      },
+      "CourseSource": {
+        "type": "string",
+        "enum": [
+          "search",
+          "manual"
+        ],
+        "description": "`search`: a course search hit; `manual`: a course the member typed in (shared with everyone as a custom course)."
+      },
+      "LoggedRounds": {
+        "type": "object",
+        "properties": {
+          "added": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Rounds logged."
+          },
+          "courses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MyCourse"
+            },
+            "description": "The member's whole list after the change, read in the same transaction."
+          }
+        },
+        "required": [
+          "added",
+          "courses"
+        ]
+      },
+      "LogRoundsRequest": {
+        "type": "object",
+        "properties": {
+          "quantity": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Rounds to log; 1 when omitted."
+          },
+          "playedOn": {
+            "type": "string",
+            "nullable": true,
+            "format": "date",
+            "description": "Date played (YYYY-MM-DD) in the member's time zone. The server's date (UTC) when omitted, so clients should send it."
+          }
+        }
+      },
+      "MovedCourse": {
+        "type": "object",
+        "properties": {
+          "rank": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "courses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MyCourse"
+            },
+            "description": "The member's whole list after the change, read in the same transaction."
+          }
+        },
+        "required": [
+          "rank",
+          "courses"
+        ]
+      },
+      "MoveCourseRequest": {
+        "type": "object",
+        "properties": {
+          "rank": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Target position; past the end means the bottom."
+          }
+        },
+        "required": [
+          "rank"
+        ]
+      },
+      "PlayCount": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "removed": {
+            "type": "boolean",
+            "description": "True when a count of zero removed the course from the list."
+          },
+          "courses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MyCourse"
+            },
+            "description": "The member's whole list after the change, read in the same transaction."
+          }
+        },
+        "required": [
+          "count",
+          "removed",
+          "courses"
+        ]
+      },
+      "SetPlayCountRequest": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000,
+            "description": "Zero removes the course from the list. Lowering deletes the oldest rounds."
+          }
+        },
+        "required": [
+          "count"
+        ]
+      },
+      "DeletedRound": {
+        "type": "object",
+        "properties": {
+          "courseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "removedCourse": {
+            "type": "boolean",
+            "description": "True when it was the course's last round, which removes the course."
+          },
+          "courses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MyCourse"
+            },
+            "description": "The member's whole list after the change, read in the same transaction."
+          }
+        },
+        "required": [
+          "courseId",
+          "removedCourse",
+          "courses"
         ]
       },
       "Rankings": {
@@ -502,7 +774,7 @@
             }
           },
           "401": {
-            "description": "No valid session: `unauthenticated`.",
+            "description": "No valid session: `unauthenticated`, or `account_deleted` after the account was deleted.",
             "content": {
               "application/json": {
                 "schema": {
@@ -513,6 +785,54 @@
           },
           "403": {
             "description": "The Clerk account cannot use the app: `username_invalid`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteMe",
+        "tags": [
+          "Account"
+        ],
+        "summary": "Delete the member's account",
+        "description": "Deletes the member's list and rounds, removes their name and email, and deletes the sign-in account. Courses they added stay in the shared catalog. Safe to retry: after a 502, call it again with the same token.",
+        "security": [
+          {
+            "ClerkSession": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The account is deleted; sign the member out."
+          },
+          "401": {
+            "description": "No valid session: `unauthenticated`, or `account_deleted` after the account was deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The Clerk account cannot use the app: `username_invalid`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The data is deleted but the sign-in account could not be: `account_deletion_incomplete`. Retry.",
             "content": {
               "application/json": {
                 "schema": {
@@ -548,7 +868,72 @@
             }
           },
           "401": {
-            "description": "No valid session: `unauthenticated`.",
+            "description": "No valid session: `unauthenticated`, or `account_deleted` after the account was deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The Clerk account cannot use the app: `username_invalid`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "addCourse",
+        "tags": [
+          "My List"
+        ],
+        "summary": "Add a course described by its details and log rounds",
+        "description": "For search hits without a catalog id and courses typed in by the member. The course is matched against the catalog or created, placed at `rank` if new to the list, and `quantity` rounds are logged. Not idempotent: retrying after a lost response logs the rounds again.",
+        "security": [
+          {
+            "ClerkSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddCourseRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The course and the updated list.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AddedCourse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid body: `validation_failed`, `us_state_required`, or `bad_request` for unreadable JSON. Also 413 `payload_too_large` above 32 KB and 415 `unsupported_media_type` without Content-Type: application/json.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session: `unauthenticated`, or `account_deleted` after the account was deleted.",
             "content": {
               "application/json": {
                 "schema": {
@@ -616,7 +1001,7 @@
             }
           },
           "401": {
-            "description": "No valid session: `unauthenticated`.",
+            "description": "No valid session: `unauthenticated`, or `account_deleted` after the account was deleted.",
             "content": {
               "application/json": {
                 "schema": {
@@ -627,6 +1012,510 @@
           },
           "403": {
             "description": "The Clerk account cannot use the app: `username_invalid`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "logRounds",
+        "tags": [
+          "My List"
+        ],
+        "summary": "Log rounds at a catalog course",
+        "description": "Adds the course at the bottom of the list if needed. Not idempotent.",
+        "security": [
+          {
+            "ClerkSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "courseId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LogRoundsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The updated list.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoggedRounds"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid body: `validation_failed`, `us_state_required`, or `bad_request` for unreadable JSON. Also 413 `payload_too_large` above 32 KB and 415 `unsupported_media_type` without Content-Type: application/json.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session: `unauthenticated`, or `account_deleted` after the account was deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The Clerk account cannot use the app: `username_invalid`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such catalog course: `course_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/courses/{courseId}": {
+      "put": {
+        "operationId": "addToList",
+        "tags": [
+          "My List"
+        ],
+        "summary": "Put a catalog course on the list",
+        "description": "Adds the course at the bottom and logs one round when it has none. Repeating it changes nothing, so retrying is safe.",
+        "security": [
+          {
+            "ClerkSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "courseId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddToListRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The updated list.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AddedToList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid body: `validation_failed`, `us_state_required`, or `bad_request` for unreadable JSON. Also 413 `payload_too_large` above 32 KB and 415 `unsupported_media_type` without Content-Type: application/json.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session: `unauthenticated`, or `account_deleted` after the account was deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The Clerk account cannot use the app: `username_invalid`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such catalog course: `course_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "removeCourse",
+        "tags": [
+          "My List"
+        ],
+        "summary": "Take a course off the list with all its rounds",
+        "description": "A 404 on retry means the course is already gone.",
+        "security": [
+          {
+            "ClerkSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "courseId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The updated list.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyCourses"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters: `validation_failed`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session: `unauthenticated`, or `account_deleted` after the account was deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The Clerk account cannot use the app: `username_invalid`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The course is not on the list: `not_on_list`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/courses/{courseId}/rank": {
+      "put": {
+        "operationId": "moveCourse",
+        "tags": [
+          "My List"
+        ],
+        "summary": "Move a course to a position on the list",
+        "description": "The whole list is renumbered, including courses a client has filtered out.",
+        "security": [
+          {
+            "ClerkSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "courseId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MoveCourseRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The course's new rank and the updated list.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MovedCourse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid body: `validation_failed`, `us_state_required`, or `bad_request` for unreadable JSON. Also 413 `payload_too_large` above 32 KB and 415 `unsupported_media_type` without Content-Type: application/json.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session: `unauthenticated`, or `account_deleted` after the account was deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The Clerk account cannot use the app: `username_invalid`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The course is not on the list: `not_on_list`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/courses/{courseId}/play-count": {
+      "put": {
+        "operationId": "setPlayCount",
+        "tags": [
+          "My List"
+        ],
+        "summary": "Set how many rounds a course has",
+        "description": "Lowering deletes the oldest rounds; raising logs rounds dated today; zero removes the course.",
+        "security": [
+          {
+            "ClerkSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "courseId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetPlayCountRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The count and the updated list.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayCount"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid body: `validation_failed`, `us_state_required`, or `bad_request` for unreadable JSON. Also 413 `payload_too_large` above 32 KB and 415 `unsupported_media_type` without Content-Type: application/json.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session: `unauthenticated`, or `account_deleted` after the account was deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The Clerk account cannot use the app: `username_invalid`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The course is not on the list: `not_on_list`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/rounds/{roundId}": {
+      "delete": {
+        "operationId": "deleteRound",
+        "tags": [
+          "My List"
+        ],
+        "summary": "Delete one round",
+        "description": "Deleting a course's last round takes the course off the list. A 404 on retry means the round is already gone.",
+        "security": [
+          {
+            "ClerkSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "roundId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The updated list.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletedRound"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters: `validation_failed`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session: `unauthenticated`, or `account_deleted` after the account was deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The Clerk account cannot use the app: `username_invalid`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such round: `round_not_found`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -712,7 +1601,7 @@
             }
           },
           "401": {
-            "description": "No valid session: `unauthenticated`.",
+            "description": "No valid session: `unauthenticated`, or `account_deleted` after the account was deleted.",
             "content": {
               "application/json": {
                 "schema": {
@@ -802,7 +1691,7 @@
             }
           },
           "401": {
-            "description": "No valid session: `unauthenticated`.",
+            "description": "No valid session: `unauthenticated`, or `account_deleted` after the account was deleted.",
             "content": {
               "application/json": {
                 "schema": {
@@ -860,7 +1749,7 @@
             }
           },
           "401": {
-            "description": "No valid session: `unauthenticated`.",
+            "description": "No valid session: `unauthenticated`, or `account_deleted` after the account was deleted.",
             "content": {
               "application/json": {
                 "schema": {

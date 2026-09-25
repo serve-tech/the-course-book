@@ -15,7 +15,11 @@ export interface paths {
         get: operations["getMe"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete the member's account
+         * @description Deletes the member's list and rounds, removes their name and email, and deletes the sign-in account. Courses they added stay in the shared catalog. Safe to retry: after a 502, call it again with the same token.
+         */
+        delete: operations["deleteMe"];
         options?: never;
         head?: never;
         patch?: never;
@@ -31,7 +35,11 @@ export interface paths {
         /** The signed-in member's list in personal rank order */
         get: operations["listMyCourses"];
         put?: never;
-        post?: never;
+        /**
+         * Add a course described by its details and log rounds
+         * @description For search hits without a catalog id and courses typed in by the member. The course is matched against the catalog or created, placed at `rank` if new to the list, and `quantity` rounds are logged. Not idempotent: retrying after a lost response logs the rounds again.
+         */
+        post: operations["addCourse"];
         delete?: never;
         options?: never;
         head?: never;
@@ -51,8 +59,96 @@ export interface paths {
          */
         get: operations["listMyCourseRounds"];
         put?: never;
+        /**
+         * Log rounds at a catalog course
+         * @description Adds the course at the bottom of the list if needed. Not idempotent.
+         */
+        post: operations["logRounds"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/courses/{courseId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Put a catalog course on the list
+         * @description Adds the course at the bottom and logs one round when it has none. Repeating it changes nothing, so retrying is safe.
+         */
+        put: operations["addToList"];
+        post?: never;
+        /**
+         * Take a course off the list with all its rounds
+         * @description A 404 on retry means the course is already gone.
+         */
+        delete: operations["removeCourse"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/courses/{courseId}/rank": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Move a course to a position on the list
+         * @description The whole list is renumbered, including courses a client has filtered out.
+         */
+        put: operations["moveCourse"];
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/courses/{courseId}/play-count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set how many rounds a course has
+         * @description Lowering deletes the oldest rounds; raising logs rounds dated today; zero removes the course.
+         */
+        put: operations["setPlayCount"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/rounds/{roundId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete one round
+         * @description Deleting a course's last round takes the course off the list. A 404 on retry means the round is already gone.
+         */
+        delete: operations["deleteRound"];
         options?: never;
         head?: never;
         patch?: never;
@@ -168,7 +264,7 @@ export interface components {
         };
         ApiErrorBody: {
             /**
-             * @description Stable machine-readable code. Current values: bad_request, validation_failed, unauthenticated, username_invalid, not_found, course_not_found, not_on_list, round_not_found, member_not_found, payload_too_large, unsupported_media_type, search_unavailable, internal. New codes may appear; treat unknown codes by HTTP status.
+             * @description Stable machine-readable code. Current values: bad_request, validation_failed, us_state_required, unauthenticated, account_deleted, username_invalid, not_found, course_not_found, not_on_list, round_not_found, member_not_found, payload_too_large, unsupported_media_type, account_deletion_incomplete, search_unavailable, internal. New codes may appear; treat unknown codes by HTTP status.
              * @example not_on_list
              */
             code: string;
@@ -223,6 +319,97 @@ export interface components {
             id: string;
             /** Format: date */
             playedOn: string;
+        };
+        AddedToList: {
+            /** @description False when the course was already on the list. */
+            added: boolean;
+            /** @description The member's whole list after the change, read in the same transaction. */
+            courses: components["schemas"]["MyCourse"][];
+        };
+        AddToListRequest: {
+            /**
+             * Format: date
+             * @description Date played (YYYY-MM-DD) in the member's time zone. The server's date (UTC) when omitted, so clients should send it.
+             */
+            playedOn?: string | null;
+        };
+        AddedCourse: {
+            /** Format: uuid */
+            courseId: string;
+            rank: number;
+            /** @description The member's whole list after the change, read in the same transaction. */
+            courses: components["schemas"]["MyCourse"][];
+        };
+        AddCourseRequest: {
+            course: components["schemas"]["CourseDetailsRequest"];
+            source: components["schemas"]["CourseSource"];
+            /** @description Position for a course not yet on the list; the bottom when omitted. A course already on the list keeps its rank. */
+            rank?: number | null;
+            /** @description Rounds to log; 1 when omitted. */
+            quantity?: number | null;
+            /**
+             * Format: date
+             * @description Date played (YYYY-MM-DD) in the member's time zone. The server's date (UTC) when omitted, so clients should send it.
+             */
+            playedOn?: string | null;
+        };
+        CourseDetailsRequest: {
+            name: string;
+            location?: string | null;
+            city?: string | null;
+            /** @description Required, as a two-letter code, for U.S. courses whose location does not name the state. */
+            state?: string | null;
+            country: string;
+            logoUrl?: string | null;
+            websiteUrl?: string | null;
+        };
+        /**
+         * @description `search`: a course search hit; `manual`: a course the member typed in (shared with everyone as a custom course).
+         * @enum {string}
+         */
+        CourseSource: "search" | "manual";
+        LoggedRounds: {
+            /** @description Rounds logged. */
+            added: number;
+            /** @description The member's whole list after the change, read in the same transaction. */
+            courses: components["schemas"]["MyCourse"][];
+        };
+        LogRoundsRequest: {
+            /** @description Rounds to log; 1 when omitted. */
+            quantity?: number | null;
+            /**
+             * Format: date
+             * @description Date played (YYYY-MM-DD) in the member's time zone. The server's date (UTC) when omitted, so clients should send it.
+             */
+            playedOn?: string | null;
+        };
+        MovedCourse: {
+            rank: number;
+            /** @description The member's whole list after the change, read in the same transaction. */
+            courses: components["schemas"]["MyCourse"][];
+        };
+        MoveCourseRequest: {
+            /** @description Target position; past the end means the bottom. */
+            rank: number;
+        };
+        PlayCount: {
+            count: number;
+            /** @description True when a count of zero removed the course from the list. */
+            removed: boolean;
+            /** @description The member's whole list after the change, read in the same transaction. */
+            courses: components["schemas"]["MyCourse"][];
+        };
+        SetPlayCountRequest: {
+            /** @description Zero removes the course from the list. Lowering deletes the oldest rounds. */
+            count: number;
+        };
+        DeletedRound: {
+            /** Format: uuid */
+            courseId: string;
+            /** @description True when it was the course's last round, which removes the course. */
+            removedCourse: boolean;
+            /** @description The member's whole list after the change, read in the same transaction. */
+            courses: components["schemas"]["MyCourse"][];
         };
         Rankings: {
             entries: components["schemas"]["RankingEntry"][];
@@ -316,7 +503,7 @@ export interface operations {
                     "application/json": components["schemas"]["Me"];
                 };
             };
-            /** @description No valid session: `unauthenticated`. */
+            /** @description No valid session: `unauthenticated`, or `account_deleted` after the account was deleted. */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -327,6 +514,51 @@ export interface operations {
             };
             /** @description The Clerk account cannot use the app: `username_invalid`. */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    deleteMe: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The account is deleted; sign the member out. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No valid session: `unauthenticated`, or `account_deleted` after the account was deleted. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description The Clerk account cannot use the app: `username_invalid`. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description The data is deleted but the sign-in account could not be: `account_deletion_incomplete`. Retry. */
+            502: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -354,7 +586,58 @@ export interface operations {
                     "application/json": components["schemas"]["MyCourses"];
                 };
             };
-            /** @description No valid session: `unauthenticated`. */
+            /** @description No valid session: `unauthenticated`, or `account_deleted` after the account was deleted. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description The Clerk account cannot use the app: `username_invalid`. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    addCourse: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddCourseRequest"];
+            };
+        };
+        responses: {
+            /** @description The course and the updated list. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AddedCourse"];
+                };
+            };
+            /** @description Invalid body: `validation_failed`, `us_state_required`, or `bad_request` for unreadable JSON. Also 413 `payload_too_large` above 32 KB and 415 `unsupported_media_type` without Content-Type: application/json. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description No valid session: `unauthenticated`, or `account_deleted` after the account was deleted. */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -403,7 +686,7 @@ export interface operations {
                     "application/json": components["schemas"]["ApiError"];
                 };
             };
-            /** @description No valid session: `unauthenticated`. */
+            /** @description No valid session: `unauthenticated`, or `account_deleted` after the account was deleted. */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -414,6 +697,370 @@ export interface operations {
             };
             /** @description The Clerk account cannot use the app: `username_invalid`. */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    logRounds: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                courseId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LogRoundsRequest"];
+            };
+        };
+        responses: {
+            /** @description The updated list. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoggedRounds"];
+                };
+            };
+            /** @description Invalid body: `validation_failed`, `us_state_required`, or `bad_request` for unreadable JSON. Also 413 `payload_too_large` above 32 KB and 415 `unsupported_media_type` without Content-Type: application/json. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description No valid session: `unauthenticated`, or `account_deleted` after the account was deleted. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description The Clerk account cannot use the app: `username_invalid`. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description No such catalog course: `course_not_found`. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    addToList: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                courseId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddToListRequest"];
+            };
+        };
+        responses: {
+            /** @description The updated list. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AddedToList"];
+                };
+            };
+            /** @description Invalid body: `validation_failed`, `us_state_required`, or `bad_request` for unreadable JSON. Also 413 `payload_too_large` above 32 KB and 415 `unsupported_media_type` without Content-Type: application/json. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description No valid session: `unauthenticated`, or `account_deleted` after the account was deleted. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description The Clerk account cannot use the app: `username_invalid`. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description No such catalog course: `course_not_found`. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    removeCourse: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                courseId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The updated list. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyCourses"];
+                };
+            };
+            /** @description Invalid parameters: `validation_failed`. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description No valid session: `unauthenticated`, or `account_deleted` after the account was deleted. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description The Clerk account cannot use the app: `username_invalid`. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description The course is not on the list: `not_on_list`. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    moveCourse: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                courseId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MoveCourseRequest"];
+            };
+        };
+        responses: {
+            /** @description The course's new rank and the updated list. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MovedCourse"];
+                };
+            };
+            /** @description Invalid body: `validation_failed`, `us_state_required`, or `bad_request` for unreadable JSON. Also 413 `payload_too_large` above 32 KB and 415 `unsupported_media_type` without Content-Type: application/json. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description No valid session: `unauthenticated`, or `account_deleted` after the account was deleted. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description The Clerk account cannot use the app: `username_invalid`. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description The course is not on the list: `not_on_list`. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    setPlayCount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                courseId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetPlayCountRequest"];
+            };
+        };
+        responses: {
+            /** @description The count and the updated list. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlayCount"];
+                };
+            };
+            /** @description Invalid body: `validation_failed`, `us_state_required`, or `bad_request` for unreadable JSON. Also 413 `payload_too_large` above 32 KB and 415 `unsupported_media_type` without Content-Type: application/json. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description No valid session: `unauthenticated`, or `account_deleted` after the account was deleted. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description The Clerk account cannot use the app: `username_invalid`. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description The course is not on the list: `not_on_list`. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    deleteRound: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                roundId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The updated list. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeletedRound"];
+                };
+            };
+            /** @description Invalid parameters: `validation_failed`. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description No valid session: `unauthenticated`, or `account_deleted` after the account was deleted. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description The Clerk account cannot use the app: `username_invalid`. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description No such round: `round_not_found`. */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -480,7 +1127,7 @@ export interface operations {
                     "application/json": components["schemas"]["ApiError"];
                 };
             };
-            /** @description No valid session: `unauthenticated`. */
+            /** @description No valid session: `unauthenticated`, or `account_deleted` after the account was deleted. */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -540,7 +1187,7 @@ export interface operations {
                     "application/json": components["schemas"]["ApiError"];
                 };
             };
-            /** @description No valid session: `unauthenticated`. */
+            /** @description No valid session: `unauthenticated`, or `account_deleted` after the account was deleted. */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -580,7 +1227,7 @@ export interface operations {
                     "application/json": components["schemas"]["MemberList"];
                 };
             };
-            /** @description No valid session: `unauthenticated`. */
+            /** @description No valid session: `unauthenticated`, or `account_deleted` after the account was deleted. */
             401: {
                 headers: {
                     [name: string]: unknown;

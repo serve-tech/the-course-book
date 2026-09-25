@@ -17,6 +17,7 @@ export function contractDocument() {
       resolve: () => Promise.reject(new Error("unused while emitting the contract")),
       forget: () => undefined,
     },
+    accounts: { deleteUser: () => Promise.reject(new Error("unused while emitting the contract")) },
     search: { search: () => Promise.resolve([]) },
     webOrigins: [],
     clientConfig: {

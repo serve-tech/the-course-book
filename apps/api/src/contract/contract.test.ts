@@ -57,6 +57,7 @@ describe("published contract", () => {
       db: createDatabase("postgres://contract@127.0.0.1:1/contract").db,
       verifySession: () => Promise.resolve(null),
       provisioner: { resolve: () => Promise.reject(new Error("unused")), forget: () => undefined },
+      accounts: { deleteUser: () => Promise.reject(new Error("unused")) },
       search: { search: () => Promise.resolve([]) },
       webOrigins: [],
       clientConfig: { minimumVersions: { ios: "0.0.0", android: "0.0.0" }, privacyUrl: "https://coursebook.golf/privacy", accountDeletionUrl: "https://coursebook.golf/account" },
@@ -96,12 +97,14 @@ describe("published contract", () => {
       db: createDatabase("postgres://contract@127.0.0.1:1/contract").db,
       verifySession: () => Promise.resolve(null),
       provisioner: { resolve: () => Promise.reject(new Error("must not be reached")), forget: () => undefined },
+      accounts: { deleteUser: () => Promise.reject(new Error("must not be reached")) },
       search: { search: () => Promise.reject(new Error("must not be reached")) },
       webOrigins: [],
       clientConfig: { minimumVersions: { ios: "0.0.0", android: "0.0.0" }, privacyUrl: "https://coursebook.golf/privacy", accountDeletionUrl: "https://coursebook.golf/account" },
     });
     const samples: Record<string, string> = {
       courseId: "11111111-1111-4111-8111-111111111111",
+      roundId: "22222222-2222-4222-8222-222222222222",
       username: "someone",
       q: "Arcadia",
     };
