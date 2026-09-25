@@ -1,1 +1,3 @@
 apps/web/app/shared/styles/legacy.css
+apps/web/app/lib/api/schema.d.ts
+contract/openapi.json

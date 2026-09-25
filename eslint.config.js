@@ -13,6 +13,8 @@ export default tseslint.config(
       "**/node_modules/",
       "**/test-results/",
       "docs/",
+      // Generated from contract/openapi.json by `pnpm contract:emit`.
+      "apps/web/app/lib/api/schema.d.ts",
     ],
   },
   js.configs.recommended,

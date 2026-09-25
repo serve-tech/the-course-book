@@ -15,7 +15,8 @@
     "db:check": "drizzle-kit check",
     "db:migrate": "node --env-file-if-exists=../../.env src/db/migrate.ts",
     "seed:build": "tsx scripts/build-seed.ts",
-    "import:supabase": "tsx scripts/import-supabase.ts"
+    "import:supabase": "tsx scripts/import-supabase.ts",
+    "contract:emit": "tsx scripts/emit-openapi.ts"
   },
   "dependencies": {
     "@clerk/backend": "^3.18.1",

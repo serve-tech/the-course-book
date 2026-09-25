@@ -1,0 +1,919 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "coursebook.golf API",
+    "version": "1.0.0",
+    "description": "JSON API for the coursebook.golf web, iOS and Android clients. Authenticate with a Clerk session token: `Authorization: Bearer <token>`. Every failure returns the ApiError envelope. The contract only grows: fields and error codes are added, never renamed or removed."
+  },
+  "servers": [
+    {
+      "url": "https://api.coursebook.golf"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "ClerkSession": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "A Clerk session token from the web, iOS or Android SDK."
+      }
+    },
+    "schemas": {
+      "Me": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "username",
+          "displayName"
+        ]
+      },
+      "ApiError": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ApiErrorBody"
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
+      "ApiErrorBody": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Stable machine-readable code. Current values: bad_request, validation_failed, unauthenticated, username_invalid, not_found, course_not_found, not_on_list, round_not_found, member_not_found, payload_too_large, unsupported_media_type, search_unavailable, internal. New codes may appear; treat unknown codes by HTTP status.",
+            "example": "not_on_list"
+          },
+          "message": {
+            "type": "string",
+            "description": "Explanation suitable to show to the member."
+          },
+          "requestId": {
+            "type": "string",
+            "description": "Correlates the failure with server logs."
+          },
+          "fields": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "$ref": "#/components/schemas/FieldError"
+            },
+            "description": "Per-field problems for validation_failed; otherwise null."
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "requestId",
+          "fields"
+        ]
+      },
+      "FieldError": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Dotted path of the invalid input, e.g. `q` or `course.name`."
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "message"
+        ]
+      },
+      "MyCourses": {
+        "type": "object",
+        "properties": {
+          "courses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MyCourse"
+            },
+            "description": "The member's list in personal rank order."
+          }
+        },
+        "required": [
+          "courses"
+        ]
+      },
+      "MyCourse": {
+        "type": "object",
+        "properties": {
+          "course": {
+            "$ref": "#/components/schemas/Course"
+          },
+          "rank": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "played": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "course",
+          "rank",
+          "played"
+        ]
+      },
+      "Course": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "location": {
+            "type": "string",
+            "nullable": true,
+            "description": "Display location, e.g. `Arcadia, MI, USA`; null when unknown."
+          },
+          "city": {
+            "type": "string",
+            "nullable": true
+          },
+          "state": {
+            "type": "string",
+            "nullable": true,
+            "description": "Two-letter state code for US courses."
+          },
+          "country": {
+            "type": "string"
+          },
+          "logoUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "websiteUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "ranks": {
+            "$ref": "#/components/schemas/CourseRanks"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "location",
+          "city",
+          "state",
+          "country",
+          "logoUrl",
+          "websiteUrl",
+          "ranks"
+        ]
+      },
+      "CourseRanks": {
+        "type": "object",
+        "properties": {
+          "world": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 1
+          },
+          "usa": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 1
+          },
+          "usaPublic": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 1
+          },
+          "state": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 1,
+            "description": "Rank on the Best-in-State list of the course's own state."
+          }
+        },
+        "required": [
+          "world",
+          "usa",
+          "usaPublic",
+          "state"
+        ]
+      },
+      "Rounds": {
+        "type": "object",
+        "properties": {
+          "rounds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Round"
+            },
+            "description": "Newest first."
+          }
+        },
+        "required": [
+          "rounds"
+        ]
+      },
+      "Round": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "playedOn": {
+            "type": "string",
+            "format": "date"
+          }
+        },
+        "required": [
+          "id",
+          "playedOn"
+        ]
+      },
+      "Rankings": {
+        "type": "object",
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RankingEntry"
+            }
+          }
+        },
+        "required": [
+          "entries"
+        ]
+      },
+      "RankingEntry": {
+        "type": "object",
+        "properties": {
+          "course": {
+            "$ref": "#/components/schemas/Course"
+          },
+          "rank": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "type": {
+            "type": "string",
+            "description": "Published list: world, usa, usa_public or state. New lists may appear."
+          },
+          "scope": {
+            "type": "string",
+            "description": "List scope, e.g. WORLD, USA or a state code."
+          }
+        },
+        "required": [
+          "course",
+          "rank",
+          "type",
+          "scope"
+        ]
+      },
+      "SearchResults": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SearchHit"
+            },
+            "description": "At most 10, best match first."
+          }
+        },
+        "required": [
+          "results"
+        ]
+      },
+      "SearchHit": {
+        "type": "object",
+        "properties": {
+          "courseId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid",
+            "description": "Catalog course id when the hit is already in the catalog; null otherwise."
+          },
+          "course": {
+            "$ref": "#/components/schemas/CourseDetails"
+          },
+          "ranks": {
+            "$ref": "#/components/schemas/CourseRanks"
+          }
+        },
+        "required": [
+          "courseId",
+          "course",
+          "ranks"
+        ]
+      },
+      "CourseDetails": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "location": {
+            "type": "string",
+            "nullable": true
+          },
+          "city": {
+            "type": "string",
+            "nullable": true
+          },
+          "state": {
+            "type": "string",
+            "nullable": true
+          },
+          "country": {
+            "type": "string"
+          },
+          "logoUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "websiteUrl": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "name",
+          "location",
+          "city",
+          "state",
+          "country",
+          "logoUrl",
+          "websiteUrl"
+        ],
+        "description": "A course described by its details, e.g. a search result not yet in the catalog."
+      },
+      "Members": {
+        "type": "object",
+        "properties": {
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Member"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true,
+            "description": "Pass as `cursor` for the next page; null on the last page."
+          }
+        },
+        "required": [
+          "members",
+          "nextCursor"
+        ]
+      },
+      "Member": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "username",
+          "displayName"
+        ],
+        "description": "Another member's public projection; never an email or an id."
+      },
+      "MemberList": {
+        "type": "object",
+        "properties": {
+          "member": {
+            "$ref": "#/components/schemas/Member"
+          },
+          "courses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MemberCourse"
+            }
+          }
+        },
+        "required": [
+          "member",
+          "courses"
+        ]
+      },
+      "MemberCourse": {
+        "type": "object",
+        "properties": {
+          "course": {
+            "$ref": "#/components/schemas/Course"
+          },
+          "rank": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "onMyList": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "course",
+          "rank",
+          "onMyList"
+        ]
+      },
+      "ClientConfig": {
+        "type": "object",
+        "properties": {
+          "minimumVersions": {
+            "$ref": "#/components/schemas/MinimumVersions"
+          },
+          "privacyUrl": {
+            "type": "string",
+            "format": "uri"
+          },
+          "accountDeletionUrl": {
+            "type": "string",
+            "format": "uri"
+          }
+        },
+        "required": [
+          "minimumVersions",
+          "privacyUrl",
+          "accountDeletionUrl"
+        ]
+      },
+      "MinimumVersions": {
+        "type": "object",
+        "properties": {
+          "ios": {
+            "type": "string"
+          },
+          "android": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ios",
+          "android"
+        ],
+        "description": "Oldest app versions the API still supports; older builds must update."
+      }
+    },
+    "parameters": {}
+  },
+  "paths": {
+    "/v1/me": {
+      "get": {
+        "operationId": "getMe",
+        "tags": [
+          "Account"
+        ],
+        "summary": "The signed-in member",
+        "security": [
+          {
+            "ClerkSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The member.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Me"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session: `unauthenticated`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The Clerk account cannot use the app: `username_invalid`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/courses": {
+      "get": {
+        "operationId": "listMyCourses",
+        "tags": [
+          "My List"
+        ],
+        "summary": "The signed-in member's list in personal rank order",
+        "security": [
+          {
+            "ClerkSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The list.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyCourses"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session: `unauthenticated`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The Clerk account cannot use the app: `username_invalid`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/courses/{courseId}/rounds": {
+      "get": {
+        "operationId": "listMyCourseRounds",
+        "tags": [
+          "My List"
+        ],
+        "summary": "Rounds the member logged at one course, newest first",
+        "description": "A course that is not on the member's list has no rounds.",
+        "security": [
+          {
+            "ClerkSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "courseId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The rounds.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rounds"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters: `validation_failed`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session: `unauthenticated`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The Clerk account cannot use the app: `username_invalid`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/rankings": {
+      "get": {
+        "operationId": "listRankings",
+        "tags": [
+          "Catalog"
+        ],
+        "summary": "Every published ranking entry",
+        "description": "Public and cacheable: responses carry an ETag; send it as If-None-Match to receive 304 when nothing changed. Send no Authorization header so shared caches can store it.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "All entries of all published lists.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rankings"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified since the ETag sent in If-None-Match."
+          }
+        }
+      }
+    },
+    "/v1/course-search": {
+      "get": {
+        "operationId": "searchCourses",
+        "tags": [
+          "Catalog"
+        ],
+        "summary": "Find courses by name",
+        "description": "Catalog courses carry their id; other hits carry details to send back when adding the course.",
+        "security": [
+          {
+            "ClerkSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 2,
+              "description": "Course name, at least two characters."
+            },
+            "required": true,
+            "description": "Course name, at least two characters.",
+            "name": "q",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Up to ten hits, best first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchResults"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters: `validation_failed`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session: `unauthenticated`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The Clerk account cannot use the app: `username_invalid`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Course discovery is unavailable: `search_unavailable`. Retry later.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/members": {
+      "get": {
+        "operationId": "listMembers",
+        "tags": [
+          "Members"
+        ],
+        "summary": "The member directory, a page at a time",
+        "security": [
+          {
+            "ClerkSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "nullable": true
+            },
+            "required": false,
+            "name": "cursor",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "nullable": true,
+              "minimum": 1,
+              "maximum": 200,
+              "description": "Defaults to 50."
+            },
+            "required": false,
+            "description": "Defaults to 50.",
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of members.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Members"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters: `validation_failed`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session: `unauthenticated`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The Clerk account cannot use the app: `username_invalid`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/members/{username}": {
+      "get": {
+        "operationId": "getMemberList",
+        "tags": [
+          "Members"
+        ],
+        "summary": "Another member's list, read-only",
+        "description": "Usernames match case-insensitively.",
+        "security": [
+          {
+            "ClerkSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "username",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The member and their list, with on-my-list flags for the viewer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session: `unauthenticated`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The Clerk account cannot use the app: `username_invalid`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such member: `member_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/client-config": {
+      "get": {
+        "operationId": "getClientConfig",
+        "tags": [
+          "Clients"
+        ],
+        "summary": "Settings every client reads at launch",
+        "description": "Apps older than the minimum version must ask the member to update.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Client settings.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientConfig"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

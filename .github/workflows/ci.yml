@@ -39,6 +39,8 @@ jobs:
           pnpm db:check
           pnpm db:generate
           git diff --exit-code --stat apps/api/src/db/migrations
+      - name: API contract drift gate
+        run: pnpm contract:check
       - run: pnpm db:migrate
       - run: pnpm test
       - run: pnpm build
