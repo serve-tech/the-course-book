@@ -1,8 +1,8 @@
 import { eq, sql } from "drizzle-orm";
-import { data } from "react-router";
 import { z } from "zod";
 import type { Database, Executor, Transaction } from "../db/client";
 import { courseRankings, courses } from "../db/schema";
+import { AppError, ErrorCode } from "./errors.server";
 import {
   cloudLocation,
   courseSchema,
@@ -106,7 +106,7 @@ function cityFromParts(parts: readonly string[], country: string): string | null
   return first;
 }
 
-/** Ensure a course row exists by id; 404 data response otherwise. */
+/** Ensure a course row exists by id; throws a 404 `AppError` otherwise. */
 export async function requireCourse(
   executor: Executor,
   courseId: string,
@@ -115,7 +115,7 @@ export async function requireCourse(
     .select({ id: courses.id })
     .from(courses)
     .where(eq(courses.id, courseId));
-  if (!row) throw data({ error: "Course not found." }, { status: 404 });
+  if (!row) throw new AppError(404, ErrorCode.CourseNotFound, "Course not found.");
   return row.id;
 }
 

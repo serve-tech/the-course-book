@@ -4,6 +4,7 @@ import type { Route } from "./+types/journal";
 import { requireUser } from "../server/auth.server";
 import { courseInputSchema, type CourseInput } from "../server/catalog.server";
 import { db } from "../server/db.server";
+import { AppError } from "../server/errors.server";
 import {
   addCustomCourse,
   addFromFriend,
@@ -21,8 +22,8 @@ import { courseSchema } from "../features/catalog/course";
 /**
  * Every journal mutation posts here with an `intent` field. Each intent runs
  * one transaction for the signed-in user; the user id never comes from the
- * form. Fetchers read `{ ok, message, ... }` or `{ error }`; thrown data
- * responses (401, 404) are returned as replies so dialogs can show them.
+ * form. Fetchers read `{ ok, message, ... }` or `{ error }`; a thrown `AppError`
+ * (404) or 401 data response is returned as a reply so dialogs can show it.
  *
  * GET with `courseId` returns the caller's round history for that course.
  */
@@ -170,6 +171,7 @@ export async function action({ request, context }: Route.ActionArgs) {
         return { ok: true as const, message: "Course deleted from My List" };
     }
   } catch (error) {
+    if (error instanceof AppError) return failure(error.message, error.status);
     if (isReply(error)) return data(error.data, error.init ?? undefined);
     throw error;
   }

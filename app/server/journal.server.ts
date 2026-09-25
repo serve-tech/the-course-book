@@ -1,5 +1,4 @@
 import { and, count, desc, eq, inArray, sql } from "drizzle-orm";
-import { data } from "react-router";
 import type { Database, Transaction } from "../db/client";
 import { courses, rounds, userCourses } from "../db/schema";
 import type { Course } from "../features/catalog/course";
@@ -10,6 +9,7 @@ import {
   requireCourse,
   type CourseInput,
 } from "./catalog.server";
+import { AppError, ErrorCode } from "./errors.server";
 
 /**
  * Journal transactions: memberships (a member's personal list) and rounds.
@@ -293,7 +293,7 @@ export async function moveCourse(
 ): Promise<{ rank: number }> {
   return withJournalLock(db, userId, async (tx) => {
     const ids = await orderedCourseIds(tx, userId);
-    if (!ids.includes(courseId)) throw data({ error: "That course is not on your list." }, { status: 404 });
+    if (!ids.includes(courseId)) throw new AppError(404, ErrorCode.NotOnList, "That course is not on your list.");
     const order = reorder(ids, courseId, rank);
     await renumber(tx, userId, order);
     return { rank: order.indexOf(courseId) + 1 };
@@ -313,7 +313,7 @@ export async function setCount(
 ): Promise<{ count: number; removed: boolean }> {
   return withJournalLock(db, userId, async (tx) => {
     if ((await membershipRank(tx, userId, courseId)) === undefined)
-      throw data({ error: "That course is not on your list." }, { status: 404 });
+      throw new AppError(404, ErrorCode.NotOnList, "That course is not on your list.");
     const target = Math.max(0, Math.floor(requested));
     if (target === 0) {
       await removeMembership(tx, userId, courseId);
@@ -347,7 +347,7 @@ export async function deleteRound(
       .select({ courseId: rounds.courseId })
       .from(rounds)
       .where(and(eq(rounds.userId, userId), eq(rounds.id, roundId)));
-    if (!round) throw data({ error: "That round no longer exists." }, { status: 404 });
+    if (!round) throw new AppError(404, ErrorCode.RoundNotFound, "That round no longer exists.");
     await tx.delete(rounds).where(and(eq(rounds.userId, userId), eq(rounds.id, roundId)));
     const remaining = await roundCount(tx, userId, round.courseId);
     if (remaining === 0) await removeMembership(tx, userId, round.courseId);
@@ -359,7 +359,7 @@ export async function deleteRound(
 export async function deleteCourse(db: Database, userId: string, courseId: string): Promise<void> {
   await withJournalLock(db, userId, async (tx) => {
     if ((await membershipRank(tx, userId, courseId)) === undefined)
-      throw data({ error: "That course is not on your list." }, { status: 404 });
+      throw new AppError(404, ErrorCode.NotOnList, "That course is not on your list.");
     await removeMembership(tx, userId, courseId);
   });
 }

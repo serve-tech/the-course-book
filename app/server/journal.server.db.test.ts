@@ -15,6 +15,7 @@ import {
   roundHistory,
   setCount,
 } from "./journal.server";
+import { ErrorCode } from "./errors.server";
 
 const { db, pool } = testDatabase();
 const USER = "user_j";
@@ -150,7 +151,7 @@ describe("moving", () => {
   });
 
   it("rejects moving a course that is not on the list", async () => {
-    await expect(moveCourse(db, USER, await seeded("usa1"), 1)).rejects.toMatchObject({ init: { status: 404 } });
+    await expect(moveCourse(db, USER, await seeded("usa1"), 1)).rejects.toMatchObject({ status: 404, code: ErrorCode.NotOnList });
   });
 
   it("serializes concurrent moves so ranks stay contiguous", async () => {
@@ -191,7 +192,7 @@ describe("counts and deletion", () => {
     expect(await deleteRound(db, USER, first?.id ?? "")).toEqual({ removedCourse: false, courseId: a });
     expect(await deleteRound(db, USER, second?.id ?? "")).toEqual({ removedCourse: true, courseId: a });
     expect(await ranks()).toEqual([[b, 1]]);
-    await expect(deleteRound(db, USER, second?.id ?? "")).rejects.toMatchObject({ init: { status: 404 } });
+    await expect(deleteRound(db, USER, second?.id ?? "")).rejects.toMatchObject({ status: 404, code: ErrorCode.RoundNotFound });
   });
 
   it("deleting a course cascades its rounds and renumbers", async () => {
@@ -200,7 +201,7 @@ describe("counts and deletion", () => {
     await deleteCourse(db, USER, b);
     expect(await ranks()).toEqual([[a, 1], [c, 2]]);
     expect((await roundsFor(b)).filter((row) => row.userId === USER)).toHaveLength(0);
-    await expect(deleteCourse(db, USER, b)).rejects.toMatchObject({ init: { status: 404 } });
+    await expect(deleteCourse(db, USER, b)).rejects.toMatchObject({ status: 404, code: ErrorCode.NotOnList });
   });
 
   it("never lets one member touch another member's journal", async () => {
@@ -208,8 +209,8 @@ describe("counts and deletion", () => {
     const a = await seeded("usa1");
     await logRounds(db, "user_other", { courseId: a }, 1);
     const [round] = await roundHistory(db, "user_other", a);
-    await expect(deleteRound(db, USER, round?.id ?? "")).rejects.toMatchObject({ init: { status: 404 } });
-    await expect(setCount(db, USER, a, 0)).rejects.toMatchObject({ init: { status: 404 } });
+    await expect(deleteRound(db, USER, round?.id ?? "")).rejects.toMatchObject({ status: 404, code: ErrorCode.RoundNotFound });
+    await expect(setCount(db, USER, a, 0)).rejects.toMatchObject({ status: 404, code: ErrorCode.NotOnList });
     expect(await roundHistory(db, "user_other", a)).toHaveLength(1);
   });
 });

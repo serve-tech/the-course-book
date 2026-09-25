@@ -10,6 +10,7 @@ import {
   invalidateCatalog,
   requireCourse,
 } from "./catalog.server";
+import { ErrorCode } from "./errors.server";
 
 const { db, pool } = testDatabase();
 
@@ -56,7 +57,7 @@ describe("find or create course", () => {
     ).resolves.toBe(row.id);
     await expect(
       requireCourse(db, "00000000-0000-4000-8000-000000000000"),
-    ).rejects.toMatchObject({ init: { status: 404 } });
+    ).rejects.toMatchObject({ status: 404, code: ErrorCode.CourseNotFound });
   });
 
   it("resolves aliases to the bundled course", async () => {
