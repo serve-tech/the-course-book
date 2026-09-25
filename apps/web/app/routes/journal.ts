@@ -17,7 +17,7 @@ import {
   setCount,
 } from "../server/backend.server";
 import { db } from "../server/db.server";
-import { countryFromLocation, deriveState } from "@coursebook/domain/catalog/geography";
+import { missingUSState } from "@coursebook/domain/catalog/geography";
 import { courseSchema } from "@coursebook/domain/catalog/course";
 
 /**
@@ -83,13 +83,8 @@ function courseInputFrom(
 }
 
 /** US courses need a resolvable state before they are stored. */
-function missingUSState(input: Exclude<CourseInput, { courseId: string }>): boolean {
-  const course = courseSchema.parse({ id: "input", ...input });
-  return (
-    countryFromLocation(course.location, course.country) === "USA" &&
-    !deriveState({ ...course, country: "USA" })
-  );
-}
+const missingState = (input: Exclude<CourseInput, { courseId: string }>) =>
+  missingUSState(courseSchema.parse({ id: "input", ...input }));
 
 const isReply = (error: unknown): error is { data: JournalReply; init: ResponseInit | null } =>
   typeof error === "object" && error !== null && "data" in error && "init" in error;
@@ -115,7 +110,7 @@ export async function action({ request, context }: Route.ActionArgs) {
         const course = courseInputFrom(form);
         if ("error" in course) return failure(course.error);
         const { input } = course;
-        if (!("courseId" in input) && missingUSState(input))
+        if (!("courseId" in input) && missingState(input))
           return failure("Select a state before logging this U.S. course");
         const result = await logRounds(db, user.id, input, form.quantity, form.playedAt);
         return {

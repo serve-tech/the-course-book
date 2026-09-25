@@ -64,6 +64,13 @@ export function deriveState(course: Course): string {
   }
   return "";
 }
+/** A U.S. course whose state cannot be resolved; such courses are not stored. */
+export function missingUSState(course: Course): boolean {
+  return (
+    countryFromLocation(course.location, course.country) === "USA" &&
+    !deriveState({ ...course, country: "USA" })
+  );
+}
 export function withUSState(course: Course, code: string): Course {
   const state = stateCode(code);
   if (!state) return course;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { courseSchema, RegionFilter } from "./course";
-import { matchesRegion } from "./geography";
+import { matchesRegion, missingUSState } from "./geography";
 
 describe("My List region matching", () => {
   it("uses location even when country metadata is wrong", () => {
@@ -26,4 +26,15 @@ describe("My List region matching", () => {
       ).toBe(true);
     },
   );
+});
+
+describe("U.S. state requirement", () => {
+  it.each([
+    ["a U.S. course with a state", { location: "Austin, TX, USA", country: "USA", state: "TX" }, false],
+    ["a U.S. location naming the state", { location: "Austin, Texas" }, false],
+    ["a U.S. course without a state", { location: "Somewhere, USA", country: "USA" }, true],
+    ["a course abroad", { location: "Dundee, Scotland", country: "Scotland" }, false],
+  ])("%s -> %s", (_label, fields, expected) => {
+    expect(missingUSState(courseSchema.parse({ id: "a", name: "Test", ...fields }))).toBe(expected);
+  });
 });
