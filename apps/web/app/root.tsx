@@ -9,7 +9,7 @@ import {
   ScrollRestoration,
 } from "react-router";
 import type { Route } from "./+types/root";
-import { clerkEnv } from "@coursebook/api/services/env";
+import { clerkEnv } from "./server/backend.server";
 import legacyStylesheet from "./shared/styles/legacy.css?url";
 
 export { middleware } from "./middleware";

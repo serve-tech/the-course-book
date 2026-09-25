@@ -1,7 +1,7 @@
 import type { Route } from "./+types/api.course-search";
 import { requireUser } from "../server/auth.server";
 import { db } from "../server/db.server";
-import { searchCourses } from "@coursebook/api/services/search";
+import { searchCourses } from "../server/backend.server";
 import { errorMessage } from "../shared/lib/errors";
 
 /** JSON resource route: `GET /api/course-search?q=` returns SearchResult[]. */

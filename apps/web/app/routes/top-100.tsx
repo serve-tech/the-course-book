@@ -1,9 +1,11 @@
 import type { Route } from "./+types/top-100";
 import { RankingsPage } from "../features/catalog/RankingsPage";
 import { getAppUser } from "../server/auth.server";
-import { publishedRankings } from "@coursebook/api/services/catalog";
+import {
+  listSummary,
+  publishedRankings,
+} from "../server/backend.server";
 import { db } from "../server/db.server";
-import { listSummary } from "@coursebook/api/services/journal";
 import { useShell } from "../shared/ui/shell";
 
 export const meta: Route.MetaFunction = () => [{ title: "Top 100 · coursebook.golf" }];

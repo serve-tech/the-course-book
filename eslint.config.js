@@ -7,10 +7,11 @@ import globals from "globals";
 export default tseslint.config(
   {
     ignores: [
-      "build/",
-      "dist/",
-      ".react-router/",
-      "node_modules/",
+      "**/build/",
+      "**/dist/",
+      "**/.react-router/",
+      "**/node_modules/",
+      "**/test-results/",
       "docs/",
     ],
   },
@@ -47,7 +48,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ["app/**/*.{ts,tsx}"],
+    files: ["apps/web/app/**/*.{ts,tsx}"],
     languageOptions: { globals: globals.browser },
     plugins: { "react-hooks": hooks, "react-refresh": refresh },
     rules: {
@@ -60,7 +61,7 @@ export default tseslint.config(
   },
   {
     // Route modules export loaders/actions/meta beside components by design.
-    files: ["app/root.tsx", "app/routes/**/*.{ts,tsx}", "app/entry.*.tsx"],
+    files: ["apps/web/app/root.tsx", "apps/web/app/routes/**/*.{ts,tsx}", "apps/web/app/entry.*.tsx"],
     rules: { "react-refresh/only-export-components": "off" },
   },
   {
@@ -95,13 +96,31 @@ export default tseslint.config(
     },
   },
   {
+    // Outside app/server the web app reaches the API package only through
+    // app/server/backend.server.ts, and never touches the database directly.
+    files: ["apps/web/app/**/*.{ts,tsx}"],
+    ignores: ["apps/web/app/server/**", "apps/web/app/**/*.test.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@coursebook/api", "@coursebook/api/*", "drizzle-orm", "drizzle-orm/*", "pg", "@clerk/backend"],
+              message: "Import services from app/server/backend.server.ts; the browser never touches the database.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: [
-      "app/server/**/*.ts",
-      "app/middleware.ts",
+      "apps/web/app/server/**/*.ts",
+      "apps/web/app/middleware.ts",
       "apps/api/**/*.ts",
-      "packages/*/vitest.config.ts",
       "tests/e2e/**/*.ts",
-      "*.config.ts",
+      "**/*.config.ts",
     ],
     languageOptions: { globals: { ...globals.node } },
   },

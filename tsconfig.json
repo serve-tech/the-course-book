@@ -1,29 +1,11 @@
 {
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "lib": [
-      "ES2023",
-      "DOM",
-      "DOM.Iterable"
-    ],
-    "jsx": "react-jsx",
-    "rootDirs": [
-      ".",
-      "./.react-router/types"
-    ],
     "types": [
-      "@react-router/node",
-      "vite/client",
       "node"
     ]
   },
   "include": [
-    "app",
-    "tests/e2e",
-    ".react-router/types/**/*",
-    "vite.config.ts",
-    "vitest.config.ts",
-    "playwright.config.ts",
-    "react-router.config.ts"
+    "vitest.config.ts"
   ]
 }

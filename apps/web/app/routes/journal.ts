@@ -2,20 +2,21 @@ import { data } from "react-router";
 import { z } from "zod";
 import type { Route } from "./+types/journal";
 import { requireUser } from "../server/auth.server";
-import { courseInputSchema, type CourseInput } from "@coursebook/api/services/catalog";
-import { db } from "../server/db.server";
-import { AppError } from "@coursebook/api/services/errors";
 import {
   addCustomCourse,
   addFromFriend,
   addFromRankings,
+  AppError,
+  type CourseInput,
+  courseInputSchema,
   deleteCourse,
   deleteRound,
   logRounds,
   moveCourse,
   roundHistory,
   setCount,
-} from "@coursebook/api/services/journal";
+} from "../server/backend.server";
+import { db } from "../server/db.server";
 import { countryFromLocation, deriveState } from "@coursebook/domain/catalog/geography";
 import { courseSchema } from "@coursebook/domain/catalog/course";
 

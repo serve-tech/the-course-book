@@ -1,7 +1,9 @@
 import { existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { defineConfig, devices } from "@playwright/test";
 
-if (existsSync(".env")) process.loadEnvFile(".env");
+const rootEnv = fileURLToPath(new URL("../../.env", import.meta.url));
+if (existsSync(rootEnv)) process.loadEnvFile(rootEnv);
 
 const TEST_DATABASE_URL =
   process.env["DATABASE_URL_TEST"] ??
@@ -20,9 +22,9 @@ const real = (value: string | undefined) =>
  * browser projects run.
  */
 export default defineConfig({
-  testDir: "./tests/e2e",
+  testDir: ".",
   // Every signed-in scenario, in both browser projects, resets and mutates
-  // the same two Clerk test users' rows (tests/e2e/db.ts). Parallel workers
+  // the same two Clerk test users' rows (db.ts). Parallel workers
   // collide on those rows, so the suite runs one test at a time.
   workers: 1,
   forbidOnly: !!process.env["CI"],
@@ -43,12 +45,12 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: "pnpm exec tsx tests/e2e/opengolf-stub.ts",
+      command: "pnpm exec tsx opengolf-stub.ts",
       url: STUB + "/healthz",
       reuseExistingServer: !process.env["CI"],
     },
     {
-      command: "pnpm build && pnpm start",
+      command: "pnpm --filter @coursebook/web build && pnpm --filter @coursebook/web start",
       url: APP + "/healthz",
       reuseExistingServer: !process.env["CI"],
       timeout: 120_000,

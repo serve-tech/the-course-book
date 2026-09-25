@@ -1,4 +1,4 @@
-import { sql } from "drizzle-orm";
+import { checkDatabase } from "../server/backend.server";
 import { db } from "../server/db.server";
 
 /**
@@ -7,7 +7,7 @@ import { db } from "../server/db.server";
  */
 export async function loader(): Promise<Response> {
   try {
-    await db.execute(sql`select 1`);
+    await checkDatabase(db);
     return Response.json({ ok: true });
   } catch (error) {
     console.error("Health check failed", error);

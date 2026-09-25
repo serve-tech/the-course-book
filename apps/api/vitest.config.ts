@@ -11,18 +11,19 @@ const TEST_DATABASE_URL =
 
 /**
  * API projects:
- * - api-node: pure modules, services without a database, scripts.
- * - api-db: `*.db.test.ts` suites against the migrated local test database,
- *   run serially because they share it.
+ * - node: pure modules, services without a database, scripts.
+ * - db: `*.db.test.ts` suites against the migrated local test database, run
+ *   serially and in their own sequence group because other packages' db
+ *   projects share the database.
  */
 export default defineConfig({
   test: {
-    restoreMocks: true,
     projects: [
       {
         test: {
-          name: "api-node",
+          name: "node",
           root: fileURLToPath(new URL(".", import.meta.url)),
+          restoreMocks: true,
           environment: "node",
           include: ["src/**/*.test.ts", "scripts/**/*.test.ts"],
           exclude: ["**/*.db.test.ts", "**/node_modules/**"],
@@ -30,12 +31,14 @@ export default defineConfig({
       },
       {
         test: {
-          name: "api-db",
+          name: "db",
           root: fileURLToPath(new URL(".", import.meta.url)),
+          restoreMocks: true,
           environment: "node",
           include: ["src/**/*.db.test.ts"],
           globalSetup: ["src/test/global-setup.ts"],
           fileParallelism: false,
+          sequence: { groupOrder: 1 },
           env: { DATABASE_URL: TEST_DATABASE_URL, DATABASE_URL_TEST: TEST_DATABASE_URL },
         },
       },

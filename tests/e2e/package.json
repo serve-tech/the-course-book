@@ -1,0 +1,22 @@
+{
+  "name": "@coursebook/e2e",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Playwright user flows against the built web app, the test database, an OpenGolfAPI stub and a Clerk development instance.",
+  "scripts": {
+    "test": "playwright test",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@clerk/backend": "^3.18.1",
+    "@clerk/testing": "2.2.36",
+    "@coursebook/api": "workspace:*",
+    "@coursebook/domain": "workspace:*",
+    "@playwright/test": "1.63.0",
+    "@types/node": "^24.0.0",
+    "drizzle-orm": "0.45.3",
+    "tsx": "^4.23.15",
+    "typescript": "6.0.3"
+  }
+}
