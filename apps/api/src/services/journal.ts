@@ -7,6 +7,7 @@ import type { ListEntry, ListSummary, RoundEntry } from "@coursebook/domain/jour
 import {
   findOrCreateCourse,
   invalidateCatalog,
+  rankedViews,
   requireCourse,
   type CourseInput,
 } from "./catalog";
@@ -61,8 +62,9 @@ export async function personalList(db: Executor, userId: string): Promise<ListEn
     .leftJoin(playedRows, eq(playedRows.courseId, userCourses.courseId))
     .where(eq(userCourses.userId, userId))
     .orderBy(userCourses.personalRank);
+  const views = await rankedViews(db, rows.map((row) => row.course));
   return rows.map((row) => ({
-    course: courseView(row.course),
+    course: views.get(row.course.id) ?? courseView(row.course),
     rank: row.rank,
     played: Number(row.played),
   }));

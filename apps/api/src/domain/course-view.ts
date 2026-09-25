@@ -17,6 +17,9 @@ export interface RankSummary {
   michigan?: number;
 }
 
+/** Placeholder location for courses with no city, state or country. */
+export const UNKNOWN_LOCATION = "Location not specified";
+
 function region(country: string, state: string | null): string {
   if (country.toUpperCase() !== "USA") return "international";
   return state?.toUpperCase() === "MI" ? "michigan" : "usa";
@@ -28,7 +31,7 @@ export function courseView(row: CourseRow, ranks: RankSummary = {}): Course {
     courseSchema.parse({
       id: row.id,
       name: row.name,
-      location: cloudLocation(row) || "Location not specified",
+      location: cloudLocation(row) || UNKNOWN_LOCATION,
       city: row.city ?? "",
       state: row.state ?? "",
       country: row.country,
@@ -54,7 +57,8 @@ export function rankSummaries(
     if (row.rankingType === "world") summary.world = row.rank;
     else if (row.rankingType === "usa") summary.usa = row.rank;
     else if (row.rankingType === "usa_public") summary.public = row.rank;
-    else if (row.rankingType === "state") {
+    else {
+      // The remaining ranking type is a Best-in-State list.
       summary.state = row.rank;
       if (row.scopeCode.toUpperCase() === "MI") summary.michigan = row.rank;
     }

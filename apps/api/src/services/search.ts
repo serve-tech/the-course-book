@@ -32,7 +32,19 @@ export const SEARCH_UNAVAILABLE =
 const API_TIMEOUT_MS = 8_000;
 const CSV_TIMEOUT_MS = 15_000;
 
-export function createCourseSearch(deps: SearchDependencies) {
+/** Course search as the API uses it; injectable for tests. */
+export interface CourseSearch {
+  /**
+   * Up to ten results for `query`, best first.
+   *
+   * Raises:
+   *     Error: `SEARCH_UNAVAILABLE` (with the cause) when both sources fail,
+   *         or the caller's AbortError when `signal` aborts.
+   */
+  search(query: string, signal?: AbortSignal): Promise<SearchResult[]>;
+}
+
+export function createCourseSearch(deps: SearchDependencies): CourseSearch {
   const fetcher = deps.fetcher ?? ((input, init) => globalThis.fetch(input, init));
   let dataset: RawCourse[] | null = null;
   let loading: Promise<RawCourse[]> | null = null;

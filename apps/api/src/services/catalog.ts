@@ -1,7 +1,7 @@
-import { eq, sql } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Database, Executor, Transaction } from "../db/client";
-import { courseRankings, courses } from "../db/schema";
+import { courseRankings, courses, type CourseRow } from "../db/schema";
 import { AppError, ErrorCode } from "./errors";
 import {
   cloudLocation,
@@ -63,6 +63,31 @@ export async function catalog(db: Database): Promise<CatalogSnapshot> {
     throw error;
   });
   return pending;
+}
+
+/**
+ * Domain views of course rows with their published ranks.
+ *
+ * Reads the rankings of just these courses, so it works inside a
+ * transaction and never serves ranks from a stale snapshot.
+ *
+ * Args:
+ *     executor: Database or open transaction.
+ *     rows: Course rows, in any order.
+ *
+ * Returns:
+ *     Views keyed by course id.
+ */
+export async function rankedViews(
+  executor: Executor,
+  rows: readonly CourseRow[],
+): Promise<Map<string, Course>> {
+  const ids = rows.map((row) => row.id);
+  const rankingRows = ids.length
+    ? await executor.select().from(courseRankings).where(inArray(courseRankings.courseId, ids))
+    : [];
+  const summaries = rankSummaries(rankingRows);
+  return new Map(rows.map((row) => [row.id, courseView(row, summaries.get(row.id))]));
 }
 
 /** Drop the snapshot so the next read sees a newly inserted course; call after commit. */

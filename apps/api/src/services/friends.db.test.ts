@@ -3,7 +3,7 @@ import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { courses, users } from "../db/schema";
 import { resetMemberData, testDatabase } from "../test/db";
 import { logRounds } from "./journal";
-import { memberList, members } from "./friends";
+import { memberList, memberPage, members } from "./friends";
 
 const { db, pool } = testDatabase();
 
@@ -34,6 +34,36 @@ describe("member directory", () => {
   });
 });
 
+describe("member directory pages", () => {
+  beforeEach(async () => {
+    await db.insert(users).values([
+      { id: "user_c", username: "Charlie", displayName: "Charlie" },
+      { id: "user_d", username: "delta", displayName: "Delta" },
+    ]);
+  });
+
+  it("pages by case-insensitive username with a cursor until the end", async () => {
+    const first = await memberPage(db, "user_a", { after: null, limit: 2 });
+    expect(first.members.map((m) => m.username)).toEqual(["bravo", "Charlie"]);
+    expect(first.nextCursor).toBe("Charlie");
+    const second = await memberPage(db, "user_a", { after: first.nextCursor, limit: 2 });
+    expect(second.members.map((m) => m.username)).toEqual(["delta"]);
+    expect(second.nextCursor).toBeNull();
+  });
+
+  it("returns no cursor when the page is exactly full", async () => {
+    const page = await memberPage(db, "user_a", { after: null, limit: 3 });
+    expect(page.members).toHaveLength(3);
+    expect(page.nextCursor).toBeNull();
+  });
+
+  it("never includes the viewer, deleted members or emails", async () => {
+    const page = await memberPage(db, "user_a", { after: null, limit: 50 });
+    expect(page.members.map((m) => m.username)).toEqual(["bravo", "Charlie", "delta"]);
+    expect(JSON.stringify(page)).not.toContain("example.com");
+  });
+});
+
 describe("member list", () => {
   it("returns the member's ranking with on-my-list evidence", async () => {
     const a = await seeded("usa1");
@@ -61,6 +91,11 @@ describe("member list", () => {
     await logRounds(db, "user_a", { courseId: duplicates[1]?.id ?? "" }, 1);
     const result = await memberList(db, "user_a", "bravo");
     expect(result?.rows[0]?.onMyList).toBe(true);
+  });
+
+  it("finds a member regardless of username case", async () => {
+    const list = await memberList(db, "user_a", "BRAVO");
+    expect(list?.member).toEqual({ username: "bravo", displayName: "Bravo" });
   });
 
   it("returns null for unknown or deleted members", async () => {
