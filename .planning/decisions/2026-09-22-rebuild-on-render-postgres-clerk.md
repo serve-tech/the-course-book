@@ -1,7 +1,7 @@
 # Rebuild on Render with Postgres and Clerk
 
 **Date:** 2026-09-22
-**Status:** Accepted
+**Status:** Accepted; single-process application shape superseded by [2026-09-25 split into a JSON API service](2026-09-25-split-into-json-api-service-for-web-ios-and-android.md)
 
 **Implementation:** branch `feat/render-clerk-rebuild` in this repository. `main` continues to deploy the Supabase application to GitHub Pages until cutover; it is frozen to hotfixes.
 
