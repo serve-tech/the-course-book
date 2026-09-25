@@ -3,8 +3,8 @@
  * test database the app server is pointed at.
  */
 import { eq, inArray, sql } from "drizzle-orm";
-import { createDatabase } from "../../app/db/client";
-import { courses, rounds, userCourses, users } from "../../app/db/schema";
+import { createDatabase } from "@coursebook/api/db/client";
+import { courses, rounds, userCourses, users } from "@coursebook/api/db/schema";
 import { normalizeName } from "@coursebook/domain/catalog/course";
 
 export const TEST_DATABASE_URL =

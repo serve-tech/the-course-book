@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { courseSchema } from "@coursebook/domain/catalog/course";
-import { SEARCH_UNAVAILABLE, createCourseSearch } from "./search.server";
+import { SEARCH_UNAVAILABLE, createCourseSearch } from "./search";
 
 const known = courseSchema.parse({
   id: "11111111-1111-4111-8111-111111111111",

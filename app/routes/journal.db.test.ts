@@ -1,10 +1,10 @@
 import { eq } from "drizzle-orm";
 import { RouterContextProvider } from "react-router";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { courses, users } from "../db/schema";
+import { courses, users } from "@coursebook/api/db/schema";
 import { userContext } from "../server/auth.server";
-import { logRounds, roundHistory } from "../server/journal.server";
-import { resetMemberData, testDatabase } from "../test/db";
+import { logRounds, roundHistory } from "@coursebook/api/services/journal";
+import { resetMemberData, testDatabase } from "@coursebook/api/test/db";
 import { action, loader } from "./journal";
 
 const { db, pool } = testDatabase();

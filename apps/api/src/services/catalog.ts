@@ -2,7 +2,7 @@ import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Database, Executor, Transaction } from "../db/client";
 import { courseRankings, courses } from "../db/schema";
-import { AppError, ErrorCode } from "./errors.server";
+import { AppError, ErrorCode } from "./errors";
 import {
   cloudLocation,
   courseSchema,
@@ -14,9 +14,9 @@ import {
   courseView,
   rankSummaries,
   rankedCourses,
-} from "../features/catalog/course-view";
+} from "../domain/course-view";
 import { countryFromLocation, stateCode } from "@coursebook/domain/catalog/geography";
-import { aliases, canonicalize } from "../features/catalog/identity";
+import { aliases, canonicalize } from "../domain/identity";
 
 /**
  * Server-side course catalog: an in-process snapshot of every course and

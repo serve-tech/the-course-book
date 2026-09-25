@@ -4,8 +4,8 @@
  * I/O, so the rules are unit-tested with plain data.
  */
 import type { Course } from "@coursebook/domain/catalog/course";
-import { equivalentCourses } from "../../app/features/catalog/identity";
-import { USERNAME_PATTERN } from "../../app/features/auth/username";
+import { equivalentCourses } from "../../src/domain/identity";
+import { USERNAME_PATTERN } from "../../src/domain/username";
 
 export interface ExportedProfile {
   id: string;

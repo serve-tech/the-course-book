@@ -3,7 +3,7 @@ import type { Route } from "./+types/friends";
 import { FriendsPage } from "../features/friends/FriendsPage";
 import { getAppUser } from "../server/auth.server";
 import { db } from "../server/db.server";
-import { memberList, members } from "../server/friends.server";
+import { memberList, members } from "@coursebook/api/services/friends";
 import { useShell } from "../shared/ui/shell";
 
 export const meta: Route.MetaFunction = () => [{ title: "Friends · coursebook.golf" }];

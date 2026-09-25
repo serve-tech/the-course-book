@@ -9,8 +9,8 @@ import {
   findOrCreateCourse,
   invalidateCatalog,
   requireCourse,
-} from "./catalog.server";
-import { ErrorCode } from "./errors.server";
+} from "./catalog";
+import { ErrorCode } from "./errors";
 
 const { db, pool } = testDatabase();
 

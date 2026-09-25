@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { toPublicMember } from "./authz.server";
+import { toPublicMember } from "./authz";
 
 const member = { id: "user_a", username: "alpha", displayName: "Alpha" };
 

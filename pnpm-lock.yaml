@@ -169,6 +169,9 @@ importers:
       '@clerk/react-router':
         specifier: 3.6.24
         version: 3.6.24(react-dom@19.3.0(react@19.3.0))(react-router@8.4.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react@19.3.0)
+      '@coursebook/api':
+        specifier: workspace:*
+        version: link:apps/api
       '@coursebook/domain':
         specifier: workspace:*
         version: link:packages/domain
@@ -272,6 +275,43 @@ importers:
       vite:
         specifier: 8.3.0
         version: 8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(tsx@4.23.15)
+      vitest:
+        specifier: 5.0.1
+        version: 5.0.1(@types/node@24.13.5)(jsdom@30.1.0)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(tsx@4.23.15))
+
+  apps/api:
+    dependencies:
+      '@clerk/backend':
+        specifier: ^3.18.1
+        version: 3.18.1(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      '@coursebook/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
+      drizzle-orm:
+        specifier: 0.45.3
+        version: 0.45.3(@types/pg@8.23.1)(pg@8.23.0)
+      pg:
+        specifier: 8.23.0
+        version: 8.23.0
+      zod:
+        specifier: 4.6.5
+        version: 4.6.5
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.13.5
+      '@types/pg':
+        specifier: ^8.23.1
+        version: 8.23.1
+      drizzle-kit:
+        specifier: 0.31.11
+        version: 0.31.11
+      tsx:
+        specifier: ^4.23.15
+        version: 4.23.15
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
       vitest:
         specifier: 5.0.1
         version: 5.0.1(@types/node@24.13.5)(jsdom@30.1.0)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(tsx@4.23.15))

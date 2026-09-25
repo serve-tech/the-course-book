@@ -2,7 +2,7 @@ import type { Route } from "./+types/my-list";
 import { JournalPage } from "../features/journal/JournalPage";
 import { getAppUser } from "../server/auth.server";
 import { db } from "../server/db.server";
-import { personalList } from "../server/journal.server";
+import { personalList } from "@coursebook/api/services/journal";
 import { useShell } from "../shared/ui/shell";
 
 export const meta: Route.MetaFunction = () => [{ title: "My List · coursebook.golf" }];

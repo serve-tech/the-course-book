@@ -1,15 +1,18 @@
 import { existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { z } from "zod";
 
 /**
  * Validated process environment, grouped so a module only requires the
  * variables it uses. Each group is parsed once on first access.
  *
- * Locally the `.env` file is loaded when present. In production Render
- * supplies the variables; nothing is read from disk.
+ * Locally the repository's `.env` is loaded when present, found by path so it
+ * works from any working directory. In production Render supplies the
+ * variables; nothing is read from disk.
  */
-if (process.env["NODE_ENV"] !== "production" && existsSync(".env")) {
-  process.loadEnvFile(".env");
+const localEnv = fileURLToPath(new URL("../../../../.env", import.meta.url));
+if (process.env["NODE_ENV"] !== "production" && existsSync(localEnv)) {
+  process.loadEnvFile(localEnv);
 }
 
 const databaseSchema = z.object({

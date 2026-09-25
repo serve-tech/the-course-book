@@ -1,5 +1,5 @@
-import { createDatabase, type Database } from "../db/client";
-import { databaseEnv } from "./env.server";
+import { createDatabase, type Database } from "@coursebook/api/db/client";
+import { databaseEnv } from "@coursebook/api/services/env";
 
 /**
  * Process-wide database handle for routes. Server modules take a `Database`

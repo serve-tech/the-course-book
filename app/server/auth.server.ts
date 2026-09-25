@@ -6,14 +6,14 @@ import {
   type RouterContextProvider,
 } from "react-router";
 import { db } from "./db.server";
-import { clerkEnv } from "./env.server";
-import { AppError } from "./errors.server";
+import { clerkEnv } from "@coursebook/api/services/env";
+import { AppError } from "@coursebook/api/services/errors";
 import {
   createProvisioner,
   identityFromClerkUser,
   provisionUser,
   type AppUser,
-} from "./provisioning.server";
+} from "@coursebook/api/services/provisioning";
 
 /**
  * React Router glue for application identity.
@@ -24,7 +24,7 @@ import {
  * `requireUser`; they never accept a user id from the client.
  */
 
-export type { AppUser } from "./provisioning.server";
+export type { AppUser } from "@coursebook/api/services/provisioning";
 
 export const userContext = createContext<AppUser | null>(null);
 

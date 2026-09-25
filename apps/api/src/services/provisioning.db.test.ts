@@ -2,8 +2,8 @@ import { eq } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { users } from "../db/schema";
 import { resetMemberData, testDatabase } from "../test/db";
-import { ErrorCode } from "./errors.server";
-import { provisionUser } from "./provisioning.server";
+import { ErrorCode } from "./errors";
+import { provisionUser } from "./provisioning";
 
 const { db, pool } = testDatabase();
 

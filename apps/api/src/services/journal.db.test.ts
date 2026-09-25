@@ -14,9 +14,9 @@ import {
   personalList,
   roundHistory,
   setCount,
-} from "./journal.server";
-import { ErrorCode } from "./errors.server";
-import { allCourses, invalidateCatalog } from "./catalog.server";
+} from "./journal";
+import { ErrorCode } from "./errors";
+import { allCourses, invalidateCatalog } from "./catalog";
 
 const { db, pool } = testDatabase();
 const USER = "user_j";

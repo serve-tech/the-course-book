@@ -1,4 +1,4 @@
-import type { CourseRankingRow, CourseRow } from "../../db/schema";
+import type { CourseRankingRow, CourseRow } from "../db/schema";
 import { cloudLocation, courseSchema, type Course, type RankedCourse } from "@coursebook/domain/catalog/course";
 import { canonicalize } from "./identity";
 

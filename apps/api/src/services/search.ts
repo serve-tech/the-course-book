@@ -1,16 +1,16 @@
 import type { Database } from "../db/client";
 import { normalizeName, type Course } from "@coursebook/domain/catalog/course";
-import { resolveAPICourse } from "../features/catalog/identity";
+import { resolveAPICourse } from "../domain/identity";
 import {
   extractCourses,
   matchesQuery,
   parseAPICourse,
   type RawCourse,
-} from "../features/catalog/opengolf";
+} from "../domain/opengolf";
 import { searchScore } from "@coursebook/domain/catalog/ranking-selectors";
 import type { SearchResult } from "@coursebook/domain/catalog/search-results";
-import { allCourses } from "./catalog.server";
-import { searchEnv } from "./env.server";
+import { allCourses } from "./catalog";
+import { searchEnv } from "./env";
 
 /**
  * Course discovery: OpenGolfAPI's REST search with its published CSV dataset
@@ -47,7 +47,7 @@ export function createCourseSearch(deps: SearchDependencies) {
       .then(async (response) => {
         if (!response.ok)
           throw new Error("OpenGolfAPI dataset " + String(response.status));
-        const { parseCSV } = await import("../features/catalog/opengolf");
+        const { parseCSV } = await import("../domain/opengolf");
         dataset = parseCSV(await response.text());
         return dataset;
       })

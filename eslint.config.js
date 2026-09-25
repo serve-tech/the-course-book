@@ -12,7 +12,6 @@ export default tseslint.config(
       ".react-router/",
       "node_modules/",
       "docs/",
-      "scripts/**/*.mjs",
     ],
   },
   js.configs.recommended,
@@ -82,11 +81,25 @@ export default tseslint.config(
     },
   },
   {
+    // The API package runs on Node and never renders UI.
+    files: ["apps/api/**/*.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            { group: ["react", "react-*", "react/*", "@react-router/*"], message: "@coursebook/api has no UI." },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: [
       "app/server/**/*.ts",
-      "app/db/**/*.ts",
       "app/middleware.ts",
-      "scripts/**/*.ts",
+      "apps/api/**/*.ts",
+      "packages/*/vitest.config.ts",
       "tests/e2e/**/*.ts",
       "*.config.ts",
     ],

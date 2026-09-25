@@ -1,0 +1,35 @@
+{
+  "name": "@coursebook/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "coursebook.golf data, services and (soon) the JSON API: schema, migrations, journal and catalog transactions.",
+  "exports": {
+    "./db/*": "./src/db/*.ts",
+    "./services/*": "./src/services/*.ts",
+    "./test/*": "./src/test/*.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "db:generate": "drizzle-kit generate",
+    "db:check": "drizzle-kit check",
+    "db:migrate": "node --env-file-if-exists=../../.env src/db/migrate.ts",
+    "seed:build": "tsx scripts/build-seed.ts",
+    "import:supabase": "tsx scripts/import-supabase.ts"
+  },
+  "dependencies": {
+    "@clerk/backend": "^3.18.1",
+    "@coursebook/domain": "workspace:*",
+    "drizzle-orm": "0.45.3",
+    "pg": "8.23.0",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/pg": "^8.23.1",
+    "drizzle-kit": "0.31.11",
+    "tsx": "^4.23.15",
+    "typescript": "6.0.3",
+    "vitest": "5.0.1"
+  }
+}

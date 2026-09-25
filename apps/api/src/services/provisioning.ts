@@ -2,8 +2,8 @@ import { sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Database } from "../db/client";
 import { users } from "../db/schema";
-import { USERNAME_RULE, isValidUsername } from "../features/auth/username";
-import { AppError, ErrorCode } from "./errors.server";
+import { USERNAME_RULE, isValidUsername } from "../domain/username";
+import { AppError, ErrorCode } from "./errors";
 
 /**
  * Application users on top of Clerk, independent of any web framework.

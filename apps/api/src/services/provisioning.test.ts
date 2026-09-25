@@ -5,7 +5,7 @@ import {
   identityFromClerkUser,
   type AppUser,
   type Identity,
-} from "./provisioning.server";
+} from "./provisioning";
 
 describe("identity from session claims", () => {
   it("reads the custom claims and defaults the display name", () => {

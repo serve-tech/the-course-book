@@ -2,8 +2,8 @@ import { eq } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { courses, users } from "../db/schema";
 import { resetMemberData, testDatabase } from "../test/db";
-import { logRounds } from "./journal.server";
-import { memberList, members } from "./friends.server";
+import { logRounds } from "./journal";
+import { memberList, members } from "./friends";
 
 const { db, pool } = testDatabase();
 

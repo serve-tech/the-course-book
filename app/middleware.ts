@@ -1,7 +1,7 @@
 import { clerkMiddleware } from "@clerk/react-router/server";
 import type { MiddlewareFunction } from "react-router";
 import { appUserMiddleware } from "./server/auth.server";
-import { clerkEnv } from "./server/env.server";
+import { clerkEnv } from "@coursebook/api/services/env";
 
 /**
  * Request middleware for every route: Clerk verifies the session, then the

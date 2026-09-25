@@ -6,15 +6,17 @@
  * each bundled course id (usa1.., michigan1.., world1..) to its catalog row
  * using the identity rules, and writes:
  *
- * - app/db/seed/courses.csv and rankings.csv for review and diffing
+ * - apps/api/src/db/seed/courses.csv and rankings.csv for review and diffing
  * - the SQL body of the seed migration passed as the first argument
  *
  * Bundled courses with no catalog match are inserted with a deterministic
  * UUID derived from their stable id so re-running the script is idempotent.
- * Run with `pnpm seed:build app/db/migrations/<file>.sql`.
+ * Run with `pnpm seed:build src/db/migrations/<file>.sql` (the path is
+ * relative to apps/api).
  */
 import { createHash } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { cloudLocation, courseSchema, normalizeName, type Course } from "@coursebook/domain/catalog/course";
 import {
   canonicalize,
@@ -22,14 +24,14 @@ import {
   informationScore,
   resolveAPICourse,
   resolveRanked,
-} from "../app/features/catalog/identity";
+} from "../src/domain/identity";
 import {
   countryFromLocation,
   deriveState,
   isUSCourse,
   withUSState,
 } from "@coursebook/domain/catalog/geography";
-import bundled from "../app/features/catalog/bundled-courses.json";
+import bundled from "../src/domain/bundled-courses.json";
 
 const SUPABASE_URL = "https://naawqzwvegqbhioqqzkh.supabase.co";
 const PUBLISHABLE_KEY = "sb_publishable_kZG71hYb0OkAOEA_bVbFBA_I7JhVkHJ";
@@ -256,9 +258,10 @@ async function run(): Promise<void> {
     courseType.add(type);
   }
 
-  mkdirSync("app/db/seed", { recursive: true });
+  const seedDir = fileURLToPath(new URL("../src/db/seed/", import.meta.url));
+  mkdirSync(seedDir, { recursive: true });
   writeFileSync(
-    "app/db/seed/courses.csv",
+    seedDir + "courses.csv",
     ["id,stable_id,name,city,state,country,website_url,logo_url,is_custom"]
       .concat(
         allCourses.map((row) =>
@@ -280,7 +283,7 @@ async function run(): Promise<void> {
       .join("\n") + "\n",
   );
   writeFileSync(
-    "app/db/seed/rankings.csv",
+    seedDir + "rankings.csv",
     ["id,course_id,ranking_type,scope_code,rank,source,source_year,source_url"]
       .concat(
         rankingRows.map((row) =>

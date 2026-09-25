@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { CourseRankingRow, CourseRow } from "../../db/schema";
+import type { CourseRankingRow, CourseRow } from "../db/schema";
 import { courseView, rankSummaries, rankedCourses } from "./course-view";
 
 const row = (overrides: Partial<CourseRow> = {}): CourseRow => ({

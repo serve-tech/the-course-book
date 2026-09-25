@@ -1,8 +1,8 @@
 /**
  * Import member data from the retired Supabase project into Postgres.
  *
- * Inputs are CSV exports (with header rows) in IMPORT_DIR (default .import/,
- * gitignored): profiles.csv, courses.csv, user_courses.csv, rounds.csv.
+ * Inputs are CSV exports (with header rows) in IMPORT_DIR (default .import/ at the repository
+ * root, gitignored): profiles.csv, courses.csv, user_courses.csv, rounds.csv.
  * The maintainer produces them with `\copy <table> to '<file>' csv header`
  * against the Supabase database; the repository never holds them.
  *
@@ -12,7 +12,7 @@
  * 2. Each profile is matched to a Clerk user by email, or created in Clerk
  *    without a password so the member signs in with Google or a reset. The
  *    users row records legacy_supabase_id.
- * 3. Memberships are re-ordered and de-duplicated by scripts/import/plan.ts;
+ * 3. Memberships are re-ordered and de-duplicated by apps/api/scripts/import/plan.ts;
  *    rounds are re-pointed and inserted; courses that only had rounds get a
  *    membership at the bottom.
  * 4. Counts are printed for verification.
@@ -22,13 +22,14 @@
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { createClerkClient } from "@clerk/backend";
 import { eq, inArray, sql } from "drizzle-orm";
-import { createDatabase } from "../app/db/client";
-import { courses, rounds, userCourses, users } from "../app/db/schema";
+import { createDatabase } from "../src/db/client";
+import { courses, rounds, userCourses, users } from "../src/db/schema";
 import { normalizeName } from "@coursebook/domain/catalog/course";
-import { courseView } from "../app/features/catalog/course-view";
-import { parseCSV } from "../app/features/catalog/opengolf";
+import { courseView } from "../src/domain/course-view";
+import { parseCSV } from "../src/domain/opengolf";
 import {
   planMemberships,
   remapRounds,
@@ -39,7 +40,9 @@ import {
 } from "./import/plan";
 
 const dryRun = process.argv.includes("--dry-run");
-const importDir = process.env["IMPORT_DIR"] ?? ".import";
+// Exports stay outside the repository tree that is committed: the default is
+// the gitignored .import/ at the repository root, whatever the working directory.
+const importDir = process.env["IMPORT_DIR"] ?? fileURLToPath(new URL("../../../.import", import.meta.url));
 const databaseUrl = process.env["DATABASE_URL"];
 const clerkSecretKey = process.env["CLERK_SECRET_KEY"];
 if (!databaseUrl || !clerkSecretKey) {

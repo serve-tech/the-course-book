@@ -1,7 +1,7 @@
 import { clerkSetup } from "@clerk/testing/playwright";
 import { test as setup } from "@playwright/test";
 import { createClerkClient } from "@clerk/backend";
-import { runMigrations } from "../../app/db/migrate";
+import { runMigrations } from "@coursebook/api/db/migrate";
 import { authAvailable, friendEmail, ownerEmail } from "./auth";
 import {
   connect,

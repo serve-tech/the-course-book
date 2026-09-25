@@ -38,7 +38,7 @@ jobs:
         run: |
           pnpm db:check
           pnpm db:generate
-          git diff --exit-code --stat app/db/migrations
+          git diff --exit-code --stat apps/api/src/db/migrations
       - run: pnpm db:migrate
       - run: pnpm test
       - run: pnpm build
