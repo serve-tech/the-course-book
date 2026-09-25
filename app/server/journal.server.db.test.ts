@@ -16,6 +16,7 @@ import {
   setCount,
 } from "./journal.server";
 import { ErrorCode } from "./errors.server";
+import { allCourses, invalidateCatalog } from "./catalog.server";
 
 const { db, pool } = testDatabase();
 const USER = "user_j";
@@ -212,5 +213,39 @@ describe("counts and deletion", () => {
     await expect(deleteRound(db, USER, round?.id ?? "")).rejects.toMatchObject({ status: 404, code: ErrorCode.RoundNotFound });
     await expect(setCount(db, USER, a, 0)).rejects.toMatchObject({ status: 404, code: ErrorCode.NotOnList });
     expect(await roundHistory(db, "user_other", a)).toHaveLength(1);
+  });
+});
+
+describe("catalog cache after creating a course", () => {
+  /** Wait until some statement in this database is blocked on a lock. */
+  const waitForLockWait = async () => {
+    for (let attempt = 0; attempt < 250; attempt += 1) {
+      const { rows } = await pool.query<{ waiting: number }>(
+        "select count(*)::int as waiting from pg_stat_activity where datname = current_database() and wait_event_type = 'Lock'",
+      );
+      if ((rows[0]?.waiting ?? 0) > 0) return;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    throw new Error("the journal transaction never waited on the row lock");
+  };
+
+  it("includes a new course when a snapshot load raced its transaction", async () => {
+    await logRounds(db, USER, { courseId: await seeded("usa1") }, 1);
+    invalidateCatalog();
+    // Hold a lock that addCustomCourse needs after it inserts the course, so a
+    // snapshot can load between the insert and the commit.
+    const blocker = await pool.connect();
+    try {
+      await blocker.query("begin");
+      await blocker.query("select 1 from user_courses where user_id = $1 for update", [USER]);
+      const creating = addCustomCourse(db, USER, { ...blob("Race Condition Links", "Hometown, OH"), isCustom: true }, null);
+      await waitForLockWait();
+      await allCourses(db);
+      await blocker.query("commit");
+      const { courseId } = await creating;
+      expect((await allCourses(db)).some((course) => course.id === courseId)).toBe(true);
+    } finally {
+      blocker.release();
+    }
   });
 });

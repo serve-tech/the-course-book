@@ -65,7 +65,7 @@ export async function catalog(db: Database): Promise<CatalogSnapshot> {
   return pending;
 }
 
-/** Drop the snapshot so the next read sees a newly inserted course. */
+/** Drop the snapshot so the next read sees a newly inserted course; call after commit. */
 export function invalidateCatalog(): void {
   pending = undefined;
 }
@@ -138,14 +138,17 @@ export async function requireCourse(
  *     createdBy: Acting user, recorded on inserted rows.
  *
  * Returns:
- *     The course row id.
+ *     The course row id and whether this call inserted it. When `created` is
+ *     true the caller must call `invalidateCatalog()` after the transaction
+ *     commits; invalidating earlier lets a concurrent load cache a snapshot
+ *     that cannot see the uncommitted row.
  */
 export async function findOrCreateCourse(
   tx: Transaction,
   input: CourseInput,
   createdBy: string | null,
-): Promise<string> {
-  if ("courseId" in input) return requireCourse(tx, input.courseId);
+): Promise<{ id: string; created: boolean }> {
+  if ("courseId" in input) return { id: await requireCourse(tx, input.courseId), created: false };
 
   const course = canonicalize(courseSchema.parse({ id: "input", ...input }));
   const key = normalizeName(course.name);
@@ -153,7 +156,7 @@ export async function findOrCreateCourse(
   const stableId = aliases.get(key);
   if (stableId) {
     const id = await courseByStableId(tx, stableId);
-    if (id) return id;
+    if (id) return { id, created: false };
   }
 
   await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${key || course.name}))`);
@@ -173,7 +176,7 @@ export async function findOrCreateCourse(
       countryFromLocation(cloudLocation(row), row.country) === wantedCountry &&
       normalizeName(cloudLocation(row)) === wantedLocation,
   );
-  if (match) return match.id;
+  if (match) return { id: match.id, created: false };
 
   const parts = course.location
     .split(",")
@@ -197,8 +200,7 @@ export async function findOrCreateCourse(
     })
     .returning({ id: courses.id });
   if (!inserted) throw new Error("Course insert returned no row");
-  invalidateCatalog();
-  return inserted.id;
+  return { id: inserted.id, created: true };
 }
 
 /** Rankings and course views for the Rankings page. */

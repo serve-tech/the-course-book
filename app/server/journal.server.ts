@@ -1,11 +1,12 @@
 import { and, count, desc, eq, inArray, sql } from "drizzle-orm";
-import type { Database, Transaction } from "../db/client";
+import type { Database, Executor, Transaction } from "../db/client";
 import { courses, rounds, userCourses } from "../db/schema";
 import type { Course } from "../features/catalog/course";
 import { courseView } from "../features/catalog/course-view";
 import { insertAt, reorder } from "../features/journal/reorder";
 import {
   findOrCreateCourse,
+  invalidateCatalog,
   requireCourse,
   type CourseInput,
 } from "./catalog.server";
@@ -59,7 +60,7 @@ export async function listSummary(db: Database, userId: string): Promise<ListSum
 }
 
 /** The member's personal list in rank order with play counts. */
-export async function personalList(db: Database, userId: string): Promise<ListEntry[]> {
+export async function personalList(db: Executor, userId: string): Promise<ListEntry[]> {
   const playedRows = db
     .select({ courseId: rounds.courseId, played: count().as("played") })
     .from(rounds)
@@ -224,12 +225,14 @@ export async function logRounds(
   quantity: number,
   playedAt?: string,
 ): Promise<{ courseId: string; count: number }> {
-  return withJournalLock(db, userId, async (tx) => {
-    const courseId = await findOrCreateCourse(tx, input, userId);
-    await ensureMembership(tx, userId, courseId);
-    const inserted = await insertRounds(tx, userId, courseId, Math.max(1, quantity), playedAt);
-    return { courseId, count: inserted.length };
+  const result = await withJournalLock(db, userId, async (tx) => {
+    const course = await findOrCreateCourse(tx, input, userId);
+    await ensureMembership(tx, userId, course.id);
+    const inserted = await insertRounds(tx, userId, course.id, Math.max(1, quantity), playedAt);
+    return { courseId: course.id, count: inserted.length, created: course.created };
   });
+  if (result.created) invalidateCatalog();
+  return { courseId: result.courseId, count: result.count };
 }
 
 /**
@@ -269,8 +272,9 @@ export async function addCustomCourse(
   input: Exclude<CourseInput, { courseId: string }>,
   requestedRank: number | null,
 ): Promise<{ courseId: string; rank: number }> {
-  return withJournalLock(db, userId, async (tx) => {
-    const courseId = await findOrCreateCourse(tx, { ...input, isCustom: true }, userId);
+  const result = await withJournalLock(db, userId, async (tx) => {
+    const course = await findOrCreateCourse(tx, { ...input, isCustom: true }, userId);
+    const courseId = course.id;
     const existing = await membershipRank(tx, userId, courseId);
     let rank = existing;
     if (rank === undefined) {
@@ -280,8 +284,10 @@ export async function addCustomCourse(
       rank = order.indexOf(courseId) + 1;
     }
     await insertRounds(tx, userId, courseId, 1);
-    return { courseId, rank };
+    return { courseId, rank, created: course.created };
   });
+  if (result.created) invalidateCatalog();
+  return { courseId: result.courseId, rank: result.rank };
 }
 
 /** Move a course to a rank; the whole list is renumbered from its full order. */
