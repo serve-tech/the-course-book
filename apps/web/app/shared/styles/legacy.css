@@ -434,3 +434,12 @@ h1 { font: 600 clamp(40px, 5vw, 60px) / 0.98 "Playfair Display"; letter-spacing:
 @media (max-width: 760px) {
   .authmodal input { font-size: 16px !important; }
 }
+
+/* Additions for the account and privacy pages (2026-09-25); the rules above are the preserved original design. */
+.app-footer .app-footer-links { margin-top: 10px; }
+.app-footer-links a { color: inherit; }
+.prose { max-width: 720px; color: var(--muted); font-size: 14px; line-height: 1.6; }
+.prose h3 { color: var(--cream); font: 600 20px "Playfair Display"; margin: 26px 0 6px; }
+.account-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; flex-wrap: wrap; }
+.error-text { color: rgb(240, 202, 202); font-size: 13px; margin: 8px 0 0; }
+#authProblem { max-width: 1120px; margin: 8px auto 0; padding: 0 20px; }

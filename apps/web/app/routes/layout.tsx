@@ -1,10 +1,10 @@
-import { useAuth, useClerk } from "@clerk/react-router";
+import { getToken, useAuth, useClerk } from "@clerk/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { NavLink, Outlet, useRevalidator } from "react-router";
+import { Link, NavLink, Outlet, useRevalidator, type ShouldRevalidateFunctionArgs } from "react-router";
 import type { Route } from "./+types/layout";
 import { AuthDialog } from "../features/auth/AuthDialog";
+import { api, ApiError, unwrap } from "../lib/api";
 import { useServerWaking } from "../lib/api/server-status";
-import { getAppUser } from "../server/auth.server";
 import { detectState } from "../shared/lib/geolocation";
 import { errorMessage } from "../shared/lib/errors";
 import { preferences } from "../shared/lib/storage";
@@ -15,8 +15,35 @@ import type { Shell } from "../shared/ui/shell";
 const SELECTED_STATE_KEY = "theCourseBookSelectedState";
 const MOBILE_BREAKPOINT = 760;
 
-export function loader({ context }: Route.LoaderArgs) {
-  return { user: getAppUser(context) };
+/**
+ * The signed-in member from the API. An account the app cannot use (its
+ * Clerk username breaks the product rule, or it was deleted) shows as signed
+ * out with the reason, instead of failing every page.
+ */
+export async function clientLoader() {
+  if (!(await getToken())) return { user: null, problem: null };
+  try {
+    return { user: unwrap(await api.GET("/v1/me")), problem: null };
+  } catch (error) {
+    if (error instanceof ApiError && (error.status === 401 || error.status === 403))
+      return { user: null, problem: error.message };
+    throw error;
+  }
+}
+clientLoader.hydrate = true as const;
+
+/** Journal changes never change who is signed in. */
+export function shouldRevalidate({ formAction, defaultShouldRevalidate }: ShouldRevalidateFunctionArgs) {
+  return formAction === "/journal" ? false : defaultShouldRevalidate;
+}
+
+export function HydrateFallback() {
+  return (
+    <div className="app">
+      <Brand />
+      <p className="empty">Loading coursebook.golf…</p>
+    </div>
+  );
 }
 
 /**
@@ -26,7 +53,7 @@ export function loader({ context }: Route.LoaderArgs) {
  * client render the same markup.
  */
 export default function Layout({ loaderData }: Route.ComponentProps) {
-  const { user } = loaderData;
+  const { user, problem } = loaderData;
   const clerk = useClerk();
   const { userId } = useAuth();
   const revalidator = useRevalidator();
@@ -127,6 +154,11 @@ export default function Layout({ loaderData }: Route.ComponentProps) {
           {user ? "Sign out" : "Sign in"}
         </button>
       </div>
+      {problem && (
+        <p className="error-text" id="authProblem" role="alert">
+          {problem}
+        </p>
+      )}
 
       <nav>
         {(
@@ -190,6 +222,9 @@ export default function Layout({ loaderData }: Route.ComponentProps) {
           {refreshing ? "Refreshing…" : "Refresh App"}
         </button>
         <span id="refreshedDate">coursebook.golf</span>
+        <span className="app-footer-links">
+          <Link to="/account">Account</Link> · <Link to="/privacy">Privacy</Link>
+        </span>
       </footer>
 
       <div

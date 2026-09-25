@@ -8,4 +8,3 @@
  */
 export { clerkEnv } from "@coursebook/api/services/env";
 export { checkDatabase } from "@coursebook/api/services/health";
-export { searchCourses } from "@coursebook/api/services/search";

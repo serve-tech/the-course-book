@@ -4,19 +4,17 @@ import { deriveState, isUSCourse, withUSState } from "@coursebook/domain/catalog
 import { Modal } from "../../shared/ui/Modal";
 import { StateSelect } from "../../shared/ui/StateSelect";
 import { errorMessage } from "../../shared/lib/errors";
+import { api, unwrap } from "../../lib/api";
+import { fromSearchHit } from "../../lib/api/mappers";
 import { replyMessage, useJournalFetcher } from "../journal/use-journal-fetcher";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SEARCH_DEBOUNCE_MS = 180;
 
-interface SearchFailure {
-  error: string;
-}
-
 /**
- * Log a round: search courses through the server, pick one, set the count.
- * A result that resolved to a catalog course posts its id; anything else
- * posts the course details for the server to find or create.
+ * Log a round: search courses through the API, pick one, set the count.
+ * A hit already in the catalog posts its id; anything else posts the course
+ * details for the API to find or create.
  */
 export function LogRoundDialog({
   signedIn,
@@ -50,18 +48,9 @@ export function LogRoundDialog({
     if (text.length < 2) return;
     const controller = new AbortController();
     const timeout = setTimeout(() => {
-      fetch("/api/course-search?q=" + encodeURIComponent(text), {
-        signal: controller.signal,
-        headers: { Accept: "application/json" },
-      })
-        .then(async (response) => {
-          const body = (await response.json()) as SearchResult[] | SearchFailure;
-          if (!response.ok || !Array.isArray(body))
-            throw new Error(
-              Array.isArray(body) ? "Course search failed" : body.error,
-            );
-          return body;
-        })
+      api
+        .GET("/v1/course-search", { params: { query: { q: text } }, signal: controller.signal })
+        .then((result) => unwrap(result).results.map(fromSearchHit))
         .then(
           (value) => {
             if (controller.signal.aborted) return;
