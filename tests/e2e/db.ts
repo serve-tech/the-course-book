@@ -45,6 +45,23 @@ export async function ensureFixtureCourses(db: ReturnType<typeof connect>["db"])
     .onConflictDoNothing();
 }
 
+/**
+ * Delete every member except the given ones, with the courses they created.
+ *
+ * The Vitest database suites share this database and leave their last test's
+ * members behind; the Friends scenario asserts the exact member directory.
+ * Courses go first because deleting a user nulls `created_by`, after which
+ * they could no longer be identified.
+ */
+export async function removeOtherMembers(
+  db: ReturnType<typeof connect>["db"],
+  members: readonly TestMember[],
+): Promise<void> {
+  const ids = sql.join(members.map((member) => sql`${member.id}`), sql`, `);
+  await db.delete(courses).where(sql`${courses.createdBy} is not null and ${courses.createdBy} not in (${ids})`);
+  await db.delete(users).where(sql`${users.id} not in (${ids})`);
+}
+
 /** Upsert the two test members' rows so directory and provisioning agree. */
 export async function ensureMembers(
   db: ReturnType<typeof connect>["db"],
