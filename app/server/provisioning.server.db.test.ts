@@ -1,14 +1,9 @@
 import { eq } from "drizzle-orm";
-import { RouterContextProvider } from "react-router";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { users } from "../db/schema";
 import { resetMemberData, testDatabase } from "../test/db";
-import {
-  identityFromClaims,
-  provisionUser,
-  requireUser,
-  userContext,
-} from "./auth.server";
+import { ErrorCode } from "./errors.server";
+import { provisionUser } from "./provisioning.server";
 
 const { db, pool } = testDatabase();
 
@@ -49,37 +44,10 @@ describe("user provisioning", () => {
     expect(user.displayName).toBe("golfer_1");
   });
 
-  it("rejects usernames outside the product rule with a 403 response", async () => {
+  it("rejects usernames outside the product rule with a 403 AppError", async () => {
     await expect(
       provisionUser(db, "user_1", { ...identity, username: "bad-name" }),
-    ).rejects.toMatchObject({ init: { status: 403 } });
+    ).rejects.toMatchObject({ status: 403, code: ErrorCode.UsernameInvalid });
     expect(await db.select().from(users)).toHaveLength(0);
-  });
-});
-
-describe("identity from session claims", () => {
-  it("reads the custom claims and defaults the display name", () => {
-    expect(
-      identityFromClaims({ sub: "user_1", username: "golfer_1", email: "g@example.com" }),
-    ).toEqual({ username: "golfer_1", displayName: "golfer_1", email: "g@example.com", avatarUrl: null });
-  });
-
-  it("returns undefined without a username claim so the backend is consulted", () => {
-    expect(identityFromClaims({ sub: "user_1" })).toBeUndefined();
-    expect(identityFromClaims(null)).toBeUndefined();
-  });
-});
-
-describe("requireUser", () => {
-  it("throws a 401 data response for anonymous requests", () => {
-    const context = new RouterContextProvider();
-    expect(() => requireUser(context)).toThrow(expect.objectContaining({ init: { status: 401 } }));
-  });
-
-  it("returns the context user when signed in", () => {
-    const context = new RouterContextProvider();
-    const user = { id: "user_1", username: "golfer_1", displayName: "Golfer One" };
-    context.set(userContext, user);
-    expect(requireUser(context)).toBe(user);
   });
 });

@@ -1,4 +1,4 @@
-import type { AppUser } from "./auth.server";
+import type { AppUser } from "./provisioning.server";
 
 /**
  * Authorization rules, stated in one place so they can be read and tested.
