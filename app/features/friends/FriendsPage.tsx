@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
-import type { PublicMember } from "../../server/authz.server";
-import type { MemberList } from "../../server/friends.server";
+import type { MemberList, PublicMember } from "./types";
 import { replyMessage, useJournalFetcher } from "../journal/use-journal-fetcher";
 
 enum FriendsFilter {

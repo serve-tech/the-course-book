@@ -1,4 +1,5 @@
 import type { AppUser } from "./provisioning.server";
+import type { PublicMember } from "../features/friends/types";
 
 /**
  * Authorization rules, stated in one place so they can be read and tested.
@@ -17,10 +18,6 @@ export enum Access {
 }
 
 /** Public projection of a member; never includes email or the Clerk id. */
-export interface PublicMember {
-  username: string;
-  displayName: string;
-}
 
 export function canViewMemberLists(viewer: AppUser | null): boolean {
   return viewer !== null;

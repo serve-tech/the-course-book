@@ -1,9 +1,9 @@
 import { and, count, desc, eq, inArray, sql } from "drizzle-orm";
 import type { Database, Executor, Transaction } from "../db/client";
 import { courses, rounds, userCourses } from "../db/schema";
-import type { Course } from "../features/catalog/course";
 import { courseView } from "../features/catalog/course-view";
 import { insertAt, reorder } from "../features/journal/reorder";
+import type { ListEntry, ListSummary, RoundEntry } from "../features/journal/types";
 import {
   findOrCreateCourse,
   invalidateCatalog,
@@ -20,24 +20,6 @@ import { AppError, ErrorCode } from "./errors.server";
  * contiguous 1..N per user; `renumber` keeps that invariant after any
  * insertion, move or removal. Play counts are always counted from rounds.
  */
-
-export interface ListSummary {
-  /** Round count per course id (only courses with at least one round). */
-  played: Record<string, number>;
-  /** Course ids on the member's list, in rank order. */
-  onList: string[];
-}
-
-export interface ListEntry {
-  course: Course;
-  rank: number;
-  played: number;
-}
-
-export interface RoundEntry {
-  id: string;
-  playedAt: string;
-}
 
 /** Play counts and list membership for a member; empty for anonymous users. */
 export async function listSummary(db: Database, userId: string): Promise<ListSummary> {

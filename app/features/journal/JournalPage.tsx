@@ -10,13 +10,8 @@ import { AddCourseDialog } from "../rounds/AddCourseDialog";
 import { CountEditor } from "./CountEditor";
 import { useCourseDrag } from "./use-course-drag";
 import { reorder } from "./reorder";
+import type { ListEntry } from "./types";
 import { replyMessage, useJournalFetcher } from "./use-journal-fetcher";
-
-export interface ListRow {
-  course: Course;
-  rank: number;
-  played: number;
-}
 
 enum Dialog {
   Log = "log",
@@ -38,7 +33,7 @@ export function JournalPage({
   onSearchFocus,
   openAuth,
 }: {
-  rows: readonly ListRow[];
+  rows: readonly ListEntry[];
   signedIn: boolean;
   selectedState: string;
   onState: (value: string) => void;

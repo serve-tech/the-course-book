@@ -1,11 +1,12 @@
 import { useEffect } from "react";
 import { useFetcher } from "react-router";
 import type { Course } from "../catalog/course";
+import type { RoundEntry } from "../journal/types";
 import { Modal } from "../../shared/ui/Modal";
 import { replyMessage, useJournalFetcher } from "../journal/use-journal-fetcher";
 
 interface HistoryData {
-  rounds?: { id: string; playedAt: string }[];
+  rounds?: RoundEntry[];
   error?: string;
 }
 

@@ -1,28 +1,16 @@
 import { and, asc, eq, isNull, ne } from "drizzle-orm";
 import type { Database } from "../db/client";
 import { courses, userCourses, users } from "../db/schema";
-import type { Course } from "../features/catalog/course";
 import { courseView } from "../features/catalog/course-view";
 import { equivalentCourses } from "../features/catalog/identity";
-import { toPublicMember, type PublicMember } from "./authz.server";
+import type { MemberList, PublicMember } from "../features/friends/types";
+import { toPublicMember } from "./authz.server";
 import { personalList } from "./journal.server";
 
 /**
  * Member directory and read-only views of other members' lists. Only the
  * public projection of a member (username, display name) ever leaves here.
  */
-
-export interface MemberListRow {
-  course: Course;
-  rank: number;
-  /** Whether the viewer already has this course (by id or equivalent identity). */
-  onMyList: boolean;
-}
-
-export interface MemberList {
-  member: PublicMember;
-  rows: MemberListRow[];
-}
 
 /** Every other active member, ordered by username. */
 export async function members(db: Database, viewerId: string): Promise<PublicMember[]> {
