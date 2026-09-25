@@ -10,6 +10,8 @@ export const courseSchema = z.object({
   world: z.number().nullable().default(null),
   usa: z.number().nullable().default(null),
   michigan: z.number().nullable().default(null),
+  /** Rank on the course's own Best-in-State list, whatever the state. */
+  stateRank: z.number().nullable().default(null),
   public: z.number().nullable().default(null),
   logo: z.string().default(""),
   website: z.string().default(""),

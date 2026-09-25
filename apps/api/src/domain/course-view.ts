@@ -11,6 +11,9 @@ export interface RankSummary {
   world?: number;
   usa?: number;
   public?: number;
+  /** Rank on the course's state list; a course is on at most one. */
+  state?: number;
+  /** The same rank when that list is Michigan's (legacy display field). */
   michigan?: number;
 }
 
@@ -34,6 +37,7 @@ export function courseView(row: CourseRow, ranks: RankSummary = {}): Course {
       usa: ranks.usa ?? null,
       public: ranks.public ?? null,
       michigan: ranks.michigan ?? null,
+      stateRank: ranks.state ?? null,
       logo: row.logoUrl ?? "",
       website: row.websiteUrl ?? "",
     }),
@@ -50,7 +54,10 @@ export function rankSummaries(
     if (row.rankingType === "world") summary.world = row.rank;
     else if (row.rankingType === "usa") summary.usa = row.rank;
     else if (row.rankingType === "usa_public") summary.public = row.rank;
-    else if (row.scopeCode.toUpperCase() === "MI") summary.michigan = row.rank;
+    else if (row.rankingType === "state") {
+      summary.state = row.rank;
+      if (row.scopeCode.toUpperCase() === "MI") summary.michigan = row.rank;
+    }
     result.set(row.courseId, summary);
   }
   return result;

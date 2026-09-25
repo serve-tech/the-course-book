@@ -52,14 +52,21 @@ describe("course view", () => {
     });
   });
 
-  it("summarizes ranks per course and maps public and Michigan lists", () => {
+  it("summarizes ranks per course and maps public and state lists", () => {
+    const ohio = "22222222-2222-4222-8222-222222222222";
     const summaries = rankSummaries([
       ranking({ id: "a", rankingType: "world", rank: 3, scopeCode: "WORLD" }),
       ranking({ id: "b", rankingType: "usa_public", rank: 7, scopeCode: "USA_PUBLIC" }),
       ranking({ id: "c", rankingType: "state", rank: 2, scopeCode: "MI" }),
-      ranking({ id: "d", rankingType: "state", rank: 9, scopeCode: "OH" }),
+      ranking({ id: "d", courseId: ohio, rankingType: "state", rank: 9, scopeCode: "OH" }),
     ]);
-    expect(summaries.get(row().id)).toEqual({ world: 3, public: 7, michigan: 2 });
+    expect(summaries.get(row().id)).toEqual({ world: 3, public: 7, state: 2, michigan: 2 });
+    expect(summaries.get(ohio)).toEqual({ state: 9 });
+  });
+
+  it("carries the state rank on the course view", () => {
+    expect(courseView(row({ state: "OH" }), { state: 9 })).toMatchObject({ stateRank: 9, michigan: null });
+    expect(courseView(row()).stateRank).toBeNull();
   });
 
   it("drops rankings whose course is unknown", () => {
