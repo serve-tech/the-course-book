@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import type { SearchResult } from "../catalog/search-results";
-import { deriveState, isUSCourse, withUSState } from "../catalog/geography";
+import type { SearchResult } from "@coursebook/domain/catalog/search-results";
+import { deriveState, isUSCourse, withUSState } from "@coursebook/domain/catalog/geography";
 import { Modal } from "../../shared/ui/Modal";
 import { StateSelect } from "../../shared/ui/StateSelect";
 import { errorMessage } from "../../shared/lib/errors";

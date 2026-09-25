@@ -1,4 +1,4 @@
-import { stateOptions } from "../../features/catalog/geography";
+import { stateOptions } from "@coursebook/domain/catalog/geography";
 export function StateSelect({
   id,
   value,

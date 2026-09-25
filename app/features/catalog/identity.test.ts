@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { courseSchema, normalizeName } from "./course";
+import { courseSchema, normalizeName } from "@coursebook/domain/catalog/course";
 import { canonicalize, equivalentCourses, resolveRanked } from "./identity";
 import bundled from "./bundled-courses.json";
 const catalog = bundled.map((course) => courseSchema.parse(course));

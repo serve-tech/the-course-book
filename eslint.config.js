@@ -65,6 +65,23 @@ export default tseslint.config(
     rules: { "react-refresh/only-export-components": "off" },
   },
   {
+    // The domain package holds pure rules shared by the API and the web app.
+    files: ["packages/domain/src/**/*.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["react", "react-*", "react/*", "@react-router/*", "hono", "hono/*", "drizzle-orm", "drizzle-orm/*", "pg", "@clerk/*", "node:*"],
+              message: "@coursebook/domain must stay framework-, database- and runtime-free.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: [
       "app/server/**/*.ts",
       "app/db/**/*.ts",

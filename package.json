@@ -12,7 +12,7 @@
     "build": "react-router build",
     "start": "react-router-serve ./build/server/index.js",
     "typegen": "react-router typegen",
-    "typecheck": "react-router typegen && tsc --noEmit",
+    "typecheck": "react-router typegen && tsc --noEmit && pnpm --filter @coursebook/domain typecheck",
     "lint": "react-router typegen && eslint .",
     "test": "vitest run",
     "test:unit": "vitest run --project node --project jsdom",
@@ -27,6 +27,7 @@
   },
   "dependencies": {
     "@clerk/react-router": "3.6.24",
+    "@coursebook/domain": "workspace:*",
     "@react-router/node": "8.4.0",
     "@react-router/serve": "8.4.0",
     "drizzle-orm": "0.45.3",

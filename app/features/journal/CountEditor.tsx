@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { Course } from "../catalog/course";
+import type { Course } from "@coursebook/domain/catalog/course";
 import { replyMessage, useJournalFetcher } from "./use-journal-fetcher";
 
 /** Inline "times played" editor for one list row; posts the set-count intent. */

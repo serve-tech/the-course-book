@@ -1,8 +1,8 @@
 import { eq } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { courses, users } from "../db/schema";
-import { RankingFilter } from "../features/catalog/course";
-import { selectRankings } from "../features/catalog/ranking-selectors";
+import { RankingFilter } from "@coursebook/domain/catalog/course";
+import { selectRankings } from "@coursebook/domain/catalog/ranking-selectors";
 import { resetMemberData, testDatabase } from "../test/db";
 import {
   catalog,

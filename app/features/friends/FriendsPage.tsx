@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
-import type { MemberList, PublicMember } from "./types";
+import type { MemberList, PublicMember } from "@coursebook/domain/friends/types";
 import { replyMessage, useJournalFetcher } from "../journal/use-journal-fetcher";
 
 enum FriendsFilter {

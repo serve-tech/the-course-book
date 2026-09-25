@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { useFetcher } from "react-router";
-import { RankingFilter, type RankedCourse } from "./course";
-import { selectRankings } from "./ranking-selectors";
-import { stateName } from "./geography";
+import { RankingFilter, type RankedCourse } from "@coursebook/domain/catalog/course";
+import { selectRankings } from "@coursebook/domain/catalog/ranking-selectors";
+import { stateName } from "@coursebook/domain/catalog/geography";
 import { StateSelect } from "../../shared/ui/StateSelect";
 
 /** The journal action's reply shape as seen by fetchers. */

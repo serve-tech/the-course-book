@@ -3,7 +3,7 @@ import type { Database } from "../db/client";
 import { courses, userCourses, users } from "../db/schema";
 import { courseView } from "../features/catalog/course-view";
 import { equivalentCourses } from "../features/catalog/identity";
-import type { MemberList, PublicMember } from "../features/friends/types";
+import type { MemberList, PublicMember } from "@coursebook/domain/friends/types";
 import { toPublicMember } from "./authz.server";
 import { personalList } from "./journal.server";
 

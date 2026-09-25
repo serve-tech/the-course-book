@@ -1,4 +1,4 @@
-import states from "../../shared/data/us-states.json";
+import states from "../data/us-states.json";
 import { normalizeName, type Course, RegionFilter } from "./course";
 export const stateOptions = states;
 export function stateCode(value: string): string {

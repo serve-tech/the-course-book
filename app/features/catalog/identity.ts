@@ -1,5 +1,5 @@
-import { normalizeName, type Course } from "./course";
-import { countryFromLocation } from "./geography";
+import { normalizeName, type Course } from "@coursebook/domain/catalog/course";
+import { countryFromLocation } from "@coursebook/domain/catalog/geography";
 
 export const canonicalLocations = new Map(
   [

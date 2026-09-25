@@ -15,7 +15,7 @@
  */
 import { createHash } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { cloudLocation, courseSchema, normalizeName, type Course } from "../app/features/catalog/course";
+import { cloudLocation, courseSchema, normalizeName, type Course } from "@coursebook/domain/catalog/course";
 import {
   canonicalize,
   equivalentCourses,
@@ -28,7 +28,7 @@ import {
   deriveState,
   isUSCourse,
   withUSState,
-} from "../app/features/catalog/geography";
+} from "@coursebook/domain/catalog/geography";
 import bundled from "../app/features/catalog/bundled-courses.json";
 
 const SUPABASE_URL = "https://naawqzwvegqbhioqqzkh.supabase.co";

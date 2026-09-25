@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { SafeStorage } from "./storage";
-import { stateCode } from "../../features/catalog/geography";
+import { stateCode } from "@coursebook/domain/catalog/geography";
 const responseSchema = z.object({
   countryCode: z.string().optional(),
   principalSubdivisionCode: z.string().optional(),

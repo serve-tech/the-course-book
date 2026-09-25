@@ -23,7 +23,7 @@ export default defineConfig({
         test: {
           name: "node",
           environment: "node",
-          include: ["app/**/*.test.ts", "scripts/**/*.test.ts"],
+          include: ["app/**/*.test.ts", "scripts/**/*.test.ts", "packages/*/src/**/*.test.ts"],
           exclude: ["**/*.db.test.ts", "**/node_modules/**"],
         },
       },

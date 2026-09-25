@@ -3,7 +3,7 @@
  * exported rows in and gets back exactly what to write; nothing here does
  * I/O, so the rules are unit-tested with plain data.
  */
-import type { Course } from "../../app/features/catalog/course";
+import type { Course } from "@coursebook/domain/catalog/course";
 import { equivalentCourses } from "../../app/features/catalog/identity";
 import { USERNAME_PATTERN } from "../../app/features/auth/username";
 

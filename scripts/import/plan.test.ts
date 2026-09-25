@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { courseSchema } from "../../app/features/catalog/course";
+import { courseSchema } from "@coursebook/domain/catalog/course";
 import { planMemberships, remapRounds, usernameFor, type ExportedMembership, type ExportedRound } from "./plan";
 
 const course = (id: string, name: string, location = "Detroit, MI, USA") =>

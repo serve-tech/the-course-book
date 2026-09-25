@@ -1,5 +1,5 @@
 import type { Database } from "../db/client";
-import { normalizeName, type Course } from "../features/catalog/course";
+import { normalizeName, type Course } from "@coursebook/domain/catalog/course";
 import { resolveAPICourse } from "../features/catalog/identity";
 import {
   extractCourses,
@@ -7,8 +7,8 @@ import {
   parseAPICourse,
   type RawCourse,
 } from "../features/catalog/opengolf";
-import { searchScore } from "../features/catalog/ranking-selectors";
-import type { SearchResult } from "../features/catalog/search-results";
+import { searchScore } from "@coursebook/domain/catalog/ranking-selectors";
+import type { SearchResult } from "@coursebook/domain/catalog/search-results";
 import { allCourses } from "./catalog.server";
 import { searchEnv } from "./env.server";
 

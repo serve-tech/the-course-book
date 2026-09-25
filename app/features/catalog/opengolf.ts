@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { courseSchema, normalizeName, type Course } from "./course";
+import { courseSchema, normalizeName, type Course } from "@coursebook/domain/catalog/course";
 
 /**
  * Pure parsing for OpenGolfAPI responses and its published CSV dataset.

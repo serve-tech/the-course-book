@@ -1,4 +1,4 @@
-import type { PublicMember } from "../features/friends/types";
+import type { PublicMember } from "@coursebook/domain/friends/types";
 
 /**
  * Authorization rules, stated in one place. Routes enforce them with

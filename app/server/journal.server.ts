@@ -2,8 +2,8 @@ import { and, count, desc, eq, inArray, sql } from "drizzle-orm";
 import type { Database, Executor, Transaction } from "../db/client";
 import { courses, rounds, userCourses } from "../db/schema";
 import { courseView } from "../features/catalog/course-view";
-import { insertAt, reorder } from "../features/journal/reorder";
-import type { ListEntry, ListSummary, RoundEntry } from "../features/journal/types";
+import { insertAt, reorder } from "@coursebook/domain/journal/reorder";
+import type { ListEntry, ListSummary, RoundEntry } from "@coursebook/domain/journal/types";
 import {
   findOrCreateCourse,
   invalidateCatalog,

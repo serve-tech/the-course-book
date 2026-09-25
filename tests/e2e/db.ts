@@ -5,7 +5,7 @@
 import { eq, inArray, sql } from "drizzle-orm";
 import { createDatabase } from "../../app/db/client";
 import { courses, rounds, userCourses, users } from "../../app/db/schema";
-import { normalizeName } from "../../app/features/catalog/course";
+import { normalizeName } from "@coursebook/domain/catalog/course";
 
 export const TEST_DATABASE_URL =
   process.env["DATABASE_URL_TEST"] ??

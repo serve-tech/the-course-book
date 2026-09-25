@@ -1,7 +1,7 @@
 import { Fragment, useState } from "react";
 import { createPortal } from "react-dom";
-import { RegionFilter, type Course } from "../catalog/course";
-import { matchesRegion, stateName } from "../catalog/geography";
+import { RegionFilter, type Course } from "@coursebook/domain/catalog/course";
+import { matchesRegion, stateName } from "@coursebook/domain/catalog/geography";
 import { StateSelect } from "../../shared/ui/StateSelect";
 import { CourseDetails } from "./CourseDetails";
 import { RoundHistory } from "../rounds/RoundHistory";
@@ -9,8 +9,8 @@ import { LogRoundDialog } from "../rounds/LogRoundDialog";
 import { AddCourseDialog } from "../rounds/AddCourseDialog";
 import { CountEditor } from "./CountEditor";
 import { useCourseDrag } from "./use-course-drag";
-import { reorder } from "./reorder";
-import type { ListEntry } from "./types";
+import { reorder } from "@coursebook/domain/journal/reorder";
+import type { ListEntry } from "@coursebook/domain/journal/types";
 import { replyMessage, useJournalFetcher } from "./use-journal-fetcher";
 
 enum Dialog {

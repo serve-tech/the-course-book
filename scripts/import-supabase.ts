@@ -26,7 +26,7 @@ import { createClerkClient } from "@clerk/backend";
 import { eq, inArray, sql } from "drizzle-orm";
 import { createDatabase } from "../app/db/client";
 import { courses, rounds, userCourses, users } from "../app/db/schema";
-import { normalizeName } from "../app/features/catalog/course";
+import { normalizeName } from "@coursebook/domain/catalog/course";
 import { courseView } from "../app/features/catalog/course-view";
 import { parseCSV } from "../app/features/catalog/opengolf";
 import {

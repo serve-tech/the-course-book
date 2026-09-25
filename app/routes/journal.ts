@@ -16,8 +16,8 @@ import {
   roundHistory,
   setCount,
 } from "../server/journal.server";
-import { countryFromLocation, deriveState } from "../features/catalog/geography";
-import { courseSchema } from "../features/catalog/course";
+import { countryFromLocation, deriveState } from "@coursebook/domain/catalog/geography";
+import { courseSchema } from "@coursebook/domain/catalog/course";
 
 /**
  * Every journal mutation posts here with an `intent` field. Each intent runs

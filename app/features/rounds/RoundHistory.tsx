@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useFetcher } from "react-router";
-import type { Course } from "../catalog/course";
-import type { RoundEntry } from "../journal/types";
+import type { Course } from "@coursebook/domain/catalog/course";
+import type { RoundEntry } from "@coursebook/domain/journal/types";
 import { Modal } from "../../shared/ui/Modal";
 import { replyMessage, useJournalFetcher } from "../journal/use-journal-fetcher";
 

@@ -9,13 +9,13 @@ import {
   normalizeName,
   type Course,
   type RankedCourse,
-} from "../features/catalog/course";
+} from "@coursebook/domain/catalog/course";
 import {
   courseView,
   rankSummaries,
   rankedCourses,
 } from "../features/catalog/course-view";
-import { countryFromLocation, stateCode } from "../features/catalog/geography";
+import { countryFromLocation, stateCode } from "@coursebook/domain/catalog/geography";
 import { aliases, canonicalize } from "../features/catalog/identity";
 
 /**

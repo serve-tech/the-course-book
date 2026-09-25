@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { Course } from "../catalog/course";
+import type { Course } from "@coursebook/domain/catalog/course";
 import { Modal } from "../../shared/ui/Modal";
 import { replyMessage, useJournalFetcher } from "./use-journal-fetcher";
 
