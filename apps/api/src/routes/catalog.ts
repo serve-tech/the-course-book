@@ -6,6 +6,7 @@ import { requireUser } from "../auth/middleware";
 import { toRankingEntry, toSearchHit } from "../contract/mappers";
 import { listRankings, searchCourses } from "../contract/routes";
 import type { AppEnv } from "../http/env";
+import { etagMatches } from "../http/etag";
 import { publishedRankings } from "../services/catalog";
 import { AppError, ErrorCode } from "../services/errors";
 import { SEARCH_UNAVAILABLE } from "../services/search";
@@ -36,7 +37,7 @@ export function registerCatalogRoutes(app: OpenAPIHono<AppEnv>, deps: AppDepende
     const { body, etag } = rankingsBody(await publishedRankings(deps.db));
     c.header("ETag", etag);
     c.header("Cache-Control", "public, max-age=3600, stale-while-revalidate=86400");
-    if (c.req.header("if-none-match") === etag) return c.body(null, 304);
+    if (etagMatches(c.req.header("if-none-match"), etag)) return c.body(null, 304);
     return c.json(body, 200);
   });
 

@@ -110,6 +110,15 @@ describe("GET /v1/rankings", () => {
     expect(await again.text()).toBe("");
   });
 
+  it("answers 304 to the weak ETag a gzip response carried", async () => {
+    const t = createTestApp(db);
+    const first = await t.app.request("/v1/rankings", { headers: { "accept-encoding": "gzip" } });
+    const weak = first.headers.get("etag") ?? "";
+    expect(weak).toMatch(/^W\//);
+    const again = await t.app.request("/v1/rankings", { headers: { "accept-encoding": "gzip", "if-none-match": weak } });
+    expect(again.status).toBe(304);
+  });
+
   it("compresses the response for clients that accept gzip", async () => {
     const t = createTestApp(db);
     const response = await t.app.request("/v1/rankings", { headers: { "accept-encoding": "gzip" } });
