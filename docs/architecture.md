@@ -103,7 +103,7 @@ Clerk holds credentials, Google sign-in, email verification and sessions. [auth.
 Clerk dashboard configuration the code assumes:
 
 - User & authentication: username required, first name required, email required, Google enabled. The product's stricter username rule (`^[A-Za-z0-9_]{3,24}$`) is re-checked by `provisionUser`, which answers 403 for a violating account rather than creating it.
-- Sessions, customize session token: `{"username": "{{user.username}}", "email": "{{user.primary_email_address}}", "name": "{{user.first_name}}", "image_url": "{{user.image_url}}"}`. Without it, provisioning fetches the user from the Backend API once per request.
+- Sessions, customize session token: `{"username": "{{user.username}}", "email": "{{user.primary_email_address}}", "name": "{{user.full_name}}", "image_url": "{{user.image_url}}"}`. Without it, provisioning fetches the user from the Backend API once per request.
 - Environment: `CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` are read by `env.server.ts` and passed explicitly to the middleware and root loader.
 - Production instance: DNS records on coursebook.golf and the project's own Google OAuth client.
 

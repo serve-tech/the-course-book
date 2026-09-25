@@ -23,9 +23,9 @@ import { clerkEnv } from "./env.server";
  * from the client.
  *
  * Session token claims: configure the Clerk session token template with
- * `username`, `email`, `name` and `image_url` so provisioning needs no
- * Backend API call. When a claim is missing (default template), the user is
- * fetched once from the Backend API.
+ * `username`, `email`, `name` (the full name) and `image_url` so
+ * provisioning needs no Backend API call. When a claim is missing (default
+ * template), the user is fetched once from the Backend API.
  */
 
 export interface AppUser {
@@ -70,10 +70,9 @@ async function identityFromBackend(userId: string): Promise<Identity> {
   const client = createClerkClient({ secretKey: clerkEnv().CLERK_SECRET_KEY });
   const user = await client.users.getUser(userId);
   const username = user.username ?? "";
-  const name = [user.firstName, user.lastName].filter(Boolean).join(" ");
   return {
     username,
-    displayName: name || username,
+    displayName: user.fullName ?? username,
     email: user.primaryEmailAddress?.emailAddress ?? null,
     avatarUrl: user.imageUrl || null,
   };

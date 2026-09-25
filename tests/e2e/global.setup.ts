@@ -33,7 +33,7 @@ setup("prepare database and Clerk", async () => {
         members.push({
           id: user.id,
           username: user.username,
-          displayName: user.firstName ?? user.username,
+          displayName: user.fullName ?? user.username,
           email,
         });
       }

@@ -155,7 +155,7 @@ try {
         .values({
           id: clerkId,
           username: found?.username ?? username,
-          displayName: found?.firstName ?? profile.display_name ?? username,
+          displayName: found?.fullName ?? profile.display_name ?? username,
           email: profile.email,
           avatarUrl: profile.avatar_url,
           legacySupabaseId: profile.id,
