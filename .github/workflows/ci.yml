@@ -5,24 +5,119 @@ on:
   pull_request:
 permissions:
   contents: read
+env:
+  DATABASE_URL: postgres://coursebook:coursebook@localhost:5433/coursebook_test
+  DATABASE_URL_TEST: postgres://coursebook:coursebook@localhost:5433/coursebook_test
+  # The web build inlines the API origin; the browser suite serves the API there.
+  VITE_API_URL: http://127.0.0.1:3001
+  # Placeholder for builds that only compile; the browser suite injects the real key.
+  VITE_CLERK_PUBLISHABLE_KEY: pk_test_ZXhhbXBsZS5jbGVyay5hY2NvdW50cy5kZXYk
 jobs:
   verify:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: coursebook
+          POSTGRES_PASSWORD: coursebook
+          POSTGRES_DB: coursebook_test
+        ports: ['5433:5432']
+        options: >-
+          --health-cmd "pg_isready -U coursebook -d coursebook_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
-          cache: npm
-      - run: npm ci
-      - run: npm run lint
-      - run: npm run typecheck
-      - run: npm test
-      - run: npm run build
-      - run: npx playwright install --with-deps chromium
-      - run: npm run test:e2e
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - name: Migration drift gate
+        run: |
+          pnpm db:check
+          pnpm db:generate
+          git diff --exit-code --stat apps/api/src/db/migrations
+      - name: API contract drift gate
+        run: pnpm contract:check
+      - run: pnpm db:migrate
+      - run: pnpm test
+      - run: pnpm build
+  browser:
+    runs-on: ubuntu-latest
+    needs: verify
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: coursebook
+          POSTGRES_PASSWORD: coursebook
+          POSTGRES_DB: coursebook_test
+        ports: ['5433:5432']
+        options: >-
+          --health-cmd "pg_isready -U coursebook -d coursebook_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      # Clerk development-instance keys and the two test accounts. Without
+      # the keys every scenario skips; without the accounts the signed-in
+      # scenarios skip. Nothing is stubbed.
+      CLERK_PUBLISHABLE_KEY: ${{ secrets.E2E_CLERK_PUBLISHABLE_KEY }}
+      CLERK_SECRET_KEY: ${{ secrets.E2E_CLERK_SECRET_KEY }}
+      E2E_OWNER_EMAIL: ${{ secrets.E2E_OWNER_EMAIL }}
+      E2E_FRIEND_EMAIL: ${{ secrets.E2E_FRIEND_EMAIL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @coursebook/e2e exec playwright install --with-deps chromium
+      - run: pnpm test:e2e
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: playwright-report
-          path: test-results/
+          path: tests/e2e/test-results/
+  docker:
+    runs-on: ubuntu-latest
+    needs: verify
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: coursebook
+          POSTGRES_PASSWORD: coursebook
+          POSTGRES_DB: coursebook_test
+        ports: ['5433:5432']
+        options: >-
+          --health-cmd "pg_isready -U coursebook -d coursebook_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -f apps/api/Dockerfile -t coursebook-api:ci .
+      # Proves the bundle starts with no node_modules, migrates on start and
+      # serves the seeded catalog. Clerk keys are placeholders; no token is sent.
+      - name: Smoke test the API image
+        run: |
+          docker run -d --name api --network host \
+            -e DATABASE_URL="$DATABASE_URL" \
+            -e CLERK_PUBLISHABLE_KEY="pk_test_$(printf 'example.clerk.accounts.dev$' | base64)" \
+            -e CLERK_SECRET_KEY="sk_test_000000000000000000000000000000000000000000000000" \
+            -e PORT=3001 \
+            coursebook-api:ci
+          curl --retry 30 --retry-delay 1 --retry-all-errors -fsS localhost:3001/healthz
+          test "$(curl -fsS localhost:3001/v1/rankings | jq '.entries | length')" = 1430
+          test "$(curl -s -o /dev/null -w '%{http_code}' localhost:3001/v1/me)" = 401
+      - if: always()
+        run: docker logs api

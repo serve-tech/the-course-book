@@ -1,0 +1,101 @@
+# Render Blueprint for coursebook.golf. This file is the source of truth for
+# Render infrastructure; secret values are entered in the dashboard (sync: false).
+# Schema: https://render.com/schema/render.yaml.json
+#
+# Staging runs on free plans (.planning/research/2026-09-25-free-tier-hosting.md):
+# the API sleeps after 15 idle minutes and takes about a minute to wake, and
+# free Postgres expires 30 days after creation. At cutover (docs/cutover.md):
+# coursebook-db moves to basic-256mb with diskSizeGB 1 before real data is
+# imported, and coursebook-api moves to starter before the mobile apps ship.
+# Omitting `plan` selects a paid plan, so every resource states one.
+databases:
+  - name: coursebook-db
+    plan: free
+    region: oregon
+    postgresMajorVersion: "17"
+
+services:
+  # JSON API for the web, iOS and Android clients. Migrations run when the
+  # container starts (free plans have no pre-deploy step).
+  - type: web
+    name: coursebook-api
+    runtime: docker
+    plan: free
+    region: oregon
+    branch: feat/render-clerk-rebuild # switch to main at cutover
+    dockerContext: .
+    dockerfilePath: ./apps/api/Dockerfile
+    healthCheckPath: /healthz
+    autoDeployTrigger: commit
+    buildFilter:
+      paths:
+        - apps/api/**
+        - packages/domain/**
+        - package.json
+        - pnpm-lock.yaml
+        - pnpm-workspace.yaml
+        - tsconfig.base.json
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: coursebook-db
+          property: connectionString
+      - key: CLERK_PUBLISHABLE_KEY
+        sync: false
+      - key: CLERK_SECRET_KEY
+        sync: false
+      # PEM public key from Clerk (API keys, "Show JWT public key") so tokens
+      # verify without a network call after a cold start.
+      - key: CLERK_JWT_KEY
+        sync: false
+      # Exact origins of the web app, comma-separated, e.g. the static site's
+      # onrender.com URL and later https://coursebook.golf.
+      - key: WEB_ORIGINS
+        sync: false
+      - key: PUBLIC_WEB_URL
+        sync: false
+
+  # The web app: a static single-page app on Render's CDN. Free, and it does
+  # not sleep; its data comes from coursebook-api.
+  - type: web
+    name: coursebook-web
+    runtime: static
+    branch: feat/render-clerk-rebuild # switch to main at cutover
+    buildCommand: corepack pnpm install --frozen-lockfile --filter @coursebook/web... && corepack pnpm --filter @coursebook/web build
+    staticPublishPath: ./apps/web/build/client
+    buildFilter:
+      paths:
+        - apps/web/**
+        - packages/domain/**
+        - package.json
+        - pnpm-lock.yaml
+        - pnpm-workspace.yaml
+        - tsconfig.base.json
+    # Client-side routes (/friends/x, /account) load the app shell.
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    # Keep in step with tests/e2e/static-server.ts.
+    headers:
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+    envVars:
+      # corepack ships with Node 24, not 25+.
+      - key: NODE_VERSION
+        value: "24"
+      # The API's public URL, e.g. https://coursebook-api.onrender.com.
+      - key: VITE_API_URL
+        sync: false
+      - key: VITE_CLERK_PUBLISHABLE_KEY
+        sync: false
