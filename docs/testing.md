@@ -42,7 +42,7 @@ A green suite does not verify Clerk's production instance, Render's environment 
 ## Add tests in the right place
 
 - **Pure logic:** colocate `*.test.ts` with the module. Use data-driven cases. See [identity.test.ts](../app/features/catalog/identity.test.ts) and [reorder.test.ts](../app/features/journal/reorder.test.ts).
-- **Schema, loaders and actions:** `*.db.test.ts` suites use `testDatabase()` and `resetMemberData()` from [app/test/db.ts](../app/test/db.ts) in `beforeEach`; the seeded catalog stays. Call exported `loader`/`action` functions with a `Request` and a `RouterContextProvider` carrying a test user. Assert on rows, not on mocks; use `expectDbError` to match constraint names in the driver's cause chain. Cover `requireUser` with a null context. See [schema.db.test.ts](../app/db/schema.db.test.ts).
+- **Schema, loaders and actions:** `*.db.test.ts` suites use `testDatabase()` and `resetMemberData()` from [app/test/db.ts](../app/test/db.ts) in `beforeEach`; the seeded catalog stays. Call exported `loader`/`action` functions with a `Request` and a `RouterContextProvider` carrying a test user. Assert on rows, not on mocks; use `expectDbError` to match constraint names in the driver's cause chain, and assert expected service failures with `rejects.toMatchObject({ status, code })` on the thrown `AppError`. Cover `requireUser` with a null context. See [schema.db.test.ts](../app/db/schema.db.test.ts).
 - **Components:** colocated `*.test.tsx` with Testing Library when a focused UI test is useful. Assert accessible, user-visible behavior.
 - **Browser flows:** extend [course-book.spec.ts](../tests/e2e/course-book.spec.ts). Mock only external boundaries: the OpenGolfAPI stub server and Clerk testing tokens. The database is real; [tests/e2e/db.ts](../tests/e2e/db.ts) seeds the fixture courses and resets both test members to the baseline scenario before each authenticated test. Assert persisted outcomes through it.
 - **Compatibility:** `app/server/clerk.smoke.test.ts` proves the Clerk middleware and `getAuth` work under React Router's middleware. Keep it passing across dependency updates.
@@ -54,7 +54,7 @@ Mock external services, not the domain or server logic whose behavior the test c
 | Area changed | Relevant assertions |
 | --- | --- |
 | Course matching/search | Canonical identity survives richer labels, aliases and inconsistent geography; catalog rows never appear as search results; CSV fallback and visible failure |
-| Round logging/count/history | Count equals round rows; existing rank untouched; newest rounds removed first on count reduction; last-round delete removes membership |
+| Round logging/count/history | Count equals round rows; existing rank untouched; oldest rounds removed first on count reduction (newest history kept); last-round delete removes membership |
 | Personal ordering/filtering | Move renumbers the full list; hidden memberships survive filtered moves; geographic filters remain read-only; ranks stay contiguous |
 | Authorization | Writes affect only the context user; anonymous access limited to index and Top 100; friends data carries no emails |
 | UI/navigation/styles | Existing flows at desktop/mobile sizes, accessible dialog controls, no hydration mismatch |

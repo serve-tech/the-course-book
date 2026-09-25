@@ -37,8 +37,8 @@ Feature folders are the organizational unit; avoid global `components/` or `serv
 
 ## Request flow
 
-1. `app/middleware.ts` exports `[clerkMiddleware(), appUserMiddleware]`. Clerk verifies the session; `appUserMiddleware` reads `getAuth(args)` and, for a signed-in user, upserts the `users` row from session claims and stores the app user in a router context (`userContext`). `root.tsx` re-exports the middleware and its loader returns `rootAuthLoader(args)` so `<ClerkProvider>` can hydrate.
-2. A route loader reads `context.get(userContext)` and calls one server module. Anonymous access is allowed on the index and Top 100 routes and returns empty personal data; Friends and search call `requireUser`, which throws a 401 `data()` response.
+1. `app/middleware.ts` exports `[clerkMiddleware(), appUserMiddleware]`. Clerk verifies the session; `appUserMiddleware` reads `getAuth(args)` and, for a signed-in user, resolves the `users` row through the framework-free provisioner in `provisioning.server.ts` (identity from session claims, upsert, per-user cache) and stores the app user in a router context (`userContext`). `root.tsx` re-exports the middleware and its loader returns `rootAuthLoader(args)` so `<ClerkProvider>` can hydrate.
+2. A route loader reads `context.get(userContext)` and calls one server module. Anonymous access is allowed on the index, Top 100 and Friends routes and returns empty personal data (Friends shows a sign-in prompt); search and the journal call `requireUser`, which throws a 401 `data()` response. Server modules throw `AppError` (`errors.server.ts`) with a status and a stable code; the journal action returns it as a reply.
 3. Every mutation posts to the `/journal` action with an `intent` field. The action requires a user, parses the form with Zod, and runs one server function inside a single transaction. The user id always comes from the context.
 4. After a fetcher submission React Router revalidates the current route's loader, so pages never hold a second copy of server data.
 
@@ -47,9 +47,9 @@ Routes:
 | Route | Loader data | Access |
 | --- | --- | --- |
 | layout | `{ user: { id, username, displayName } \| null }` | anonymous ok |
-| `/` My List | `{ courses: [{ id, name, location, city, state, country, rank, played }] }` ordered by personal rank | anonymous gets an empty list |
-| `/top-100` | `{ rankings, played, onList }`; `selectRankings` runs client-side | anonymous ok |
-| `/friends/:username?` | `{ members: [{ username, displayName }], selected?: { username, displayName, rows } }`; no emails, no user ids | signed in |
+| `/` My List | `{ rows: [{ course, rank, played }], signedIn }` ordered by personal rank | anonymous gets an empty list |
+| `/top-100` | `{ rankings, played, onList, signedIn }`; `selectRankings` runs client-side | anonymous ok |
+| `/friends/:username?` | `{ signedIn, members: [{ username, displayName }], selected: { member: { username, displayName }, rows: [{ course, rank, onMyList }] } \| null }`; 404 for an unknown username; no emails, no user ids | anonymous gets a sign-in prompt |
 | `/api/course-search?q=` | `SearchResult[]`; 400 when `q` is shorter than 2 characters | signed in |
 | `/journal` | POST action by intent (`log`, `top`, `friend`, `add-course`, `move`, `set-count`, `delete-round`, `delete-course`); GET returns the caller's rounds for one course | signed in |
 | `/healthz` | `{ ok }` after `SELECT 1`; 503 on failure | none |
@@ -72,7 +72,7 @@ Do not add a client store, a cache of loader data or a persisted copy of the per
 
 | Table | Purpose and key rules |
 | --- | --- |
-| `users` | One row per Clerk user (`id` is the Clerk id). `username` unique case-insensitively; `email` never leaves the server; `legacy_supabase_id` links imported accounts; rows are soft-deleted only. |
+| `users` | One row per Clerk user (`id` is the Clerk id). `username` unique case-insensitively; `email` never leaves the server; `legacy_supabase_id` links imported accounts; `deleted_at` is reserved for account deletion, which is not implemented yet. |
 | `courses` | Shared catalog. Seeded rows keep their original UUIDs; `stable_id` carries the bundled ids (`usa1`, `michigan3`, `world1`); `name_key` is `normalizeName(name)`; custom courses set `is_custom` and `created_by`. |
 | `course_rankings` | Published lists: `ranking_type` in world, usa, usa_public, state; unique per (type, scope, rank) and per (course, type). |
 | `user_courses` | Memberships. `personal_rank` is NOT NULL and contiguous 1..N per user (deferred unique constraint). |
@@ -87,7 +87,7 @@ The seed migration (`0001_seed_catalog.sql`) carries the retired project's publi
 - **Counts:** the number of round rows is the play count. Never synthesize rounds from a count.
 - **Order:** published rankings and personal rank are separate. Logging, count edits and adds from Rankings or Friends never change an existing membership's rank. Only `move` renumbers, and it renumbers the complete list from the full order so courses hidden by a filter keep their positions (`reorder()` in `app/features/journal/reorder.ts`).
 - **Log Round intents:** `log` inserts N rounds (minimum 1) sharing one `played_at` and creates the membership at the bottom if missing. `top` adds the membership if missing and inserts a round only when none exists. `friend` is a no-op when the membership exists, else one round plus a membership at the bottom. `add-course` creates the course, inserts at the requested rank clamped to [1, N+1] (default bottom) and logs one round.
-- **Counts and deletes:** `set-count` diffs against actual rounds (delete newest surplus, insert shortfall); zero deletes the membership. Deleting the last round deletes the membership. Deleting a course deletes the membership and cascades its rounds. All of these renumber remaining ranks.
+- **Counts and deletes:** `set-count` diffs against actual rounds (delete the oldest surplus so the newest history is kept, insert shortfall), as the original application did; zero deletes the membership. Deleting the last round deletes the membership. Deleting a course deletes the membership and cascades its rounds. All of these renumber remaining ranks.
 - **Identity:** resolve a course through `identity.ts` before creating a row: explicit uuid, alias to `stable_id`, canonical Scottish geography, then `name_key` plus country with an exact normalized-location match, else insert under an advisory lock on `name_key`. External search ids are never stored as course ids.
 - **Search:** OpenGolfAPI results are resolved against the catalog so known courses carry their uuid; the catalog itself is never returned as search results. When the REST endpoint fails, the CSV dataset is searched (parsed once per process). Both failing produces a visible error and a retry.
 - **Rankings page:** progress uses the full list before search and "Show mine". World, USA and public lists render only with 100 unique ranks; state lists need a selected state and at least one row.
@@ -98,7 +98,7 @@ The seed migration (`0001_seed_catalog.sql`) carries the retired project's publi
 
 ## Authentication and authorization
 
-Clerk holds credentials, Google sign-in, email verification and sessions. [auth.server.ts](../app/server/auth.server.ts) provisions the `users` row on each signed-in request (cached for a minute per identity) and exposes `getAppUser` and `requireUser`; [authz.server.ts](../app/server/authz.server.ts) states the access rules with tests: anonymous reads are limited to the index and Top 100; writes only affect the context user; member lists are readable by any signed-in member; other members are exposed only as username and display name.
+Clerk holds credentials, Google sign-in, email verification and sessions. [provisioning.server.ts](../app/server/provisioning.server.ts) resolves the `users` row for each signed-in request (cached for a minute per user) and [auth.server.ts](../app/server/auth.server.ts) exposes it through `getAppUser` and `requireUser`; [authz.server.ts](../app/server/authz.server.ts) states the access rules with tests: anonymous reads are limited to the index and Top 100; writes only affect the context user; member lists are readable by any signed-in member; other members are exposed only as username and display name.
 
 Clerk dashboard configuration the code assumes:
 
