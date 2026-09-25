@@ -1,28 +1,51 @@
+import { getToken } from "@clerk/react-router";
+import type { PublicMember } from "@coursebook/domain/friends/types";
 import { data } from "react-router";
 import type { Route } from "./+types/friends";
 import { FriendsPage } from "../features/friends/FriendsPage";
-import { getAppUser } from "../server/auth.server";
-import { db } from "../server/db.server";
-import { memberList, members } from "../server/backend.server";
+import { api, ApiError, unwrap, type ApiSchemas } from "../lib/api";
+import { fromMemberList } from "../lib/api/mappers";
 import { useShell } from "../shared/ui/shell";
 
 export const meta: Route.MetaFunction = () => [{ title: "Friends · coursebook.golf" }];
 
-export function headers(): HeadersInit {
-  return { "Cache-Control": "private, no-store" };
+/** Every page of the member directory. */
+async function allMembers(): Promise<PublicMember[]> {
+  const members: PublicMember[] = [];
+  let cursor: string | null = null;
+  do {
+    const page: ApiSchemas["Members"] = unwrap(
+      await api.GET("/v1/members", { params: { query: { limit: 200, ...(cursor ? { cursor } : {}) } } }),
+    );
+    members.push(...page.members);
+    cursor = page.nextCursor;
+  } while (cursor);
+  return members;
+}
+
+async function memberList(username: string) {
+  try {
+    return fromMemberList(unwrap(await api.GET("/v1/members/{username}", { params: { path: { username } } })));
+  } catch (error) {
+    if (error instanceof ApiError && error.code === "member_not_found")
+      throw data({ error: "No member with that username." }, { status: 404 });
+    throw error;
+  }
 }
 
 /** Anonymous visitors see the page with a sign-in prompt; member data needs a session. */
-export async function loader({ context, params }: Route.LoaderArgs) {
-  const user = getAppUser(context);
-  if (!user) return { signedIn: false as const, members: [], selected: null };
-  const [directory, selected] = await Promise.all([
-    members(db, user.id),
-    params.username ? memberList(db, user.id, params.username) : Promise.resolve(null),
+export async function clientLoader({ params }: Route.ClientLoaderArgs) {
+  if (!(await getToken())) return { signedIn: false as const, members: [], selected: null };
+  const [members, selected] = await Promise.all([
+    allMembers(),
+    params.username ? memberList(params.username) : Promise.resolve(null),
   ]);
-  if (params.username && !selected)
-    throw data({ error: "No member with that username." }, { status: 404 });
-  return { signedIn: true as const, members: directory, selected };
+  return { signedIn: true as const, members, selected };
+}
+clientLoader.hydrate = true as const;
+
+export function HydrateFallback() {
+  return <p className="empty">Loading members…</p>;
 }
 
 export default function Friends({ loaderData }: Route.ComponentProps) {
