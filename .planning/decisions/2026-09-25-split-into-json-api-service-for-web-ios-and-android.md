@@ -30,7 +30,13 @@ Native clients cannot use React Router's loader data format or the form-encoded 
 
 Option 2. The API is its own Render web service and the only owner of application data and authorization. The web app is a static single-page app on Render and a client of that API, alongside the iOS and Android apps. The domain logic, transactions, schema, migrations and their tests from the rebuild carry over; transport and client data loading are rewritten. The change is made before cutover, when it is cheapest.
 
-Framework, contract and repository-layout choices are settled in the implementation plan and recorded here once approved.
+### Implementation choices (approved plan and P0 spikes, 2026-09-25)
+
+- **Layout:** pnpm workspace with `apps/api` (`@coursebook/api`), `apps/web` (`@coursebook/web`), `packages/domain` (pure rules both sides run), `tests/e2e`, and a language-neutral `contract/openapi.json`; native apps later in `apps/ios` and `apps/android`.
+- **API:** Hono 4 on `@hono/node-server` with `@hono/zod-openapi`; OpenAPI 3.0.3 generated from route definitions and committed; one esbuild bundle; migrations run in-process at start under an advisory lock (free Render plans have no pre-deploy command).
+- **Auth:** `@clerk/backend` `authenticateRequest` with `acceptsToken: "session_token"` and a `jwtKey`, **without `authorizedParties`**, because it rejects tokens lacking `azp` and native tokens have none. Our policy afterwards: `azp` present must be an allowed web origin; absent is accepted. No `Authorization` header means anonymous (Clerk is not called); an invalid header is 401. Cookies are ignored, so there is no CSRF surface.
+- **Web:** React Router 8 framework mode with `ssr: false`; `ClerkProvider` in the root `Layout`; `clientLoader`/`clientAction` call the API through `openapi-fetch` types generated from the committed contract.
+- **Contract rules for Swift and Kotlin:** see [API split spikes](../research/2026-09-25-api-split-spikes.md): named schemas, explicit `operationId`s, always-present response fields, `.nullish()` request fields, error codes as documented strings.
 
 ## Consequences
 
