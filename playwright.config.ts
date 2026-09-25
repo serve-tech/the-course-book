@@ -21,7 +21,10 @@ const real = (value: string | undefined) =>
  */
 export default defineConfig({
   testDir: "./tests/e2e",
-  fullyParallel: true,
+  // Every signed-in scenario, in both browser projects, resets and mutates
+  // the same two Clerk test users' rows (tests/e2e/db.ts). Parallel workers
+  // collide on those rows, so the suite runs one test at a time.
+  workers: 1,
   forbidOnly: !!process.env["CI"],
   retries: process.env["CI"] ? 2 : 0,
   use: {

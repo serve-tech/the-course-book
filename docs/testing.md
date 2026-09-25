@@ -35,7 +35,7 @@ For documentation-only changes, check referenced paths, links, commands and clai
 | `pnpm test` | Vitest with three projects: `node` for pure modules, server modules and scripts; `jsdom` for component tests; `db` for `*.db.test.ts` suites against the migrated test database, run serially |
 | `pnpm db:check` and `pnpm db:generate` | Migration drift gate: the snapshot chain is consistent and `app/db/schema.ts` produces no new migration. CI fails if `app/db/migrations` changes |
 | `build` | Client and server bundles under `build/` |
-| `test:e2e` | Playwright user flows against the built server, the migrated test database, the local OpenGolfAPI stub ([tests/e2e/opengolf-stub.ts](../tests/e2e/opengolf-stub.ts)) and Clerk testing tokens; desktop Chromium and Chromium emulating an iPhone viewport |
+| `test:e2e` | Playwright user flows against the built server, the migrated test database, the local OpenGolfAPI stub ([tests/e2e/opengolf-stub.ts](../tests/e2e/opengolf-stub.ts)) and Clerk testing tokens; desktop Chromium and Chromium emulating an iPhone viewport, one test at a time because every scenario shares the two test users |
 
 A green suite does not verify Clerk's production instance, Render's environment or DNS. Describe those limits accurately.
 
