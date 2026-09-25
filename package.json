@@ -8,8 +8,8 @@
     "node": "^24.15.0 || >=26.0.0"
   },
   "scripts": {
-    "dev": "pnpm --filter @coursebook/web dev",
-    "build": "pnpm --filter @coursebook/web build",
+    "dev": "pnpm -r --parallel dev",
+    "build": "pnpm -r build",
     "start": "pnpm --filter @coursebook/web start",
     "typegen": "pnpm --filter @coursebook/web typegen",
     "typecheck": "tsc --noEmit && pnpm -r typecheck",

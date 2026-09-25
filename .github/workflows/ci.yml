@@ -83,3 +83,37 @@ jobs:
         with:
           name: playwright-report
           path: tests/e2e/test-results/
+  docker:
+    runs-on: ubuntu-latest
+    needs: verify
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: coursebook
+          POSTGRES_PASSWORD: coursebook
+          POSTGRES_DB: coursebook_test
+        ports: ['5433:5432']
+        options: >-
+          --health-cmd "pg_isready -U coursebook -d coursebook_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -f apps/api/Dockerfile -t coursebook-api:ci .
+      # Proves the bundle starts with no node_modules, migrates on start and
+      # serves the seeded catalog. Clerk keys are placeholders; no token is sent.
+      - name: Smoke test the API image
+        run: |
+          docker run -d --name api --network host \
+            -e DATABASE_URL="$DATABASE_URL" \
+            -e CLERK_PUBLISHABLE_KEY="pk_test_$(printf 'example.clerk.accounts.dev$' | base64)" \
+            -e CLERK_SECRET_KEY="sk_test_000000000000000000000000000000000000000000000000" \
+            -e PORT=3001 \
+            coursebook-api:ci
+          curl --retry 30 --retry-delay 1 --retry-all-errors -fsS localhost:3001/healthz
+          test "$(curl -fsS localhost:3001/v1/rankings | jq '.entries | length')" = 1430
+          test "$(curl -s -o /dev/null -w '%{http_code}' localhost:3001/v1/me)" = 401
+      - if: always()
+        run: docker logs api

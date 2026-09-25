@@ -10,10 +10,13 @@
     "./test/*": "./src/test/*.ts"
   },
   "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "build": "node build.ts",
+    "start": "node --enable-source-maps dist/main.mjs",
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:check": "drizzle-kit check",
-    "db:migrate": "node --env-file-if-exists=../../.env src/db/migrate.ts",
+    "db:migrate": "node --env-file-if-exists=../../.env src/db/migrate-cli.ts",
     "seed:build": "tsx scripts/build-seed.ts",
     "import:supabase": "tsx scripts/import-supabase.ts",
     "contract:emit": "tsx scripts/emit-openapi.ts"

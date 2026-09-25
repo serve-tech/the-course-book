@@ -4,12 +4,23 @@ import { fileURLToPath } from "node:url";
 import pg from "pg";
 
 /**
+ * Session advisory lock key held while migrating. Arbitrary but fixed; it
+ * shares the int8 key space with nothing else in this schema.
+ */
+const MIGRATION_LOCK = 725_202_609;
+
+/**
  * Apply committed migrations to the database named by DATABASE_URL.
  *
- * Runs as `node src/db/migrate.ts` from apps/api (Node's built-in type
- * stripping), so this file must stay free of TypeScript-only runtime syntax
- * such as enums and must not import the schema. The test harnesses and local
- * setup call `runMigrations` directly.
+ * The API runs this on every start (free Render plans have no pre-deploy
+ * step), and during a deploy the new instance starts while the old one still
+ * serves. A session advisory lock makes concurrent starts migrate one at a
+ * time; the second finds nothing left to apply.
+ *
+ * `migrate-cli.ts` runs it from the command line with Node's built-in type
+ * stripping, so this file must stay free of TypeScript-only runtime syntax
+ * such as enums and must not import the schema. The API entry, the test
+ * harnesses and local setup call `runMigrations` directly.
  *
  * Args:
  *     connectionString: Postgres URL.
@@ -22,18 +33,15 @@ export async function runMigrations(
 ): Promise<void> {
   const pool = new pg.Pool({ connectionString, max: 1 });
   try {
-    await migrate(drizzle(pool), { migrationsFolder });
+    const client = await pool.connect();
+    try {
+      await client.query("select pg_advisory_lock($1)", [MIGRATION_LOCK]);
+      await migrate(drizzle(client), { migrationsFolder });
+    } finally {
+      await client.query("select pg_advisory_unlock($1)", [MIGRATION_LOCK]).catch(() => undefined);
+      client.release();
+    }
   } finally {
     await pool.end();
   }
-}
-
-if (process.argv[1] && import.meta.url === new URL(process.argv[1], "file://").href) {
-  const url = process.env["DATABASE_URL"];
-  if (!url) {
-    console.error("DATABASE_URL is required");
-    process.exit(1);
-  }
-  await runMigrations(url);
-  console.log("Migrations applied");
 }
