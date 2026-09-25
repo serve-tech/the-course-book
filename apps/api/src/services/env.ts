@@ -35,6 +35,26 @@ const searchSchema = z.object({
     ),
 });
 
+const origin = z
+  .url()
+  .refine((value) => new URL(value).origin === value, "Use a bare origin such as https://coursebook.golf, without a path or trailing slash.");
+
+const apiSchema = z.object({
+  PORT: z.coerce.number().int().min(1).max(65535).default(3001),
+  /** Comma-separated exact web origins for CORS and the token `azp` check. */
+  WEB_ORIGINS: z
+    .string()
+    .default("")
+    .transform((value) => value.split(",").map((part) => part.trim()).filter(Boolean))
+    .pipe(z.array(origin)),
+  /** The Clerk instance's JWT public key (PEM) for networkless verification. */
+  CLERK_JWT_KEY: z.string().startsWith("-----BEGIN PUBLIC KEY-----").optional(),
+  /** Public web address, used for the privacy and account-deletion links. */
+  PUBLIC_WEB_URL: origin.default("https://coursebook.golf"),
+  MIN_IOS_VERSION: z.string().regex(/^\d+\.\d+\.\d+$/).default("0.0.0"),
+  MIN_ANDROID_VERSION: z.string().regex(/^\d+\.\d+\.\d+$/).default("0.0.0"),
+});
+
 function memo<T>(parse: () => T): () => T {
   let value: T | undefined;
   return () => (value ??= parse());
@@ -48,3 +68,16 @@ export const clerkEnv = memo(() => clerkSchema.parse(process.env));
 
 /** External course discovery endpoints. */
 export const searchEnv = memo(() => searchSchema.parse(process.env));
+
+/**
+ * Parse API server settings from an environment-like object.
+ *
+ * Raises:
+ *     ZodError: When a value is malformed, e.g. a web origin with a path.
+ */
+export function parseApiEnv(source: Record<string, string | undefined>) {
+  return apiSchema.parse(source);
+}
+
+/** API server settings: port, web origins, token key and client configuration. */
+export const apiEnv = memo(() => parseApiEnv(process.env));
