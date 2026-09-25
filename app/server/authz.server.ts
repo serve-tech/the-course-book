@@ -1,8 +1,8 @@
-import type { AppUser } from "./provisioning.server";
 import type { PublicMember } from "../features/friends/types";
 
 /**
- * Authorization rules, stated in one place so they can be read and tested.
+ * Authorization rules, stated in one place. Routes enforce them with
+ * `getAppUser`/`requireUser`; the one reusable piece is the public projection.
  *
  * - Anonymous visitors may read the index (empty personal data) and the
  *   published rankings.
@@ -12,25 +12,7 @@ import type { PublicMember } from "../features/friends/types";
  * - Nothing about another member is exposed beyond username and display name.
  */
 
-export enum Access {
-  Anonymous = "anonymous",
-  Member = "member",
-}
-
 /** Public projection of a member; never includes email or the Clerk id. */
-
-export function canViewMemberLists(viewer: AppUser | null): boolean {
-  return viewer !== null;
-}
-
-export function canSearchCourses(viewer: AppUser | null): boolean {
-  return viewer !== null;
-}
-
-export function ownsJournal(viewer: AppUser | null, userId: string): boolean {
-  return viewer !== null && viewer.id === userId;
-}
-
 export function toPublicMember(user: {
   username: string;
   displayName: string;

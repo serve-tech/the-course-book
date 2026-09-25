@@ -61,3 +61,16 @@ describe("OpenGolfAPI parsing", () => {
     expect(matchesQuery(row, "")).toBe(false);
   });
 });
+
+describe("API course parsing", () => {
+  it("skips empty API aliases", () => {
+    expect(
+      parseAPICourse({
+        name: "",
+        course_name: "Actual Name",
+        id: "",
+        course_id: 99,
+      }).name,
+    ).toBe("Actual Name");
+  });
+});
