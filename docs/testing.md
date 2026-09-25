@@ -67,7 +67,7 @@ Do not sign into production or create/delete real records as part of an automate
 
 ## CI and handoff
 
-[Verify application](../.github/workflows/ci.yml) runs lint, typecheck, the migration drift gate, migrations against a Postgres service, all tests and the build on working branches and PRs, then a `browser` job with the Playwright suite and a `docker` job that builds the production image.
+[Verify application](../.github/workflows/ci.yml) runs lint, typecheck, the migration drift gate, migrations against a Postgres service, all tests and the build on working branches and PRs, then a `browser` job with the Playwright suite. The server-rendered image was retired by the API split; an image job returns with the API service.
 
 [Deploy GitHub Pages](../.github/workflows/pages.yml) still publishes the retired static application from `main` until cutover; it does not run on the rebuild branch.
 
