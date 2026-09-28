@@ -119,7 +119,13 @@ jobs:
             -e PORT=3001 \
             coursebook-api:ci
           curl --retry 30 --retry-delay 1 --retry-all-errors -fsS localhost:3001/healthz
-          test "$(curl -fsS localhost:3001/v1/rankings | jq '.entries | length')" = 1430
+          # The API serves every ranking the migrations seeded; the database is
+          # the reference, so catalog updates need no change here.
+          stored=$(docker run --rm --network host postgres:17-alpine psql "$DATABASE_URL" -tAc "select count(*) from course_rankings")
+          served=$(curl -fsS localhost:3001/v1/rankings | jq '.entries | length')
+          echo "rankings: $served served, $stored stored"
+          test "$stored" -gt 0
+          test "$served" = "$stored"
           test "$(curl -s -o /dev/null -w '%{http_code}' localhost:3001/v1/me)" = 401
       - if: always()
         run: docker logs api

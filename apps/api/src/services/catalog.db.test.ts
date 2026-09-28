@@ -1,6 +1,6 @@
-import { eq } from "drizzle-orm";
+import { count, eq } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { courses, users } from "../db/schema";
+import { courseRankings, courses, users } from "../db/schema";
 import { RankingFilter } from "@coursebook/domain/catalog/course";
 import { selectRankings } from "@coursebook/domain/catalog/ranking-selectors";
 import { resetMemberData, testDatabase } from "../test/db";
@@ -32,8 +32,10 @@ const stable = async (stableId: string) => {
 describe("catalog snapshot", () => {
   it("loads every course and complete published lists", async () => {
     const snapshot = await catalog(db);
-    expect(snapshot.courses.length).toBeGreaterThanOrEqual(1414);
-    expect(snapshot.rankings).toHaveLength(1430);
+    const [stored] = await db.select({ courses: count() }).from(courses);
+    const [ranked] = await db.select({ rankings: count() }).from(courseRankings);
+    expect(snapshot.courses).toHaveLength(stored?.courses ?? -1);
+    expect(snapshot.rankings).toHaveLength(ranked?.rankings ?? -1);
     const world = selectRankings(snapshot.rankings, RankingFilter.World, "", "", false, {});
     expect(world.complete).toBe(true);
     expect(world.total).toBe(100);

@@ -40,7 +40,7 @@ For documentation-only changes, check referenced paths, links, commands and clai
 | `pnpm contract:check` | The committed contract and web API types match the route definitions. `contract.test.ts` adds the rules native clients depend on: served and committed documents match, operations uniquely named, no polymorphic schemas, no email properties, response fields required, every secured operation 401s without a token |
 | `build` | The API bundle (`apps/api/dist`) and the static web app (`apps/web/build/client`) |
 | `test:e2e` | Playwright user flows against the built API and static web app, the migrated test database, the local OpenGolfAPI stub ([tests/e2e/opengolf-stub.ts](../tests/e2e/opengolf-stub.ts)) and a Clerk development instance; desktop Chromium and Chromium emulating an iPhone viewport, one test at a time because every scenario shares the two test users |
-| CI `docker` job | The API image builds, starts with no `node_modules`, migrates on start, serves `/healthz`, the 1430 seeded rankings and a 401 without a token |
+| CI `docker` job | The API image builds, starts with no `node_modules`, migrates on start, serves `/healthz`, every ranking stored in the database (compared with the database, not a fixed number) and a 401 without a token |
 
 A green suite does not verify Clerk's production instance, Render's environment or DNS. Describe those limits accurately.
 

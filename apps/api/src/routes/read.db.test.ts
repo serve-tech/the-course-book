@@ -1,5 +1,5 @@
 import { courseSchema } from "@coursebook/domain/catalog/course";
-import { eq } from "drizzle-orm";
+import { count, eq } from "drizzle-orm";
 import { gunzipSync } from "node:zlib";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import {
@@ -13,7 +13,7 @@ import {
   RoundsSchema,
   SearchResultsSchema,
 } from "../contract/schemas";
-import { courses, users } from "../db/schema";
+import { courseRankings, courses, users } from "../db/schema";
 import { invalidateCatalog } from "../services/catalog";
 import { logRounds } from "../services/journal";
 import { createTestApp, TEST_CLIENT_CONFIG } from "../test/app";
@@ -29,6 +29,12 @@ beforeEach(async () => {
   await resetMemberData(db);
   invalidateCatalog();
 });
+
+/** Rankings stored by the seed migrations; the API must serve all of them. */
+const storedRankings = async () => {
+  const [row] = await db.select({ n: count() }).from(courseRankings);
+  return row?.n ?? -1;
+};
 
 const seeded = async (stableId: string) => {
   const [row] = await db.select({ id: courses.id }).from(courses).where(eq(courses.stableId, stableId));
@@ -101,7 +107,7 @@ describe("GET /v1/rankings", () => {
     const result = await t.get("/v1/rankings");
     expect(result.status).toBe(200);
     const body = RankingsSchema.parse(result.body);
-    expect(body.entries).toHaveLength(1430);
+    expect(body.entries).toHaveLength(await storedRankings());
     expect(result.headers.get("cache-control")).toBe("public, max-age=3600, stale-while-revalidate=86400");
     const etag = result.headers.get("etag");
     expect(etag).toMatch(/^".+"$/);
@@ -124,7 +130,7 @@ describe("GET /v1/rankings", () => {
     const response = await t.app.request("/v1/rankings", { headers: { "accept-encoding": "gzip" } });
     expect(response.headers.get("content-encoding")).toBe("gzip");
     const json: unknown = JSON.parse(gunzipSync(Buffer.from(await response.arrayBuffer())).toString());
-    expect(RankingsSchema.parse(json).entries).toHaveLength(1430);
+    expect(RankingsSchema.parse(json).entries).toHaveLength(await storedRankings());
   });
 });
 
