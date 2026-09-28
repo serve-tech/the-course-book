@@ -4,6 +4,7 @@ A golf course journal: log rounds, rank the courses you have played, compare aga
 
 - Repository: https://github.com/serve-tech/the-course-book
 - Production: https://serve-tech.github.io/the-course-book/ (retired static build, still live until cutover); coursebook.golf will point at Render after cutover.
+- Staging: https://coursebook-golf-web.onrender.com (API https://coursebook-golf-api.onrender.com), deployed from `feat/render-clerk-rebuild` with the Clerk development instance. The free API sleeps after 15 idle minutes; the first request then takes about a minute.
 
 ## Working on the project
 
@@ -49,7 +50,7 @@ The rebuild and the split into an API with clients live on the branch `feat/rend
 
 ## Deployment and data
 
-`render.yaml` is the Render Blueprint: the API as a Docker web service (`apps/api/Dockerfile`), the web app as a static site (`apps/web/build/client`) and a Postgres 17 database, all in Oregon and on free plans for staging. Secret and per-environment values (Clerk keys, `WEB_ORIGINS`, `VITE_API_URL`, …) are entered in the Render dashboard; the database URL is wired from the database resource. The API runs its migrations on start. Create or update the infrastructure by syncing the Blueprint from the Render dashboard, never by hand-creating services. Both services deploy from the branch named in the Blueprint (`feat/render-clerk-rebuild` until cutover, then `main`).
+`render.yaml` is the Render Blueprint: the API as a Docker web service (`apps/api/Dockerfile`), the web app as a static site (`apps/web/build/client`) and a Postgres 17 database, all in Oregon and on free plans for staging. Non-secret settings (Clerk publishable and JWT public keys, `WEB_ORIGINS`, `PUBLIC_WEB_URL`, `VITE_API_URL`) are values in `render.yaml`; the only secret, `CLERK_SECRET_KEY`, is entered in the Render dashboard; the database URL is wired from the database resource. The API runs its migrations on start. Create or update the infrastructure by syncing the Blueprint from the Render dashboard, never by hand-creating services. Both services deploy from the branch named in the Blueprint (`feat/render-clerk-rebuild` until cutover, then `main`).
 
 Local check of the API image:
 
