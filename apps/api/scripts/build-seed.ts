@@ -4,10 +4,9 @@
  * Reads `courses` and `course_rankings` through the anonymous REST endpoint
  * (both tables are publicly readable; no credentials are involved), assigns
  * each bundled course id (usa1.., michigan1.., world1..) to its catalog row
- * using the identity rules, and writes:
- *
- * - apps/api/src/db/seed/courses.csv and rankings.csv for review and diffing
- * - the SQL body of the seed migration passed as the first argument
+ * using the identity rules, and writes the SQL body of the seed migration
+ * passed as the first argument. The migration is the only committed copy of
+ * the catalog.
  *
  * Bundled courses with no catalog match are inserted with a deterministic
  * UUID derived from their stable id so re-running the script is idempotent.
@@ -15,8 +14,7 @@
  * relative to apps/api).
  */
 import { createHash } from "node:crypto";
-import { mkdirSync, writeFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { writeFileSync } from "node:fs";
 import { cloudLocation, courseSchema, normalizeName, type Course } from "@coursebook/domain/catalog/course";
 import {
   canonicalize,
@@ -137,11 +135,6 @@ function courseFromRow(row: CourseRow): Course {
 const sqlString = (value: string | null | undefined): string =>
   value === null || value === undefined ? "NULL" : `'${value.replace(/'/g, "''")}'`;
 
-const csvCell = (value: string | number | boolean | null): string => {
-  const text = value === null ? "" : String(value);
-  return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-};
-
 function main(): Promise<void> {
   return run();
 }
@@ -257,52 +250,6 @@ async function run(): Promise<void> {
     if (courseType.has(type)) throw new Error(`duplicate course/type ${type}`);
     courseType.add(type);
   }
-
-  const seedDir = fileURLToPath(new URL("../src/db/seed/", import.meta.url));
-  mkdirSync(seedDir, { recursive: true });
-  writeFileSync(
-    seedDir + "courses.csv",
-    ["id,stable_id,name,city,state,country,website_url,logo_url,is_custom"]
-      .concat(
-        allCourses.map((row) =>
-          [
-            row.id,
-            stableIds.get(row.id) ?? null,
-            row.name,
-            row.city,
-            row.state,
-            row.country ?? "USA",
-            row.website_url,
-            row.logo_url,
-            row.is_custom ?? false,
-          ]
-            .map(csvCell)
-            .join(","),
-        ),
-      )
-      .join("\n") + "\n",
-  );
-  writeFileSync(
-    seedDir + "rankings.csv",
-    ["id,course_id,ranking_type,scope_code,rank,source,source_year,source_url"]
-      .concat(
-        rankingRows.map((row) =>
-          [
-            row.id,
-            row.course_id,
-            row.ranking_type,
-            row.scope_code,
-            row.rank,
-            row.source,
-            row.source_year,
-            row.source_url,
-          ]
-            .map(csvCell)
-            .join(","),
-        ),
-      )
-      .join("\n") + "\n",
-  );
 
   const courseValues = allCourses.map((row) =>
     [
