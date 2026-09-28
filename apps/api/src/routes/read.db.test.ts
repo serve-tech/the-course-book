@@ -135,9 +135,11 @@ describe("GET /v1/course-search", () => {
   it("maps catalog hits with their id and other hits with details only", async () => {
     const t = createTestApp(db);
     const catalogId = await seeded("usa1");
+    // The second hit carries an OpenGolfAPI-style uuid that is not a catalog row.
+    const external = hit("b25a4e85-561a-4ca4-8028-7c3480c9bbc0", "Arcadia South");
     t.setSearchResults([
-      { course: hit(catalogId, "Arcadia Bluffs"), display: hit(catalogId, "Arcadia Bluffs") },
-      { course: hit("api-7", "Arcadia South"), display: hit("api-7", "Arcadia South") },
+      { course: hit(catalogId, "Arcadia Bluffs"), display: hit(catalogId, "Arcadia Bluffs"), catalogId },
+      { course: external, display: external, catalogId: null },
     ]);
     const result = await t.get("/v1/course-search?q=Arcadia", t.bearer("user_1", "golfer_1"));
     const body = SearchResultsSchema.parse(result.body);

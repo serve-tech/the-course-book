@@ -37,6 +37,7 @@ describe("course search", () => {
 
     const results = await service.search("Test Alpha");
     expect(results.map((result) => result.course.id)).toEqual([known.id]);
+    expect(results.map((result) => result.catalogId)).toEqual([known.id]);
     expect(fetcher).toHaveBeenCalledWith(
       expect.objectContaining({ href: "https://api.example.test/v1/courses/search?q=Test+Alpha&limit=50" }),
       expect.objectContaining({ cache: "no-store" }),
@@ -53,6 +54,23 @@ describe("course search", () => {
     const results = await createCourseSearch(deps(fetcher)).search("Mystery");
     expect(results[0]?.course).toMatchObject({ name: "Mystery Meadows", country: "USA", state: "KS" });
     expect(results[0]?.course.id).toMatch(/^api-/);
+    expect(results[0]?.catalogId).toBeNull();
+  });
+
+  // OpenGolfAPI's own course ids are uuids, like catalog ids; a uuid-shaped id
+  // once made an unknown course look like a catalog course, and logging it
+  // failed with course_not_found.
+  it.each([
+    ["no id", {}],
+    ["a non-uuid id", { id: "og-7" }],
+    ["an OpenGolfAPI uuid id", { id: "b25a4e85-561a-4ca4-8028-7c3480c9bbc0" }],
+  ])("marks an unknown course with %s as outside the catalog", async (_label, identity) => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+      Response.json([{ ...identity, name: "Mystery Meadows", city: "Nowhere", state: "KS" }]),
+    );
+    const [result] = await createCourseSearch(deps(fetcher)).search("Mystery");
+    expect(result?.course.name).toBe("Mystery Meadows");
+    expect(result?.catalogId).toBeNull();
   });
 
   it("reports an upstream failure instead of presenting an empty search", async () => {

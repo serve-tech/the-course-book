@@ -8,7 +8,6 @@ import { api, unwrap } from "../../lib/api";
 import { fromSearchHit } from "../../lib/api/mappers";
 import { replyMessage, useJournalFetcher } from "../journal/use-journal-fetcher";
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SEARCH_DEBOUNCE_MS = 180;
 
 /**
@@ -101,8 +100,8 @@ export function LogRoundDialog({
     submit({
       intent: "log",
       quantity: String(count),
-      ...(UUID.test(course.id)
-        ? { courseId: course.id }
+      ...(selected.catalogId
+        ? { courseId: selected.catalogId }
         : {
             course: JSON.stringify({
               name: course.name,
@@ -245,7 +244,7 @@ export function LogRoundDialog({
                     includeDC
                     onChange={(value) => {
                       const course = withUSState(selected.course, value);
-                      setSelected({ course, display: course });
+                      setSelected({ ...selected, course, display: course });
                     }}
                   />
                 </div>

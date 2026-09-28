@@ -73,14 +73,15 @@ describe("contract course mapping", () => {
 
 describe("search hit mapping", () => {
   it("carries the catalog id for a known course", () => {
-    const hit = toSearchHit({ course: course(), display: course() });
+    const hit = toSearchHit({ course: course(), display: course(), catalogId: CATALOG_ID });
     expect(hit.courseId).toBe(CATALOG_ID);
     expect(SearchHitSchema.safeParse(hit).success).toBe(true);
   });
 
-  it("carries no id for a course outside the catalog", () => {
-    const external = course({ id: "api-123", world: null, usa: null, public: null, michigan: null, stateRank: null });
-    const hit = toSearchHit({ course: external, display: external });
+  // OpenGolfAPI ids are uuids too: the id's shape must not decide membership.
+  it.each(["api-123", "b25a4e85-561a-4ca4-8028-7c3480c9bbc0"])("carries no id for a course outside the catalog (id %s)", (id) => {
+    const external = course({ id, world: null, usa: null, public: null, michigan: null, stateRank: null });
+    const hit = toSearchHit({ course: external, display: external, catalogId: null });
     expect(hit.courseId).toBeNull();
     expect(hit.ranks).toEqual({ world: null, usa: null, usaPublic: null, state: null });
     expect(SearchHitSchema.safeParse(hit).success).toBe(true);

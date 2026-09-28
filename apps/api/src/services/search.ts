@@ -84,7 +84,7 @@ export function createCourseSearch(deps: SearchDependencies): CourseSearch {
   };
 
   const build = (raw: RawCourse[], catalog: readonly Course[], text: string): SearchResult[] => {
-    const found = new Map<string, Course>();
+    const found = new Map<string, SearchResult>();
     for (const record of raw) {
       try {
         const apiCourse = parseAPICourse(record);
@@ -98,15 +98,14 @@ export function createCourseSearch(deps: SearchDependencies): CourseSearch {
               location: apiCourse.location || known.location,
             }
           : apiCourse;
-        if (!found.has(course.id)) found.set(course.id, course);
+        if (!found.has(course.id)) found.set(course.id, { course, display: course, catalogId: known?.id ?? null });
       } catch (error) {
         console.warn("Unable to parse OpenGolfAPI course result", error, record);
       }
     }
     return [...found.values()]
-      .sort((a, b) => searchScore(b, text) - searchScore(a, text))
-      .slice(0, 10)
-      .map((course) => ({ course, display: course }));
+      .sort((a, b) => searchScore(b.course, text) - searchScore(a.course, text))
+      .slice(0, 10);
   };
 
   return {

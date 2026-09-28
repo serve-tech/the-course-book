@@ -60,13 +60,14 @@ export function fromRound(round: ApiSchemas["Round"]): RoundEntry {
 }
 
 /**
- * A search hit as the Log Round dialog's `SearchResult`. Hits outside the
- * catalog get a synthetic, non-uuid id (`search:<index>`), which the dialog
- * already treats as "send the details" rather than "send the id".
+ * A search hit as the Log Round dialog's `SearchResult`. `catalogId` is the
+ * API's `courseId`: set for catalog courses, which the dialog logs by id, and
+ * null for other hits, which it logs by details. Hits outside the catalog get
+ * a synthetic id (`search:<index>`) only so the list has a stable key.
  */
 export function fromSearchHit(hit: ApiSchemas["SearchHit"], index: number): SearchResult {
   const course = toCourse(hit.courseId ?? "search:" + String(index), hit.course, hit.ranks);
-  return { course, display: course };
+  return { course, display: course, catalogId: hit.courseId };
 }
 
 export function fromMemberList(list: ApiSchemas["MemberList"]): MemberList {

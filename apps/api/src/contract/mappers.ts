@@ -2,7 +2,6 @@ import type { Course, RankedCourse } from "@coursebook/domain/catalog/course";
 import type { SearchResult } from "@coursebook/domain/catalog/search-results";
 import type { MemberList } from "@coursebook/domain/friends/types";
 import type { ListEntry, RoundEntry } from "@coursebook/domain/journal/types";
-import { z } from "zod";
 import { UNKNOWN_LOCATION } from "../domain/course-view";
 import type {
   ContractCourse,
@@ -19,7 +18,6 @@ import type {
  * only place that knows both shapes.
  */
 
-const uuid = z.uuid();
 const orNull = (value: string): string | null => (value.trim() ? value : null);
 
 export function toCourseRanks(course: Course): CourseRanks {
@@ -66,13 +64,13 @@ export function toRankingEntry(entry: RankedCourse) {
 }
 
 /**
- * A search hit. Hits already in the catalog carry its uuid; other hits carry
- * only their details, which a client sends back to add the course.
+ * A search hit. Hits already in the catalog carry its id; other hits carry
+ * only their details, which a client sends back to add the course. Catalog
+ * membership comes from the search (`catalogId`), not from the id's shape.
  */
 export function toSearchHit(result: SearchResult) {
-  const catalogId = uuid.safeParse(result.course.id);
   return {
-    courseId: catalogId.success ? catalogId.data : null,
+    courseId: result.catalogId,
     course: toCourseDetails(result.course),
     ranks: toCourseRanks(result.course),
   };

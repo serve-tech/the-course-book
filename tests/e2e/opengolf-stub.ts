@@ -14,11 +14,13 @@ interface StubCourse {
   country: string;
 }
 
+// Uuid ids like the real OpenGolfAPI's, distinct from the fixture catalog's,
+// so a course outside the catalog never passes as a catalog course.
 const courses: StubCourse[] = [
-  { id: "api-alpha", name: "Test Alpha Links", city: "Detroit", state: "MI", country: "USA" },
-  { id: "api-beta", name: "Test Beta Links", city: "Detroit", state: "MI", country: "USA" },
-  { id: "api-mystery", name: "Mystery Meadows", city: "Nowhere", state: "KS", country: "USA" },
-  { id: "api-fallback", name: "Fallback Test Links", city: "Detroit", state: "MI", country: "USA" },
+  { id: "0e5f1c2a-7b1d-4c55-9a51-000000000001", name: "Test Alpha Links", city: "Detroit", state: "MI", country: "USA" },
+  { id: "0e5f1c2a-7b1d-4c55-9a51-000000000002", name: "Test Beta Links", city: "Detroit", state: "MI", country: "USA" },
+  { id: "0e5f1c2a-7b1d-4c55-9a51-000000000003", name: "Mystery Meadows", city: "Nowhere", state: "KS", country: "USA" },
+  { id: "0e5f1c2a-7b1d-4c55-9a51-000000000004", name: "Fallback Test Links", city: "Detroit", state: "MI", country: "USA" },
 ];
 
 const csv = () =>

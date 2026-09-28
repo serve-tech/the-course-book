@@ -63,10 +63,12 @@ describe("other API shapes", () => {
     ]);
   });
 
-  it("keeps a catalog hit's id and gives other hits a non-uuid id", () => {
+  it("keeps a catalog hit's id as its catalogId and marks other hits as outside the catalog", () => {
     const details = { name: "Arcadia South", location: "Arcadia, MI, USA", city: "Arcadia", state: "MI", country: "USA", logoUrl: null, websiteUrl: null };
-    expect(fromSearchHit({ courseId: arcadia.id, course: details, ranks: ranks() }, 0).course.id).toBe(arcadia.id);
-    expect(fromSearchHit({ courseId: null, course: details, ranks: ranks() }, 4).course.id).toBe("search:4");
+    const known = fromSearchHit({ courseId: arcadia.id, course: details, ranks: ranks() }, 0);
+    expect([known.course.id, known.catalogId]).toEqual([arcadia.id, arcadia.id]);
+    const other = fromSearchHit({ courseId: null, course: details, ranks: ranks() }, 4);
+    expect([other.course.id, other.catalogId]).toEqual(["search:4", null]);
   });
 
   it("round-trips course details for an add-course request", () => {
