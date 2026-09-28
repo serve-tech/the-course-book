@@ -38,7 +38,7 @@ Local development never connects to production data. Automated tests use the loc
 3. Identify the behavior to preserve and the acceptance checks for the requested change.
 4. Keep feature code together. Extract pure logic and test it; put database work in `apps/api/src/services/`, expose it as an API operation (then `pnpm contract:emit`), and call it from the web app through `app/lib/api` in a `clientLoader` or the journal `clientAction`.
 5. Run the checks in [testing](docs/testing.md), review the diff and update documentation affected by the change.
-6. Commit logical units with Conventional Commits, push the branch and open a PR against `main`. Include what changed, why, test results and remaining limitations.
+6. Commit logical units with Conventional Commits, push the branch and open a PR against `main`. Include what changed, why, test results and remaining limitations. `main` is protected: a PR merges only when its `verify`, `browser` and `docker` checks pass and the branch is up to date with `main`; direct pushes are rejected, for administrators too.
 
 Avoid "cleanup" of course identities, rank semantics or migration history alongside unrelated UI work. These have data implications explained in the architecture guide.
 
@@ -46,7 +46,7 @@ Avoid "cleanup" of course identities, rank semantics or migration history alongs
 
 `pnpm build` produces the API bundle (`apps/api/dist`, what the Docker image runs) and the static web app (`apps/web/build/client`). `apps/api/Dockerfile` and `render.yaml` describe the production build and infrastructure.
 
-Render deploys both services from the branch named in `render.yaml`. During the rebuild that is `feat/render-clerk-rebuild`, which acts as the staging deployment; at cutover it becomes `main`. Until cutover, `main` still publishes the retired static application to GitHub Pages through `pages.yml` and is frozen to hotfixes.
+Render deploys both services from the branch named in `render.yaml`, and only after that commit's CI checks pass. During the rebuild that is `feat/render-clerk-rebuild`, which acts as the staging deployment; at cutover it becomes `main`. Until cutover, `main` still publishes the retired static application to GitHub Pages through `pages.yml` and is frozen to hotfixes.
 
 **Check the PR's "Verify application" result before an authorized merge.** Failed verification must not be merged.
 
