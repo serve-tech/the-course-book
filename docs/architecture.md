@@ -10,8 +10,8 @@ Built and tested on `feat/render-clerk-rebuild`: the API with its read and write
 
 | Piece | What it is | Render resource |
 | --- | --- | --- |
-| API | `apps/api`, bundled by esbuild into one file and shipped in a Docker image ([Dockerfile](../apps/api/Dockerfile)). Runs migrations on start, then serves `/healthz` and `/v1/*` | `coursebook-api` web service |
-| Web app | `apps/web/build/client`, static files with an `index.html` fallback for client-side routes | `coursebook-web` static site |
+| API | `apps/api`, bundled by esbuild into one file and shipped in a Docker image ([Dockerfile](../apps/api/Dockerfile)). Runs migrations on start, then serves `/healthz` and `/v1/*` | `coursebook-golf-api` web service |
+| Web app | `apps/web/build/client`, static files with an `index.html` fallback for client-side routes | `coursebook-golf-web` static site |
 | Database | Postgres 17 | `coursebook-db` |
 | Contract | [contract/openapi.json](../contract/openapi.json), generated from the API's route definitions; clients generate their code from it | not deployed; also served at `/v1/openapi.json` |
 

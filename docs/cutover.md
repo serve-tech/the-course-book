@@ -2,7 +2,7 @@
 
 Each step names who does it and what proves it worked. The retired Supabase project is never modified; it is exported from, then paused.
 
-The Render footprint is three resources from [render.yaml](../render.yaml): `coursebook-api` (Docker web service), `coursebook-web` (static site) and `coursebook-db` (Postgres). Staging starts on free plans; step 4 moves the database to a paid plan before real member data goes in.
+The Render footprint is three resources from [render.yaml](../render.yaml): `coursebook-golf-api` (Docker web service), `coursebook-golf-web` (static site) and `coursebook-db` (Postgres). Every non-secret setting (publishable keys, the JWT public key, origins and URLs) is a value in `render.yaml`, so changing one is a commit and a Blueprint sync. The one secret, `CLERK_SECRET_KEY`, is `sync: false`: Render asks for it when the Blueprint is created and ignores it on later syncs, so later changes are made in the dashboard. Staging starts on free plans; step 4 moves the database to a paid plan before real member data goes in.
 
 ## 0. Preconditions
 
@@ -12,20 +12,9 @@ The Render footprint is three resources from [render.yaml](../render.yaml): `cou
 
 ## 1. Render staging from the branch (maintainer)
 
-1. In the Render dashboard, New, Blueprint, connect the repository, pick `render.yaml`. Render creates the three resources from the branch named in the file, all on free plans (no payment method should be needed; Render may still ask for a card to verify the account).
-2. Enter the values Render prompts for:
-
-   | Resource | Variable | Value (development Clerk instance for now) |
-   | --- | --- | --- |
-   | coursebook-api | `CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY` | Clerk dashboard, API keys |
-   | coursebook-api | `CLERK_JWT_KEY` | Clerk dashboard, API keys, JWT public key (PEM) |
-   | coursebook-api | `WEB_ORIGINS` | The static site's URL, e.g. `https://coursebook-web.onrender.com` (no trailing slash) |
-   | coursebook-api | `PUBLIC_WEB_URL` | The same URL |
-   | coursebook-web | `VITE_API_URL` | The API's URL, e.g. `https://coursebook-api.onrender.com` |
-   | coursebook-web | `VITE_CLERK_PUBLISHABLE_KEY` | Same as the API's publishable key |
-
-   If Render assigns different `onrender.com` names than expected, correct `WEB_ORIGINS`, `PUBLIC_WEB_URL` and `VITE_API_URL`, then redeploy both services.
-3. Confirm the API deploy log shows no migration or startup error, and `https://<api>/healthz` returns `{"ok":true}`.
+1. Open `https://render.com/deploy?repo=https://github.com/serve-tech/the-course-book/tree/feat/render-clerk-rebuild` (or in the dashboard: New, Blueprint, connect the repository). Make sure the Blueprint's branch is `feat/render-clerk-rebuild`: `main` has no `render.yaml` until cutover. Render has no API or CLI command that creates a Blueprint, so this step is manual. Render creates the three resources on free plans (no payment method should be needed; Render may still ask for a card to verify the account).
+2. Render prompts for one value: `CLERK_SECRET_KEY` on `coursebook-golf-api`, the development instance's secret key from `.env`. Everything else comes from `render.yaml`, using the development Clerk instance and the `onrender.com` URLs `https://coursebook-golf-web.onrender.com` (web) and `https://coursebook-golf-api.onrender.com` (API). Service names set these hostnames; if Render ever assigns a suffixed hostname because a name is taken, correct `WEB_ORIGINS`, `PUBLIC_WEB_URL` and `VITE_API_URL` in `render.yaml` and sync.
+3. Confirm the API deploy log shows no migration or startup error, and `https://coursebook-golf-api.onrender.com/healthz` returns `{"ok":true}`.
 4. On the static site: Top 100 shows complete lists (seeded catalog); sign up with a throwaway account; log a round, reorder, and reload to confirm both persist; Friends loads; the Account page deletes the throwaway account.
 5. Wait more than 15 minutes, open the site again and time the first data load: expect the "Waking the server…" notice and roughly a minute.
 
@@ -34,7 +23,7 @@ The Render footprint is three resources from [render.yaml](../render.yaml): `cou
 1. Clerk dashboard, create the production instance for the application; add the DNS records Clerk lists for coursebook.golf (CNAMEs for the frontend API, accounts portal and email) and wait for verification.
 2. Create the project's own Google OAuth client in Google Cloud Console with Clerk's redirect URI; enter its credentials in Clerk's Google social connection.
 3. Apply the same settings as development: username, first name and email required; session token claims `username`, `email`, `name` (`{{user.full_name}}`), `image_url`; self-service account deletion off.
-4. Keep the production keys (publishable, secret and JWT public key) ready; do not enter them in Render until step 5.
+4. Keep the production keys (publishable, secret and JWT public key) ready; do not put them in Render until step 5. The JWT public key is also served, as a JWK, by `GET https://api.clerk.com/v1/jwks` with the secret key.
 
 ## 3. Rehearse the import (maintainer + agent)
 
@@ -59,15 +48,14 @@ The Render footprint is three resources from [render.yaml](../render.yaml): `cou
 
 ## 5. Point the domains and switch to main (maintainer + agent)
 
-1. Enter the production Clerk keys: `CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY` and `CLERK_JWT_KEY` on the API; `VITE_CLERK_PUBLISHABLE_KEY` on the static site.
-2. Add `coursebook.golf` and `www.coursebook.golf` as custom domains on `coursebook-web`, and `api.coursebook.golf` on `coursebook-api`; create the DNS records Render shows and wait for the certificates. (The Hobby workspace includes two custom domains; each additional one is billed.)
-3. Update the origins: `WEB_ORIGINS=https://coursebook.golf,https://www.coursebook.golf` and `PUBLIC_WEB_URL=https://coursebook.golf` on the API, `VITE_API_URL=https://api.coursebook.golf` on the static site; redeploy both.
-4. Change `branch` in `render.yaml` to `main` for both services, merge the branch to `main`, delete `.github/workflows/pages.yml` on `main`, and disable GitHub Pages in the repository settings.
-5. Smoke test on coursebook.golf with a real account: sign in, log a round, reorder, Friends, sign out. Check the API's Render logs for errors (every error response carries a request id that appears in the logs).
+1. Add `coursebook.golf` and `www.coursebook.golf` as custom domains on `coursebook-golf-web`, and `api.coursebook.golf` on `coursebook-golf-api`; create the DNS records Render shows and wait for the certificates. (The Hobby workspace includes two custom domains; each additional one is billed.)
+2. Switch to the production Clerk instance and the domains in one go, so the API never runs with keys from two Clerk instances: replace `CLERK_SECRET_KEY` on `coursebook-golf-api` in the Render dashboard, then immediately commit one `render.yaml` change with the production `CLERK_PUBLISHABLE_KEY` and `CLERK_JWT_KEY` on the API, the production `VITE_CLERK_PUBLISHABLE_KEY` on the static site, `WEB_ORIGINS=https://coursebook.golf,https://www.coursebook.golf,https://coursebook-golf-web.onrender.com` and `PUBLIC_WEB_URL=https://coursebook.golf` on the API, and `VITE_API_URL=https://api.coursebook.golf` on the static site. Confirm the Blueprint sync applied it and both services redeployed.
+3. Change `branch` in `render.yaml` to `main` for both services, merge the branch to `main` and point the Blueprint at `main` in the dashboard (Render's API cannot change a Blueprint's branch). Delete `.github/workflows/pages.yml` on `main`, and disable GitHub Pages in the repository settings.
+4. Smoke test on coursebook.golf with a real account: sign in, log a round, reorder, Friends, sign out. Check the API's Render logs for errors (every error response carries a request id that appears in the logs).
 
 ## 6. After cutover
 
-- Before the iOS and Android apps ship, move `coursebook-api` to `plan: starter` so apps never wait for a cold start; raise the minimum versions in `/v1/client-config` (`MIN_IOS_VERSION`, `MIN_ANDROID_VERSION`) only when an old app build must stop working.
+- Before the iOS and Android apps ship, move `coursebook-golf-api` to `plan: starter` so apps never wait for a cold start; raise the minimum versions in `/v1/client-config` (`MIN_IOS_VERSION`, `MIN_ANDROID_VERSION`) only when an old app build must stop working.
 - Keep the Supabase project paused, not deleted, until a Render database restore has been tested from a backup.
 - Update the README production link and remove the `onrender.com` origins from `WEB_ORIGINS` once the domains serve all traffic.
 - Revoke anonymous access to the retired backup tables on Supabase before it is ever unpaused (separate approval; unrelated to this repository).

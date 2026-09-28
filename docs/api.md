@@ -4,7 +4,7 @@ The authoritative description is [contract/openapi.json](../contract/openapi.jso
 
 ## Basics
 
-- **Base URL:** the `coursebook-api` Render service (`https://api.coursebook.golf` after cutover).
+- **Base URL:** the `coursebook-golf-api` Render service, `https://coursebook-golf-api.onrender.com` (`https://api.coursebook.golf` after cutover).
 - **Authentication:** `Authorization: Bearer <Clerk session token>` on member operations. Omit the header on public operations. Cookies are ignored.
 - **Bodies:** JSON with `Content-Type: application/json`, at most 32 KB. Optional request fields may be missing or `null`.
 - **Responses:** every documented field is always present; absent values are `null`. Changes to your list return the whole updated list (`courses`), so clients replace their copy.
