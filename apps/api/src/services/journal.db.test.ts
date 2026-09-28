@@ -4,13 +4,9 @@ import { courses, rounds, userCourses, users } from "../db/schema";
 import { resetMemberData, testDatabase } from "../test/db";
 import {
   addCourseByDetails,
-  addCustomCourse,
-  addFromFriend,
-  addFromRankings,
   addToList,
   deleteCourse,
   deleteRound,
-  listSummary,
   logRounds,
   moveCourse,
   personalList,
@@ -31,6 +27,14 @@ beforeEach(async () => {
   await resetMemberData(db);
   await db.insert(users).values({ id: USER, username: "journal", displayName: "Journal" });
 });
+
+/** A member's play count for one course, read from their list. */
+const playedOn = async (courseId: string) =>
+  (await personalList(db, USER)).find((entry) => entry.course.id === courseId)?.played;
+
+/** Add a hand-entered course at `rank` (bottom when null) with one round. */
+const addCustom = (input: Parameters<typeof addCourseByDetails>[2], rank: number | null) =>
+  addCourseByDetails(db, USER, { ...input, isCustom: true }, { rank, quantity: 1 });
 
 const seeded = async (stableId: string) => {
   const [row] = await db.select({ id: courses.id }).from(courses).where(eq(courses.stableId, stableId));
@@ -80,7 +84,7 @@ describe("logging rounds", () => {
     await logRounds(db, USER, { courseId: b }, 1);
     await logRounds(db, USER, { courseId: a }, 2);
     expect(await ranks()).toEqual([[a, 1], [b, 2]]);
-    expect((await listSummary(db, USER)).played[a]).toBe(3);
+    expect(await playedOn(a)).toBe(3);
   });
 
   it("creates a course from search details when none matches", async () => {
@@ -94,36 +98,17 @@ describe("logging rounds", () => {
   });
 });
 
-describe("adding from rankings and members", () => {
-  it("rankings add logs a first round only and keeps the list order", async () => {
-    const a = await seeded("usa1");
-    await addFromRankings(db, USER, a);
-    await addFromRankings(db, USER, a);
-    expect((await roundsFor(a)).filter((row) => row.userId === USER)).toHaveLength(1);
-  });
-
-  it("member add is a no-op when the course is already listed", async () => {
-    const a = await seeded("usa1");
-    await logRounds(db, USER, { courseId: a }, 2);
-    expect(await addFromFriend(db, USER, a)).toEqual({ added: false });
-    expect((await roundsFor(a)).filter((row) => row.userId === USER)).toHaveLength(2);
-    const b = await seeded("usa2");
-    expect(await addFromFriend(db, USER, b)).toEqual({ added: true });
-    expect(await ranks()).toEqual([[a, 1], [b, 2]]);
-  });
-});
-
 describe("custom courses", () => {
   it("inserts at the requested rank, clamped, and shifts the others", async () => {
     const a = await seeded("usa1");
     const b = await seeded("usa2");
     await logRounds(db, USER, { courseId: a }, 1);
     await logRounds(db, USER, { courseId: b }, 1);
-    const first = await addCustomCourse(db, USER, blob("Backyard Nine", "Hometown, OH, USA", { state: "OH", country: "USA" }), 1);
+    const first = await addCustom(blob("Backyard Nine", "Hometown, OH, USA", { state: "OH", country: "USA" }), 1);
     expect(first.rank).toBe(1);
-    const bottom = await addCustomCourse(db, USER, blob("Far Field", "Elsewhere, OH, USA", { state: "OH", country: "USA" }), 99);
+    const bottom = await addCustom(blob("Far Field", "Elsewhere, OH, USA", { state: "OH", country: "USA" }), 99);
     expect(bottom.rank).toBe(4);
-    const unranked = await addCustomCourse(db, USER, blob("Quiet Links", "Somewhere, OH, USA", { state: "OH", country: "USA" }), null);
+    const unranked = await addCustom(blob("Quiet Links", "Somewhere, OH, USA", { state: "OH", country: "USA" }), null);
     expect(unranked.rank).toBe(5);
     expect((await ranks()).map(([, rank]) => rank)).toEqual([1, 2, 3, 4, 5]);
     expect((await ranks())[0]?.[0]).toBe(first.courseId);
@@ -134,11 +119,11 @@ describe("custom courses", () => {
   it("keeps the rank and logs a round when the course is already listed", async () => {
     const a = await seeded("usa1");
     await logRounds(db, USER, { courseId: a }, 1);
-    const custom = await addCustomCourse(db, USER, blob("Backyard Nine", "Hometown, OH, USA", { state: "OH", country: "USA" }), null);
-    const again = await addCustomCourse(db, USER, blob("Backyard Nine", "Hometown, OH, USA", { state: "OH", country: "USA" }), 1);
+    const custom = await addCustom(blob("Backyard Nine", "Hometown, OH, USA", { state: "OH", country: "USA" }), null);
+    const again = await addCustom(blob("Backyard Nine", "Hometown, OH, USA", { state: "OH", country: "USA" }), 1);
     expect(again.courseId).toBe(custom.courseId);
     expect(again.rank).toBe(2);
-    expect((await listSummary(db, USER)).played[custom.courseId]).toBe(2);
+    expect(await playedOn(custom.courseId)).toBe(2);
   });
 });
 
@@ -243,13 +228,13 @@ describe("catalog cache after creating a course", () => {
   it("includes a new course when a snapshot load raced its transaction", async () => {
     await logRounds(db, USER, { courseId: await seeded("usa1") }, 1);
     invalidateCatalog();
-    // Hold a lock that addCustomCourse needs after it inserts the course, so a
+    // Hold a lock that adding the course needs after it inserts it, so a
     // snapshot can load between the insert and the commit.
     const blocker = await pool.connect();
     try {
       await blocker.query("begin");
       await blocker.query("select 1 from user_courses where user_id = $1 for update", [USER]);
-      const creating = addCustomCourse(db, USER, { ...blob("Race Condition Links", "Hometown, OH"), isCustom: true }, null);
+      const creating = addCustom(blob("Race Condition Links", "Hometown, OH"), null);
       await waitForLockWait();
       await allCourses(db);
       await blocker.query("commit");
@@ -271,6 +256,16 @@ describe("adding for API clients", () => {
     const again = await addToList(db, USER, a);
     expect(again.added).toBe(false);
     expect(again.courses).toMatchObject([{ rank: 1, played: 1 }]);
+  });
+
+  it("appends at the bottom and leaves a listed course with rounds unchanged", async () => {
+    const a = await seeded("usa1");
+    await logRounds(db, USER, { courseId: a }, 2);
+    expect((await addToList(db, USER, a)).added).toBe(false);
+    expect((await roundsFor(a)).filter((row) => row.userId === USER)).toHaveLength(2);
+    const b = await seeded("usa2");
+    expect((await addToList(db, USER, b)).added).toBe(true);
+    expect(await ranks()).toEqual([[a, 1], [b, 2]]);
   });
 
   it("logs a round for a listed course that has none", async () => {

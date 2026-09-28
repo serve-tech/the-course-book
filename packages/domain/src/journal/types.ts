@@ -18,11 +18,3 @@ export interface RoundEntry {
   /** ISO date (YYYY-MM-DD). */
   playedAt: string;
 }
-
-/** Play counts and list membership for a member. */
-export interface ListSummary {
-  /** Round count per course id (only courses with at least one round). */
-  played: Record<string, number>;
-  /** Course ids on the member's list, in rank order. */
-  onList: string[];
-}

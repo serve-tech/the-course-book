@@ -3,7 +3,7 @@ import type { Database, Executor, Transaction } from "../db/client";
 import { courses, rounds, userCourses, users } from "../db/schema";
 import { courseView } from "../domain/course-view";
 import { insertAt, reorder } from "@coursebook/domain/journal/reorder";
-import type { ListEntry, ListSummary, RoundEntry } from "@coursebook/domain/journal/types";
+import type { ListEntry, RoundEntry } from "@coursebook/domain/journal/types";
 import {
   findOrCreateCourse,
   invalidateCatalog,
@@ -21,26 +21,6 @@ import { AppError, ErrorCode } from "./errors";
  * contiguous 1..N per user; `renumber` keeps that invariant after any
  * insertion, move or removal. Play counts are always counted from rounds.
  */
-
-/** Play counts and list membership for a member; empty for anonymous users. */
-export async function listSummary(db: Database, userId: string): Promise<ListSummary> {
-  const [memberships, counts] = await Promise.all([
-    db
-      .select({ courseId: userCourses.courseId })
-      .from(userCourses)
-      .where(eq(userCourses.userId, userId))
-      .orderBy(userCourses.personalRank),
-    db
-      .select({ courseId: rounds.courseId, played: count() })
-      .from(rounds)
-      .where(eq(rounds.userId, userId))
-      .groupBy(rounds.courseId),
-  ]);
-  return {
-    played: Object.fromEntries(counts.map((row) => [row.courseId, row.played])),
-    onList: memberships.map((row) => row.courseId),
-  };
-}
 
 /** The member's personal list in rank order with play counts. */
 export async function personalList(db: Executor, userId: string): Promise<ListEntry[]> {
@@ -297,46 +277,6 @@ export async function addToList(
     if ((await roundCount(tx, userId, courseId)) === 0) await insertRounds(tx, userId, courseId, 1, playedOn);
     return { added: created, courses: await personalList(tx, userId) };
   });
-}
-
-/**
- * "Add to my list" from the Rankings page: add the membership if missing and
- * log one round only when the course has none yet.
- */
-export async function addFromRankings(db: Database, userId: string, courseId: string): Promise<void> {
-  await withJournalLock(db, userId, async (tx) => {
-    await requireCourse(tx, courseId);
-    await ensureMembership(tx, userId, courseId);
-    if ((await roundCount(tx, userId, courseId)) === 0) await insertRounds(tx, userId, courseId, 1);
-  });
-}
-
-/** "Add to my list" from a member's page: no-op when already on the list. */
-export async function addFromFriend(
-  db: Database,
-  userId: string,
-  courseId: string,
-): Promise<{ added: boolean }> {
-  return withJournalLock(db, userId, async (tx) => {
-    await requireCourse(tx, courseId);
-    const { created } = await ensureMembership(tx, userId, courseId);
-    if (created) await insertRounds(tx, userId, courseId, 1);
-    return { added: created };
-  });
-}
-
-/**
- * Add a hand-entered course at a requested rank (clamped to [1, N+1],
- * default bottom) and log one round. If the member already has the course,
- * its rank is kept and one round is still logged.
- */
-export async function addCustomCourse(
-  db: Database,
-  userId: string,
-  input: Exclude<CourseInput, { courseId: string }>,
-  requestedRank: number | null,
-): Promise<{ courseId: string; rank: number; courses: ListEntry[] }> {
-  return addCourseByDetails(db, userId, { ...input, isCustom: true }, { rank: requestedRank, quantity: 1 });
 }
 
 /** Move a course to a rank; the whole list is renumbered from its full order. */
