@@ -42,6 +42,24 @@ test.beforeEach(async ({ page }) => {
 const row = (page: Page, name: string) =>
   page.locator("#mylist .rankrow").filter({ has: page.getByText(name, { exact: true }) });
 
+/**
+ * How far Clerk's card sits inside the auth dialog's content box on each side,
+ * in whole pixels; `{ left: 0, right: 0 }` when it fills it exactly. The right
+ * edge uses `clientWidth` so a scrollbar does not count as overflow.
+ */
+const authCardInset = (page: Page) =>
+  page.evaluate(() => {
+    const modal = document.querySelector<HTMLElement>("#authmodal .modal");
+    const card = document.querySelector("#authClerk .cl-cardBox");
+    if (!modal || !card) return null;
+    const style = getComputedStyle(modal);
+    const box = modal.getBoundingClientRect();
+    const inner = card.getBoundingClientRect();
+    const contentLeft = box.left + parseFloat(style.borderLeftWidth) + parseFloat(style.paddingLeft);
+    const contentRight = box.left + parseFloat(style.borderLeftWidth) + modal.clientWidth - parseFloat(style.paddingRight);
+    return { left: Math.round(inner.left - contentLeft), right: Math.round(contentRight - inner.right) };
+  });
+
 test("anonymous navigation, dialogs and mobile layout remain usable", async ({ page }) => {
   test.skip(!clerkAvailable, "Clerk development instance keys are not configured");
   await page.goto("/");
@@ -55,6 +73,13 @@ test("anonymous navigation, dialogs and mobile layout remain usable", async ({ p
   await expect(page.locator("#modalsearch")).toBeDisabled();
   await page.getByRole("button", { name: "Sign In", exact: true }).click();
   await expect(page.locator("#authmodal")).toBeVisible();
+  // Clerk's fixed-width card once overflowed the dialog on wide screens and
+  // fell short of its padding on phones; it fills the content box instead.
+  await expect(page.locator("#authClerk .cl-cardBox.cl-signIn-start")).toBeVisible();
+  await expect.poll(() => authCardInset(page)).toEqual({ left: 0, right: 0 });
+  await page.locator("#authToggle").click();
+  await expect(page.locator("#authClerk .cl-cardBox.cl-signUp-start")).toBeVisible();
+  await expect.poll(() => authCardInset(page)).toEqual({ left: 0, right: 0 });
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
   ).toBe(true);
