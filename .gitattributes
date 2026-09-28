@@ -1,0 +1,17 @@
+# Files produced by a command, never edited by hand. linguist-generated hides
+# them by default in GitHub diffs and leaves them out of the repository's
+# language statistics. Regenerate them with the command noted above each one.
+# Schema migrations stay visible: review them like code.
+
+# pnpm install
+pnpm-lock.yaml linguist-generated=true
+
+# pnpm contract:emit
+contract/openapi.json linguist-generated=true
+apps/web/app/lib/api/schema.d.ts linguist-generated=true
+
+# pnpm db:generate (drizzle-kit snapshots and journal)
+apps/api/src/db/migrations/meta/*.json linguist-generated=true
+
+# pnpm seed:build
+apps/api/src/db/migrations/0001_seed_catalog.sql linguist-generated=true
