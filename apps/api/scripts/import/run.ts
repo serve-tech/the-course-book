@@ -13,10 +13,9 @@
  */
 import type { ClerkClient } from "@clerk/backend";
 import { asc, eq, inArray, isNull, notInArray, or } from "drizzle-orm";
-import { normalizeName, type Course } from "@coursebook/domain/catalog/course";
+import { normalizeName } from "@coursebook/domain/catalog/course";
 import type { Database } from "../../src/db/client";
 import { courses, rounds, userCourses, users } from "../../src/db/schema";
-import { courseView } from "../../src/domain/course-view";
 import { assignUsernames, planImport, summarizeLedger, type ImportPlan, type PlannedMember } from "./plan";
 import type { SupabaseExport } from "./rows";
 
@@ -94,10 +93,6 @@ function report(plan: ImportPlan, log: (line: string) => void): void {
     const total = [...counts.values()].reduce((sum, count) => sum + count, 0);
     log(`${table}: ${String(total)} rows = ${[...counts].map(([kind, count]) => `${String(count)} ${kind}`).join(", ")}`);
   }
-  for (const entry of plan.ledger) {
-    if (entry.outcome.kind === "merged") log(`  merged: ${entry.table} ${entry.id} into course ${entry.outcome.into}`);
-    if (entry.outcome.kind === "moved") log(`  moved: ${entry.table} ${entry.id} to course ${entry.outcome.to}`);
-  }
   for (const notice of plan.notices) log(`notice: ${notice}`);
 }
 
@@ -117,8 +112,8 @@ function report(plan: ImportPlan, log: (line: string) => void): void {
  */
 export async function runImport(deps: Dependencies, data: SupabaseExport, options: { dryRun: boolean }): Promise<ImportResult> {
   const { db, accounts, log } = deps;
-  const catalog = new Map<string, Course>((await db.select().from(courses)).map((row) => [row.id, courseView(row)]));
-  const plan = planImport(data, catalog);
+  const catalogIds = new Set((await db.select({ id: courses.id }).from(courses)).map((row) => row.id));
+  const plan = planImport(data, catalogIds);
   report(plan, log);
   if (plan.problems.length) {
     log(`\n${String(plan.problems.length)} problems; nothing was written:`);

@@ -4,12 +4,15 @@
  * plus a ledger that gives every source row exactly one outcome. Nothing here
  * does I/O, so the rules are unit-tested with plain data.
  *
+ * The import is 1-for-1 (maintainer decision, 2026-09-28): every list entry
+ * and round keeps its own course, and nothing is merged or corrected, even
+ * where the old data is wrong. Only what the new schema forces changes, and
+ * the report says so: ranks are renumbered 1..N in their existing order, and
+ * a course with rounds but no list entry gets one at the bottom.
+ *
  * Nothing is dropped silently: a row the plan cannot place is a problem, and
  * any problem stops the import before it writes (run.ts).
  */
-import { normalizeName, type Course } from "@coursebook/domain/catalog/course";
-import { courseView } from "../../src/domain/course-view";
-import { equivalentCourses } from "../../src/domain/identity";
 import { USERNAME_PATTERN } from "../../src/domain/username";
 import type { CourseRow, MembershipRow, ProfileRow, RoundRow, SupabaseExport } from "./rows";
 
@@ -25,8 +28,6 @@ export type PlacedRound = RoundRow & WithOwner & { played_on: string };
 export interface MembershipPlan {
   /** Ordered course ids per Supabase user id, ranks 1..N by index. */
   order: Map<string, string[]>;
-  /** Duplicate course id -> kept course id, per user, for re-pointing rounds. */
-  merged: Map<string, Map<string, string>>;
   /** Courses that had rounds but no membership, appended at the bottom. */
   orphans: { userId: string; courseId: string }[];
 }
@@ -34,28 +35,26 @@ export interface MembershipPlan {
 /**
  * Decide each member's final order.
  *
- * Rules: sort memberships by rank (nulls last), then creation time, then id;
- * collapse memberships whose courses are equivalent by the identity rule
- * onto the first one; append courses that only have rounds.
+ * Every membership keeps its own course. Order: rank (nulls last), then
+ * creation time, then id, renumbered 1..N; courses that only have rounds are
+ * appended at the bottom, as the old app showed them.
  *
  * Raises:
- *     Error: A membership or round names a course missing from `courses`;
+ *     Error: A membership or round names a course missing from `courseIds`;
  *         `planImport` reports those as problems before calling this.
  */
 export function planMemberships(
   memberships: readonly Pick<MembershipRow & WithOwner, "id" | "user_id" | "course_id" | "personal_rank" | "created_at">[],
   rounds: readonly WithOwner[],
-  courses: ReadonlyMap<string, Course>,
+  courseIds: ReadonlySet<string>,
 ): MembershipPlan {
   const known = (courseId: string) => {
-    if (!courses.has(courseId)) throw new Error(`planMemberships: unknown course ${courseId}`);
+    if (!courseIds.has(courseId)) throw new Error(`planMemberships: unknown course ${courseId}`);
   };
   const byUser = new Map<string, (typeof memberships)[number][]>();
   for (const membership of memberships) {
     known(membership.course_id);
-    const list = byUser.get(membership.user_id) ?? [];
-    list.push(membership);
-    byUser.set(membership.user_id, list);
+    byUser.set(membership.user_id, [...(byUser.get(membership.user_id) ?? []), membership]);
   }
   const roundCourses = new Map<string, Set<string>>();
   for (const round of rounds) {
@@ -66,47 +65,25 @@ export function planMemberships(
   }
 
   const order = new Map<string, string[]>();
-  const merged = new Map<string, Map<string, string>>();
   const orphans: { userId: string; courseId: string }[] = [];
-  const userIds = new Set([...byUser.keys(), ...roundCourses.keys()]);
-
-  for (const userId of userIds) {
-    const sorted = [...(byUser.get(userId) ?? [])].sort(
-      (a, b) =>
-        (a.personal_rank ?? Number.MAX_SAFE_INTEGER) - (b.personal_rank ?? Number.MAX_SAFE_INTEGER) ||
-        (a.created_at ?? "").localeCompare(b.created_at ?? "") ||
-        a.id.localeCompare(b.id),
-    );
-    const kept: string[] = [];
-    const merges = new Map<string, string>();
-    for (const membership of sorted) {
-      const course = courses.get(membership.course_id);
-      const duplicate = kept.find((courseId) => equivalentCourses(courses.get(courseId), course));
-      if (duplicate && duplicate !== membership.course_id) merges.set(membership.course_id, duplicate);
-      else if (!kept.includes(membership.course_id)) kept.push(membership.course_id);
-    }
+  for (const userId of new Set([...byUser.keys(), ...roundCourses.keys()])) {
+    const kept = [...(byUser.get(userId) ?? [])]
+      .sort(
+        (a, b) =>
+          (a.personal_rank ?? Number.MAX_SAFE_INTEGER) - (b.personal_rank ?? Number.MAX_SAFE_INTEGER) ||
+          (a.created_at ?? "").localeCompare(b.created_at ?? "") ||
+          a.id.localeCompare(b.id),
+      )
+      .map((membership) => membership.course_id);
     for (const courseId of roundCourses.get(userId) ?? []) {
-      const target = merges.get(courseId) ?? courseId;
-      if (!kept.includes(target)) {
-        kept.push(target);
-        orphans.push({ userId, courseId: target });
+      if (!kept.includes(courseId)) {
+        kept.push(courseId);
+        orphans.push({ userId, courseId });
       }
     }
     order.set(userId, kept);
-    if (merges.size) merged.set(userId, merges);
   }
-  return { order, merged, orphans };
-}
-
-/** Re-point rounds whose course was merged into another membership. */
-export function remapRounds<T extends WithOwner>(
-  rounds: readonly T[],
-  merged: ReadonlyMap<string, ReadonlyMap<string, string>>,
-): T[] {
-  return rounds.map((round) => {
-    const target = merged.get(round.user_id)?.get(round.course_id);
-    return target ? { ...round, course_id: target } : round;
-  });
+  return { order, orphans };
 }
 
 /**
@@ -133,10 +110,6 @@ export type Outcome =
   | { kind: "imported" }
   /** A course the new catalog already has. */
   | { kind: "in_catalog" }
-  /** A list entry folded into the member's entry for an equivalent course. */
-  | { kind: "merged"; into: string }
-  /** A round moved to the member's entry for an equivalent course. */
-  | { kind: "moved"; to: string }
   | { kind: "problem"; reason: string };
 
 export interface LedgerEntry {
@@ -188,24 +161,6 @@ export interface ImportPlan {
   notices: string[];
 }
 
-/** Domain view of an exported course, for the equivalence rule. */
-function exportedCourseView(row: CourseRow): Course {
-  return courseView({
-    id: row.id,
-    stableId: null,
-    name: row.name,
-    nameKey: normalizeName(row.name),
-    city: row.city,
-    state: row.state,
-    country: row.country ?? "USA",
-    logoUrl: row.logo_url,
-    websiteUrl: row.website_url,
-    isCustom: row.is_custom ?? false,
-    createdBy: null,
-    createdAt: new Date(0),
-  });
-}
-
 const utcDate = (timestamp: string) => new Date(timestamp).toISOString().slice(0, 10);
 
 /**
@@ -214,14 +169,15 @@ const utcDate = (timestamp: string) => new Date(timestamp).toISOString().slice(0
  * Members are the union of `auth.users` and `profiles`; the auth email wins.
  * A member without an email, or sharing one with another member, cannot get a
  * Clerk account, so their rows are problems. Exported courses the catalog
- * lacks are inserted. List entries and rounds need a known member and course;
- * a round without `played_at` is dated from its creation time. The old app
- * showed play counts from rounds, never `times_played`, so a mismatch is a
- * notice, not a problem.
+ * lacks are inserted. List entries and rounds need a known member and course,
+ * and keep it (1-for-1); two list entries for the same member and course
+ * cannot both exist in the new schema, so that is a problem. A round without
+ * `played_at` is dated from its creation time. The old app showed play
+ * counts from rounds, never `times_played`, so a mismatch is a notice.
  *
  * Args:
  *     data: The validated export.
- *     catalog: Courses already in the database, by id.
+ *     catalogIds: Ids of the courses already in the database.
  *
  * Returns:
  *     What to write, the ledger, problems and notices.
@@ -230,7 +186,7 @@ const utcDate = (timestamp: string) => new Date(timestamp).toISOString().slice(0
  *     Error: The ledger does not hold exactly one entry per exported row
  *         (a bug in this function, never a data condition).
  */
-export function planImport(data: SupabaseExport, catalog: ReadonlyMap<string, Course>): ImportPlan {
+export function planImport(data: SupabaseExport, catalogIds: ReadonlySet<string>): ImportPlan {
   const ledger: LedgerEntry[] = [];
   const problems: string[] = [];
   const notices: string[] = [];
@@ -292,14 +248,14 @@ export function planImport(data: SupabaseExport, catalog: ReadonlyMap<string, Co
   }
 
   // Courses.
-  const courses = new Map(catalog);
+  const courses = new Set(catalogIds);
   const newCourses: CourseRow[] = [];
   for (const row of data.courses) {
-    if (catalog.has(row.id)) {
+    if (catalogIds.has(row.id)) {
       record("courses", row.id, { kind: "in_catalog" });
     } else {
       newCourses.push(row);
-      courses.set(row.id, exportedCourseView(row));
+      courses.add(row.id);
       record("courses", row.id, { kind: "imported" });
     }
   }
@@ -317,10 +273,17 @@ export function planImport(data: SupabaseExport, catalog: ReadonlyMap<string, Co
   // List entries and rounds: place what can be placed, record the rest.
   const placedMemberships: PlacedMembership[] = [];
   const membershipProblems = new Map<string, string>();
+  const entryOwner = new Map<string, string>();
   for (const row of data.memberships) {
     const reason = placementProblem(row);
+    const key = `${row.user_id ?? ""}|${row.course_id ?? ""}`;
+    const earlier = entryOwner.get(key);
     if (reason || !row.user_id || !row.course_id) membershipProblems.set(row.id, reason ?? "cannot be placed");
-    else placedMemberships.push({ ...row, user_id: row.user_id, course_id: row.course_id });
+    else if (earlier) membershipProblems.set(row.id, `repeats list entry ${earlier} for the same member and course`);
+    else {
+      entryOwner.set(key, row.id);
+      placedMemberships.push({ ...row, user_id: row.user_id, course_id: row.course_id });
+    }
   }
   const placedRounds: PlacedRound[] = [];
   const roundProblems = new Map<string, string>();
@@ -339,44 +302,38 @@ export function planImport(data: SupabaseExport, catalog: ReadonlyMap<string, Co
 
   const plan = planMemberships(placedMemberships, placedRounds, courses);
 
-  // Ledger for list entries, and each entry's notes (merged entries keep theirs).
-  const lists = new Map<string, PlannedEntry[]>();
-  const notesByEntry = new Map<string, string[]>();
-  const seen = new Set<string>();
-  const placedById = new Map(placedMemberships.map((membership) => [membership.id, membership]));
+  // Ledger for list entries; each keeps its course and notes.
   for (const row of data.memberships) {
     const reason = membershipProblems.get(row.id);
-    const placed = placedById.get(row.id);
-    if (reason || !placed) {
-      record("user_courses", row.id, { kind: "problem", reason: reason ?? "cannot be placed" });
-      continue;
-    }
-    const target = plan.merged.get(placed.user_id)?.get(placed.course_id) ?? placed.course_id;
-    const key = `${placed.user_id}|${target}`;
-    record("user_courses", row.id, seen.has(key) || target !== placed.course_id ? { kind: "merged", into: target } : { kind: "imported" });
-    seen.add(key);
-    if (placed.notes?.trim()) notesByEntry.set(key, [...(notesByEntry.get(key) ?? []), placed.notes.trim()]);
+    record("user_courses", row.id, reason ? { kind: "problem", reason } : { kind: "imported" });
   }
+  const placedByEntry = new Map(placedMemberships.map((membership) => [`${membership.user_id}|${membership.course_id}`, membership]));
+  const lists = new Map<string, PlannedEntry[]>();
+  let renumbered = 0;
   for (const [userId, order] of plan.order) {
-    lists.set(
-      userId,
-      order.map((courseId, index) => {
-        const notes = [...new Set(notesByEntry.get(`${userId}|${courseId}`) ?? [])];
-        return { courseId, rank: index + 1, notes: notes.length ? notes.join("\n\n") : null };
-      }),
-    );
+    const entries = order.map((courseId, index) => ({
+      courseId,
+      rank: index + 1,
+      notes: placedByEntry.get(`${userId}|${courseId}`)?.notes ?? null,
+    }));
+    if (entries.some((entry) => placedByEntry.get(`${userId}|${entry.courseId}`)?.personal_rank !== entry.rank)) renumbered++;
+    lists.set(userId, entries);
   }
+  if (plan.orphans.length)
+    notices.push(`${String(plan.orphans.length)} list entries added at the bottom for courses that have rounds but no list entry (the new schema requires one; the old app showed them there)`);
+  if (renumbered)
+    notices.push(`${String(renumbered)} members' ranks renumbered 1..N in their existing order (the old data had duplicate, missing or skipped ranks, or courses with only rounds)`);
 
   // Ledger for rounds.
   const rounds = new Map<string, PlannedRound[]>();
-  const remapped = new Map(remapRounds(placedRounds, plan.merged).map((round) => [round.id, round]));
+  const placedRoundById = new Map(placedRounds.map((round) => [round.id, round]));
   for (const row of data.rounds) {
-    const round = remapped.get(row.id);
+    const round = placedRoundById.get(row.id);
     if (!round) {
       record("rounds", row.id, { kind: "problem", reason: roundProblems.get(row.id) ?? "cannot be placed" });
       continue;
     }
-    record("rounds", row.id, round.course_id === row.course_id ? { kind: "imported" } : { kind: "moved", to: round.course_id });
+    record("rounds", row.id, { kind: "imported" });
     rounds.set(round.user_id, [
       ...(rounds.get(round.user_id) ?? []),
       {

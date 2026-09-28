@@ -1,24 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { courseSchema } from "@coursebook/domain/catalog/course";
 import {
   assignUsernames,
   planImport,
   planMemberships,
-  remapRounds,
   summarizeLedger,
   usernameFor,
   type PlannedMember,
 } from "./plan";
 import type { AuthUserRow, CourseRow, MembershipRow, ProfileRow, RoundRow, SupabaseExport } from "./rows";
 
-const course = (id: string, name: string, location = "Detroit, MI, USA") => courseSchema.parse({ id, name, location });
-
-const catalog = new Map([
-  ["a", course("a", "Alpha Links")],
-  ["a2", course("a2", "Alpha Links Golf Club")],
-  ["b", course("b", "Beta Links")],
-  ["c", course("c", "Gamma Links")],
-]);
+// Catalog course ids. "a" and "a2" stand for two rows of what looks like the
+// same course (e.g. "Alpha Links" and "Alpha Links Golf Club"): the import
+// keeps them apart.
+const catalog = new Set(["a", "a2", "b", "c"]);
 
 // A syntactically valid bcrypt digest (not a real password's).
 const BCRYPT = "$2a$10$" + "abcdefghijklmnopqrstuv".repeat(2).slice(0, 22) + "ABCDEFGHIJKLMNOPQRSTUVWXYZ01234";
@@ -89,11 +83,15 @@ describe("membership planning", () => {
     expect(plan.orphans).toEqual([]);
   });
 
-  it("collapses equivalent duplicate courses and re-points their rounds", () => {
+  it("keeps look-alike courses as separate entries (1-for-1)", () => {
     const plan = planMemberships([placed("m1", "a", 1), placed("m2", "a2", 2), placed("m3", "b", 3)], [{ user_id: "u1", course_id: "a2" }], catalog);
-    expect(plan.order.get("u1")).toEqual(["a", "b"]);
-    expect(plan.merged.get("u1")?.get("a2")).toBe("a");
-    expect(remapRounds([{ id: "r1", user_id: "u1", course_id: "a2" }], plan.merged)[0]?.course_id).toBe("a");
+    expect(plan.order.get("u1")).toEqual(["a", "a2", "b"]);
+    expect(plan.orphans).toEqual([]);
+  });
+
+  it("orders duplicate ranks by creation time, then id", () => {
+    const plan = planMemberships([placed("m2", "b", 8, "2026-02-01"), placed("m1", "a", 8, "2026-01-01"), placed("m3", "c", 8, "2026-01-01")], [], catalog);
+    expect(plan.order.get("u1")).toEqual(["a", "c", "b"]);
   });
 
   it("appends courses that only have rounds", () => {
@@ -136,22 +134,21 @@ describe("import planning", () => {
     expect(plan.ledger).toHaveLength(3 + 3 + 2 + 4 + 4);
     const summary = summarizeLedger(plan.ledger);
     expect(Object.fromEntries(summary.get("courses") ?? [])).toEqual({ in_catalog: 1, imported: 1 });
-    expect(Object.fromEntries(summary.get("user_courses") ?? [])).toEqual({ imported: 3, merged: 1 });
-    expect(Object.fromEntries(summary.get("rounds") ?? [])).toEqual({ imported: 3, moved: 1 });
-    expect(plan.ledger.find((entry) => entry.id === "m2")?.outcome).toEqual({ kind: "merged", into: "a" });
-    expect(plan.ledger.find((entry) => entry.id === "r2")?.outcome).toEqual({ kind: "moved", to: "a" });
+    expect(Object.fromEntries(summary.get("user_courses") ?? [])).toEqual({ imported: 4 });
+    expect(Object.fromEntries(summary.get("rounds") ?? [])).toEqual({ imported: 4 });
   });
 
-  it("keeps every round, merged entries' notes and courses that only had rounds", () => {
+  it("keeps every entry and round on its own course, with its notes, 1-for-1", () => {
     const plan = planImport(data, catalog);
     expect(plan.lists.get("u1")).toEqual([
-      { courseId: "a", rank: 1, notes: "played it in the rain" },
-      { courseId: "custom1", rank: 2, notes: null },
-      { courseId: "c", rank: 3, notes: null },
+      { courseId: "a", rank: 1, notes: null },
+      { courseId: "a2", rank: 2, notes: "played it in the rain" },
+      { courseId: "custom1", rank: 3, notes: null },
+      { courseId: "c", rank: 4, notes: null },
     ]);
     expect(plan.rounds.get("u1")?.map((entry) => [entry.id, entry.courseId])).toEqual([
       ["r1", "a"],
-      ["r2", "a"],
+      ["r2", "a2"],
       ["r3", "c"],
     ]);
     expect(plan.rounds.get("u2")?.[0]?.playedOn).toBe("2026-03-04");
@@ -167,9 +164,15 @@ describe("import planning", () => {
     ]);
   });
 
-  it("reports stored counts that differ from rounds and rounds dated from creation", () => {
+  it("reports every change the new schema forces", () => {
     const { notices } = planImport(data, catalog);
     expect(notices).toContain("1 rounds have no played_at and are dated from created_at");
+    expect(notices).toContain(
+      "1 list entries added at the bottom for courses that have rounds but no list entry (the new schema requires one; the old app showed them there)",
+    );
+    expect(notices).toContain(
+      "1 members' ranks renumbered 1..N in their existing order (the old data had duplicate, missing or skipped ranks, or courses with only rounds)",
+    );
     expect(notices).toContain(
       "2 list entries have a stored times_played that differs from their rounds; the old app showed round counts, which are imported",
     );
@@ -191,6 +194,14 @@ describe("import planning", () => {
     const plan = planImport(exported({ authUsers: [auth("u1", "one@example.com")], ...rows }), catalog);
     expect(plan.problems.join("\n")).toMatch(message);
     expect(plan.ledger.filter((entry) => entry.outcome.kind === "problem")).toHaveLength(1);
+  });
+
+  it("stops on two list entries for the same member and course", () => {
+    const plan = planImport(
+      exported({ authUsers: [auth("u1", "one@example.com")], memberships: [membership("m1", "u1", "a"), membership("m2", "u1", "a")] }),
+      catalog,
+    );
+    expect(plan.problems).toEqual(["user_courses m2: repeats list entry m1 for the same member and course"]);
   });
 
   it("stops on a member without an email, and on every row that belongs to them", () => {
