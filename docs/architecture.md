@@ -125,7 +125,7 @@ Validate untrusted input at boundaries: request parameters and bodies (contract 
 
 ## Hosting and operations
 
-- **Cold starts:** a free web service sleeps after 15 idle minutes and takes about a minute to wake; the web app shows "Waking the server…" when a request is slow and waits up to 90 seconds. The static site never sleeps. Before the native apps ship, the API moves to a paid plan so phones never wait.
+- **Cold starts:** a free web service sleeps after 15 idle minutes and takes up to about a minute to wake (Render's figure; 12.5 s measured on staging, 2026-09-28); the web app shows "Waking the server…" when a request is slow and waits up to 90 seconds. The static site never sleeps. Before the native apps ship, the API moves to a paid plan so phones never wait.
 - **Migrations** run in the API process before it listens (free plans have no pre-deploy step), under a session advisory lock, so an overlapping deploy migrates once. Migrations must stay backward-compatible with the previous release, which keeps serving while the new one starts.
 - **Per-process caches:** the catalog snapshot (10 minutes, invalidated after a course is created), the search dataset and the provisioning cache assume one API instance; correctness never depends on them.
 - **Logs:** one JSON line per API request with its request id, which also appears in every error envelope and the `X-Request-Id` header.

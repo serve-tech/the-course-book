@@ -4,7 +4,7 @@ A golf course journal: log rounds, rank the courses you have played, compare aga
 
 - Repository: https://github.com/serve-tech/the-course-book
 - Production: https://serve-tech.github.io/the-course-book/ (retired static build, still live until cutover); coursebook.golf will point at Render after cutover.
-- Staging: https://coursebook-golf-web.onrender.com (API https://coursebook-golf-api.onrender.com), deployed from `feat/render-clerk-rebuild` with the Clerk development instance. The free API sleeps after 15 idle minutes; the first request then takes about a minute.
+- Staging: https://coursebook-golf-web.onrender.com (API https://coursebook-golf-api.onrender.com), deployed from `feat/render-clerk-rebuild` with the Clerk development instance. The free API sleeps after 15 idle minutes; the first request then waits for it to wake (12.5 s measured on 2026-09-28; Render documents up to about a minute).
 
 ## Working on the project
 
