@@ -32,14 +32,15 @@ The Render footprint is three resources from [render.yaml](../render.yaml): `cou
    mkdir -p .import
    psql "$SUPABASE_DB_URL" -1 -v ON_ERROR_STOP=1 \
      -c "set transaction isolation level repeatable read, read only" \
+     -c "\copy (select id, email, encrypted_password from auth.users) to '.import/auth_users.csv' csv header" \
      -c "\copy profiles to '.import/profiles.csv' csv header" \
      -c "\copy courses to '.import/courses.csv' csv header" \
      -c "\copy user_courses to '.import/user_courses.csv' csv header" \
      -c "\copy rounds to '.import/rounds.csv' csv header"
    ```
-   `-1` runs every command in one transaction, and `repeatable read` makes all four files one consistent snapshot (checked on 2026-09-28: the isolation level holds across the `\copy` commands); `read only` means the export cannot change Supabase. `.import/` at the repository root is gitignored. Never commit it.
-2. Dry run against the local database: `DATABASE_URL=<local> CLERK_SECRET_KEY=<dev> pnpm import:supabase --dry-run`. Review unmatched profiles, merged duplicates and orphan counts.
-3. Real run against the local database with the development Clerk instance (creates dev-instance users only); run the API and web app locally, sign in as an imported member and confirm their list and rounds.
+   `-1` runs every command in one transaction, and `repeatable read` makes all five files one consistent snapshot (checked on 2026-09-28: the isolation level holds across the `\copy` commands); `read only` means the export cannot change Supabase. `.import/` at the repository root is gitignored. `auth_users.csv` holds every member's bcrypt password hash, so members keep their passwords: never commit, print or share it, and delete `.import/` once the import is verified (step 4.7).
+2. Dry run against the local database: `DATABASE_URL=<local> CLERK_SECRET_KEY=<dev> pnpm import:supabase --dry-run`. The importer ([apps/api/scripts/import/](../apps/api/scripts/import/)) validates every row, then gives every exported row exactly one outcome and prints the totals per table: imported, already in the catalog, merged into an equivalent list entry, moved with it (rounds), or a problem. Nothing is dropped: any invalid row or problem stops it before it writes, with the file and row or the reason. Read the merges and the notices (rounds dated from their creation time, stored `times_played` that differs from the rounds, members without a password).
+3. Real run against the local database with the development Clerk instance (creates dev-instance users only). It verifies itself: after writing, every member's list order, ranks and round ids must equal the plan, or it exits non-zero. Run the API and web app locally, sign in as yourself with your old password (hashes are imported, so it works unchanged) and confirm your list and rounds. Rerunning is safe until members use the new site: accounts are found by email and each member's list and rounds are replaced.
 
 ## 4. Upgrade the database, freeze and import (maintainer)
 
@@ -55,9 +56,9 @@ The Render footprint is three resources from [render.yaml](../render.yaml): `cou
    ```
    Undo, only if the cutover is abandoned: grant back exactly the saved `INSERT`, `UPDATE` and `DELETE` rows.
 4. Take the final export (step 3.1) from the frozen, still readable database.
-5. Run the import against Render's database using the production Clerk secret key: `DATABASE_URL=<render external url with ?sslmode=require> CLERK_SECRET_KEY=<prod> pnpm import:supabase`. Existing members are created in Clerk production without passwords; they sign in with Google or "Forgot password".
-6. Verify the printed counts against the export row counts and that no member has non-contiguous ranks.
-7. Only after the import is verified, pause the Supabase project (Settings, General, Pause). Until then it stays frozen but readable, so a failed import can be re-exported and rerun without resuming a paused project.
+5. Run the import against Render's database using the production Clerk secret key: `DATABASE_URL=<render external url with ?sslmode=require> CLERK_SECRET_KEY=<prod> pnpm import:supabase`. Members are created in Clerk production with their Supabase password (bcrypt hash) and their Supabase id as the external id. Password members sign in with their old password (Clerk emails a one-time code the first time on a new device); Google members use "Continue with Google", which Clerk links to the imported account by email; anyone can use "Forgot password".
+6. Confirm it exited 0 and printed `verified: every list, rank and round matches the plan`, with no problems and every table's rows accounted for.
+7. Delete `.import/` (it holds password hashes). Only then, and only after the import is verified, pause the Supabase project (Settings, General, Pause). Until then it stays frozen but readable, so a failed import can be re-exported and rerun without resuming a paused project.
 
 ## 5. Point the domains and switch to main (maintainer + agent)
 
