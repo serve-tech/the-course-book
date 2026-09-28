@@ -27,6 +27,9 @@ The Render footprint is three resources from [render.yaml](../render.yaml): `cou
 
 ## 3. Rehearse the import (maintainer + agent)
 
+On 2026-09-28 the maintainer skipped the local real run (step 3.3); dry runs against the local and the Render database replaced it, and a first pass was imported into Render (step 4.5).
+
+
 1. Export from Supabase, from the repository root:
    ```sh
    mkdir -p .import
@@ -44,7 +47,7 @@ The Render footprint is three resources from [render.yaml](../render.yaml): `cou
 
 ## 4. Upgrade the database, freeze and import (maintainer)
 
-1. Move `coursebook-db` to a paid plan before any real data is stored: in `render.yaml` set `plan: basic-256mb` and `diskSizeGB: 1` (otherwise a paid database defaults to 15 GB), commit, and sync the Blueprint. Free Render databases expire 30 days after creation and have no backups. Confirm the data survived the upgrade (the seeded catalog is still there).
+1. Move `coursebook-db` to a paid plan (the maintainer deferred this on 2026-09-28; member data has been in the free database since then, so the upgrade is due before it expires on **2026-10-28**, and Render deletes it with all data 14 days later): in `render.yaml` set `plan: basic-256mb` and `diskSizeGB: 1` (otherwise a paid database defaults to 15 GB), commit, and sync the Blueprint. Free Render databases expire 30 days after creation and have no backups. Confirm the data survived the upgrade (the seeded catalog is still there).
 2. Announce a short freeze to members.
 3. Freeze writes while leaving reads (explicit maintainer approval required; this is the only change ever made to the retired project). The old app writes only through Supabase's REST API as the `anon` and `authenticated` roles, with no stored procedures, so revoking their write privileges stops every write while the site keeps showing data. In the Supabase SQL editor, first save the current grants so the undo restores exactly them:
    ```sql
@@ -56,7 +59,7 @@ The Render footprint is three resources from [render.yaml](../render.yaml): `cou
    ```
    Undo, only if the cutover is abandoned: grant back exactly the saved `INSERT`, `UPDATE` and `DELETE` rows.
 4. Take the final export (step 3.1) from the frozen, still readable database.
-5. Run the import against Render's database using the production Clerk secret key: `DATABASE_URL=<render external url with ?sslmode=require> CLERK_SECRET_KEY=<prod> pnpm import:supabase`. Members are created in Clerk production with their Supabase password (bcrypt hash) and their Supabase id as the external id. Password members sign in with their old password (Clerk emails a one-time code the first time on a new device); Google members use "Continue with Google", which Clerk links to the imported account by email; anyone can use "Forgot password".
+5. Run the import against Render's database using the production Clerk secret key. A first pass ran on 2026-09-28 before the freeze (11 members, 286 list entries, 711 rounds, 11 production Clerk accounts, verified); this run after the freeze finds those accounts by email and replaces each member's list and rounds with the final snapshot. A password changed on the old site after the first pass does not carry over; "Forgot password" covers it. `DATABASE_URL=<render external url with ?sslmode=require> CLERK_SECRET_KEY=<prod> pnpm import:supabase`. Members are created in Clerk production with their Supabase password (bcrypt hash) and their Supabase id as the external id. Password members sign in with their old password (Clerk emails a one-time code the first time on a new device); Google members use "Continue with Google", which Clerk links to the imported account by email; anyone can use "Forgot password".
 6. Confirm it exited 0 and printed `verified: every list, rank and round matches the plan`, with no problems and every table's rows accounted for.
 7. Delete `.import/` (it holds password hashes). Only then, and only after the import is verified, pause the Supabase project (Settings, General, Pause). Until then it stays frozen but readable, so a failed import can be re-exported and rerun without resuming a paused project.
 
