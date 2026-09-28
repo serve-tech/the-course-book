@@ -159,6 +159,7 @@ describe("moving, counting and deleting", () => {
     const again = await t.app.request(`/v1/me/courses/${a}`, { method: "DELETE", headers: auth });
     expect(again.status).toBe(404);
     expect(errorOf(await again.json()).code).toBe("not_on_list");
+    expect(t.errors).toEqual([]); // client errors are not logged
   });
 
   it("zero removes a course", async () => {
@@ -220,6 +221,9 @@ describe("DELETE /v1/me", () => {
     const first = await t.app.request("/v1/me", { method: "DELETE", headers: auth });
     expect(first.status).toBe(502);
     expect(errorOf(await first.json()).code).toBe("account_deletion_incomplete");
+    // The Clerk failure behind the 502 reaches the log, not just the client.
+    expect(t.errors).toHaveLength(1);
+    expect(t.errors[0]).toMatchObject({ code: "account_deletion_incomplete", cause: { message: "Clerk unavailable" } });
     const [row] = await db.select().from(users).where(eq(users.id, "user_1"));
     expect(row?.deletedAt).not.toBeNull();
     t.failAccountDeletion(null);

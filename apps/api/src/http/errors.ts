@@ -60,11 +60,17 @@ const exceptionMessages: Partial<Record<ContentfulStatusCode, string>> = {
  * Map thrown errors to the envelope.
  *
  * Args:
- *     log: Receives unexpected errors with the request id.
+ *     log: Receives server-side failures with the request id: unexpected
+ *         errors, and `AppError`s with a 5xx status, whose `cause` (e.g. the
+ *         Clerk error behind `account_deletion_incomplete`) exists only here.
+ *         Client errors (4xx) are expected traffic and are not logged.
  */
 export function errorHandler(log: (message: string, detail: unknown) => void): ErrorHandler<AppEnv> {
   return (error, c) => {
-    if (error instanceof AppError) return c.json(errorBody(c, error.code, error.message), error.status);
+    if (error instanceof AppError) {
+      if (error.status >= 500) log(`API error ${error.code} ${c.get("requestId")}`, error);
+      return c.json(errorBody(c, error.code, error.message), error.status);
+    }
     if (error instanceof HTTPException && error.status < 500) {
       const code = exceptionCodes[error.status] ?? ErrorCode.BadRequest;
       const message = exceptionMessages[error.status] ?? error.message;
