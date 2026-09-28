@@ -23,7 +23,7 @@ pnpm --filter @coursebook/e2e exec playwright install chromium
 pnpm test:e2e
 ```
 
-Pass Playwright options after `--`, e.g. `pnpm test:e2e -- --reporter=line`.
+Pass Playwright options directly, e.g. `pnpm test:e2e --reporter=line` or `pnpm test:e2e -g "account deletion"`. Do not add `--`: pnpm forwards it, and Playwright then ignores the options after it and runs the whole suite.
 
 The browser suite builds and starts the API on port 3001 against the test database, builds the web app and serves it on port 3000 with [static-server.ts](../tests/e2e/static-server.ts) (the same `index.html` fallback and headers as the Render static site), starts the OpenGolfAPI stub on port 3999, and runs a `setup` project that migrates the database and prepares Clerk. Every scenario needs real Clerk development-instance keys (`CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`): every page waits for Clerk to load before loading data, and with placeholder keys it never loads. Authenticated scenarios additionally need `E2E_OWNER_EMAIL` and `E2E_FRIEND_EMAIL` for two test users with usernames and first names. Tests sign in with Clerk's ticket strategy (a sign-in token minted with the secret key), not a password: Clerk's Client Trust asks a password sign-in from an unrecognized device for an emailed code, and every test browser is a new device. The account-deletion scenario creates and deletes its own throwaway development user. Missing values skip the affected scenarios with a stated reason rather than failing; there is no stubbed-auth mode. In CI these come from repository secrets prefixed `E2E_`.
 
