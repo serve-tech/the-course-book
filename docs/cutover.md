@@ -50,7 +50,12 @@ The Render footprint is three resources from [render.yaml](../render.yaml): `cou
 
 1. Add `coursebook.golf` and `www.coursebook.golf` as custom domains on `coursebook-golf-web`, and `api.coursebook.golf` on `coursebook-golf-api`; create the DNS records Render shows and wait for the certificates. (The Hobby workspace includes two custom domains; each additional one is billed.)
 2. Switch to the production Clerk instance and the domains in one go, so the API never runs with keys from two Clerk instances: replace `CLERK_SECRET_KEY` on `coursebook-golf-api` in the Render dashboard, then immediately commit one `render.yaml` change with the production `CLERK_PUBLISHABLE_KEY` and `CLERK_JWT_KEY` on the API, the production `VITE_CLERK_PUBLISHABLE_KEY` on the static site, `WEB_ORIGINS=https://coursebook.golf,https://www.coursebook.golf,https://coursebook-golf-web.onrender.com` and `PUBLIC_WEB_URL=https://coursebook.golf` on the API, and `VITE_API_URL=https://api.coursebook.golf` on the static site. Confirm the Blueprint sync applied it and both services redeployed.
-3. Change `branch` in `render.yaml` to `main` for both services, merge the branch to `main` and point the Blueprint at `main` in the dashboard (Render's API cannot change a Blueprint's branch). Delete `.github/workflows/pages.yml` on `main`, and disable GitHub Pages in the repository settings.
+3. Move Render from the branch to `main`, in this order, so no service ever tracks a branch without the new code:
+   1. Merge `feat/render-clerk-rebuild` into `main`. The services keep deploying from the branch, and `render.yaml` still names it. The retired Pages workflow fails on `main` (it runs `npm ci` and the repository has no `package-lock.json`), so GitHub Pages keeps serving its last deployment.
+   2. Point the Blueprint at `main` in the Render dashboard (Render's API cannot change a Blueprint's branch).
+   3. In a pull request to `main`, change `branch` in `render.yaml` to `main` for both services and delete `.github/workflows/pages.yml`; after the merge, confirm the Blueprint sync moved both services to `main` and they redeployed (sync manually in the dashboard if it did not).
+   4. Only then delete the `feat/render-clerk-rebuild` branch; a service still tracking a deleted branch stops receiving deploys.
+   5. Disable GitHub Pages in the repository settings once coursebook.golf serves the Render site.
 4. Smoke test on coursebook.golf with a real account: sign in, log a round, reorder, Friends, sign out. Check the API's Render logs for errors (every error response carries a request id that appears in the logs).
 
 ## 6. After cutover
