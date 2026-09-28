@@ -69,7 +69,7 @@ A bug fix needs a regression that would fail with the bug present.
 
 ## Live checks
 
-Do not sign into production or create/delete real records as part of an automated test. Local development uses the docker-compose database and a Clerk development instance. A live production check needs explicit authorization, a defined account and an agreed cleanup plan.
+Do not sign into production or create/delete real records as part of an automated test. `pnpm smoke:staging` ([staging-smoke.ts](../tests/e2e/staging-smoke.ts)) runs the main signed-in flows against the deployed staging site with a throwaway Clerk development-instance user and refuses any key other than a development one (`sk_test_`); an interrupted run deletes its account through the API before deleting the Clerk user, so no orphan member row is left. Local development uses the docker-compose database and a Clerk development instance. A live production check needs explicit authorization, a defined account and an agreed cleanup plan.
 
 ## CI and handoff
 

@@ -17,6 +17,7 @@
     "test:unit": "vitest run --project domain --project '@coursebook/api (node)' --project '@coursebook/web (node)' --project '@coursebook/web (jsdom)'",
     "test:watch": "vitest",
     "test:e2e": "pnpm --filter @coursebook/e2e test",
+    "smoke:staging": "pnpm --filter @coursebook/e2e smoke:staging",
     "contract:emit": "pnpm --filter @coursebook/api contract:emit && pnpm --filter @coursebook/web contract:types",
     "contract:check": "pnpm contract:emit && git diff --exit-code -- contract apps/web/app/lib/api/schema.d.ts",
     "db:generate": "pnpm --filter @coursebook/api db:generate",
