@@ -1,6 +1,6 @@
 # Cutover runbook: GitHub Pages + Supabase to Render + Postgres + Clerk
 
-Each step names who does it and what proves it worked. The retired Supabase project is never modified; it is exported from, then paused.
+Each step names who does it and what proves it worked. The retired Supabase project is never modified except for the write freeze in step 4.3 (a reversible privilege change that needs the maintainer's explicit approval at the time); it is exported from, then paused.
 
 The Render footprint is three resources from [render.yaml](../render.yaml): `coursebook-golf-api` (Docker web service), `coursebook-golf-web` (static site) and `coursebook-db` (Postgres). Every non-secret setting (publishable keys, the JWT public key, origins and URLs) is a value in `render.yaml`, so changing one is a commit and a Blueprint sync. The one secret, `CLERK_SECRET_KEY`, is `sync: false`: Render asks for it when the Blueprint is created and ignores it on later syncs, so later changes are made in the dashboard. Staging starts on free plans; step 4 moves the database to a paid plan before real member data goes in.
 
@@ -27,24 +27,37 @@ The Render footprint is three resources from [render.yaml](../render.yaml): `cou
 
 ## 3. Rehearse the import (maintainer + agent)
 
-1. Export from Supabase (read-only), from the repository root:
+1. Export from Supabase, from the repository root:
    ```sh
-   psql "$SUPABASE_DB_URL" -c "\copy profiles to '.import/profiles.csv' csv header" \
+   mkdir -p .import
+   psql "$SUPABASE_DB_URL" -1 -v ON_ERROR_STOP=1 \
+     -c "set transaction isolation level repeatable read, read only" \
+     -c "\copy profiles to '.import/profiles.csv' csv header" \
      -c "\copy courses to '.import/courses.csv' csv header" \
      -c "\copy user_courses to '.import/user_courses.csv' csv header" \
      -c "\copy rounds to '.import/rounds.csv' csv header"
    ```
-   `.import/` at the repository root is gitignored. Never commit it.
+   `-1` runs every command in one transaction, and `repeatable read` makes all four files one consistent snapshot (checked on 2026-09-28: the isolation level holds across the `\copy` commands); `read only` means the export cannot change Supabase. `.import/` at the repository root is gitignored. Never commit it.
 2. Dry run against the local database: `DATABASE_URL=<local> CLERK_SECRET_KEY=<dev> pnpm import:supabase --dry-run`. Review unmatched profiles, merged duplicates and orphan counts.
 3. Real run against the local database with the development Clerk instance (creates dev-instance users only); run the API and web app locally, sign in as an imported member and confirm their list and rounds.
 
 ## 4. Upgrade the database, freeze and import (maintainer)
 
 1. Move `coursebook-db` to a paid plan before any real data is stored: in `render.yaml` set `plan: basic-256mb` and `diskSizeGB: 1` (otherwise a paid database defaults to 15 GB), commit, and sync the Blueprint. Free Render databases expire 30 days after creation and have no backups. Confirm the data survived the upgrade (the seeded catalog is still there).
-2. Announce a short freeze to members; pause the Supabase project (Settings, General, Pause). This stops writes without deleting anything.
-3. Re-export (step 3.1) so the snapshot is final.
-4. Run the import against Render's database using the production Clerk secret key: `DATABASE_URL=<render external url with ?sslmode=require> CLERK_SECRET_KEY=<prod> pnpm import:supabase`. Existing members are created in Clerk production without passwords; they sign in with Google or "Forgot password".
-5. Verify the printed counts against the export row counts and that no member has non-contiguous ranks.
+2. Announce a short freeze to members.
+3. Freeze writes while leaving reads (explicit maintainer approval required; this is the only change ever made to the retired project). The old app writes only through Supabase's REST API as the `anon` and `authenticated` roles, with no stored procedures, so revoking their write privileges stops every write while the site keeps showing data. In the Supabase SQL editor, first save the current grants so the undo restores exactly them:
+   ```sql
+   select grantee, table_name, privilege_type from information_schema.role_table_grants
+   where table_schema = 'public' and grantee in ('anon', 'authenticated') order by 1, 2, 3;
+
+   revoke insert, update, delete on public.profiles, public.courses, public.user_courses,
+     public.rounds, public.course_rankings from anon, authenticated;
+   ```
+   Undo, only if the cutover is abandoned: grant back exactly the saved `INSERT`, `UPDATE` and `DELETE` rows.
+4. Take the final export (step 3.1) from the frozen, still readable database.
+5. Run the import against Render's database using the production Clerk secret key: `DATABASE_URL=<render external url with ?sslmode=require> CLERK_SECRET_KEY=<prod> pnpm import:supabase`. Existing members are created in Clerk production without passwords; they sign in with Google or "Forgot password".
+6. Verify the printed counts against the export row counts and that no member has non-contiguous ranks.
+7. Only after the import is verified, pause the Supabase project (Settings, General, Pause). Until then it stays frozen but readable, so a failed import can be re-exported and rerun without resuming a paused project.
 
 ## 5. Point the domains and switch to main (maintainer + agent)
 
