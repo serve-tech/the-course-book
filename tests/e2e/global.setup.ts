@@ -18,6 +18,12 @@ import {
  * make the two Clerk test users the only members in the users table.
  */
 setup("prepare database and Clerk", async () => {
+  if (process.env["E2E_REQUIRE_AUTH"] === "1" && !authAvailable) {
+    const missing = ["CLERK_PUBLISHABLE_KEY", "CLERK_SECRET_KEY", "E2E_OWNER_EMAIL", "E2E_FRIEND_EMAIL"].filter(
+      (name) => !process.env[name] || process.env[name].includes("replace_me"),
+    );
+    throw new Error(`E2E_REQUIRE_AUTH=1 but these are missing, so scenarios would skip: ${missing.join(", ")}`);
+  }
   await runMigrations(TEST_DATABASE_URL);
   const { db, pool } = connect();
   try {
