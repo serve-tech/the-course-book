@@ -35,7 +35,7 @@ export default defineConfig({
           root: fileURLToPath(new URL(".", import.meta.url)),
           restoreMocks: true,
           environment: "node",
-          include: ["src/**/*.db.test.ts"],
+          include: ["src/**/*.db.test.ts", "scripts/**/*.db.test.ts"],
           globalSetup: ["src/test/global-setup.ts"],
           fileParallelism: false,
           sequence: { groupOrder: 1 },
