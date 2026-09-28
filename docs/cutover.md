@@ -66,7 +66,7 @@ The Render footprint is three resources from [render.yaml](../render.yaml): `cou
 3. Move Render from the branch to `main`, in this order, so no service ever tracks a branch without the new code:
    1. Merge `feat/render-clerk-rebuild` into `main`. The services keep deploying from the branch, and `render.yaml` still names it. The retired Pages workflow fails on `main` (it runs `npm ci` and the repository has no `package-lock.json`), so GitHub Pages keeps serving its last deployment.
    2. Point the Blueprint at `main` in the Render dashboard (Render's API cannot change a Blueprint's branch).
-   3. In a pull request to `main`, change `branch` in `render.yaml` to `main` for both services and delete `.github/workflows/pages.yml`; after the merge, confirm the Blueprint sync moved both services to `main` and they redeployed (sync manually in the dashboard if it did not).
+   3. In a pull request to `main`, change `branch` in `render.yaml` to `main` for both services and delete `.github/workflows/pages.yml` (both services deploy only when every check on the commit passes, and the retired Pages workflow fails on `main`, so leaving it would block every deploy); after the merge, confirm the Blueprint sync moved both services to `main` and they redeployed (sync manually in the dashboard if it did not).
    4. Only then delete the `feat/render-clerk-rebuild` branch; a service still tracking a deleted branch stops receiving deploys.
    5. Disable GitHub Pages in the repository settings once coursebook.golf serves the Render site.
 4. Smoke test on coursebook.golf with a real account: sign in, log a round, reorder, Friends, sign out. Check the API's Render logs for errors (every error response carries a request id that appears in the logs).
