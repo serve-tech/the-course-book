@@ -77,9 +77,12 @@ test("anonymous navigation, dialogs and mobile layout remain usable", async ({ p
   // fell short of its padding on phones; it fills the content box instead.
   await expect(page.locator("#authClerk .cl-cardBox.cl-signIn-start")).toBeVisible();
   await expect.poll(() => authCardInset(page)).toEqual({ left: 0, right: 0 });
-  await page.locator("#authToggle").click();
-  await expect(page.locator("#authClerk .cl-cardBox.cl-signUp-start")).toBeVisible();
-  await expect.poll(() => authCardInset(page)).toEqual({ left: 0, right: 0 });
+  // Clerk's "Sign up" link goes to the full-page sign-up, which the dialog
+  // once kept covering.
+  await page.locator("#authClerk .cl-footerActionLink").click();
+  await expect(page).toHaveURL(/\/sign-up/);
+  await expect(page.locator("#authmodal")).toHaveCount(0);
+  await expect(page.locator("#signup .cl-cardBox.cl-signUp-start")).toBeVisible();
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
   ).toBe(true);

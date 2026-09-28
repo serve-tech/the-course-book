@@ -1,6 +1,6 @@
 import { getToken, useAuth, useClerk } from "@clerk/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, NavLink, Outlet, useRevalidator, type ShouldRevalidateFunctionArgs } from "react-router";
+import { Link, NavLink, Outlet, useLocation, useRevalidator, type ShouldRevalidateFunctionArgs } from "react-router";
 import type { Route } from "./+types/layout";
 import { AuthDialog } from "../features/auth/AuthDialog";
 import { api, ApiError, unwrap } from "../lib/api";
@@ -58,7 +58,17 @@ export default function Layout({ loaderData }: Route.ComponentProps) {
     if (lastUser.current !== undefined && lastUser.current !== userId) void revalidator.revalidate();
     lastUser.current = userId;
   }, [userId, revalidator]);
-  const [authOpen, setAuthOpen] = useState(false);
+  // The sign-in dialog belongs to the page it was opened on. When Clerk
+  // navigates elsewhere (its "Sign up" link goes to /sign-up), the dialog
+  // closes instead of covering the new page; state is adjusted during render,
+  // not in an effect.
+  const { pathname } = useLocation();
+  const [authOpenOn, setAuthOpenOn] = useState<string | null>(null);
+  if (authOpenOn !== null && authOpenOn !== pathname) setAuthOpenOn(null);
+  const authOpen = authOpenOn === pathname;
+  const openAuthDialog = () => {
+    setAuthOpenOn(pathname);
+  };
   const [storedState, setStoredState] = usePreference(SELECTED_STATE_KEY);
   const selectedState = storedState.toUpperCase();
   const [toast, setToast] = useState("");
@@ -111,9 +121,7 @@ export default function Layout({ loaderData }: Route.ComponentProps) {
     selectedState,
     onState,
     searchFocus,
-    openAuth: () => {
-      setAuthOpen(true);
-    },
+    openAuth: openAuthDialog,
   };
 
   const signOut = () => {
@@ -139,7 +147,7 @@ export default function Layout({ loaderData }: Route.ComponentProps) {
           id="authOpen"
           onClick={() => {
             if (user) signOut();
-            else setAuthOpen(true);
+            else openAuthDialog();
           }}
         >
           {user ? "Sign out" : "Sign in"}
@@ -181,7 +189,7 @@ export default function Layout({ loaderData }: Route.ComponentProps) {
       {authOpen && !user && (
         <AuthDialog
           onClose={() => {
-            setAuthOpen(false);
+            setAuthOpenOn(null);
           }}
         />
       )}
