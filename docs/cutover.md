@@ -73,7 +73,12 @@ The Render footprint is three resources from [render.yaml](../render.yaml): `cou
 
 ## 6. After cutover
 
-- Before the iOS and Android apps ship, move `coursebook-golf-api` to `plan: starter` so apps never wait for a cold start; raise the minimum versions in `/v1/client-config` (`MIN_IOS_VERSION`, `MIN_ANDROID_VERSION`) only when an old app build must stop working.
+- Requirements before the iOS and Android apps ship (release gates, not follow-ups):
+  - Move `coursebook-golf-api` to `plan: starter` so apps never wait for a cold start; raise the minimum versions in `/v1/client-config` (`MIN_IOS_VERSION`, `MIN_ANDROID_VERSION`) only when an old app build must stop working.
+  - A contract compatibility check in CI against the released contract: commit the contract each app release ships with as a baseline and fail on breaking changes. `pnpm contract:check` only proves the committed file matches today's routes, so a rename that regenerates both still passes.
+  - Swift and Kotlin client generation and compilation from `contract/openapi.json` in CI (the spikes proved it once; CI must keep proving it).
+  - An `Idempotency-Key` on the round-logging `POST` operations. Today a retry after a lost response logs the rounds again ([api.md](api.md)); phone networks make that likely, and the web benefits too.
+  - Sign in with Apple in Clerk (App Store rule 4.8 applies because Google sign-in is offered).
 - Keep the Supabase project paused, not deleted, until a Render database restore has been tested from a backup.
 - Update the README production link and remove the `onrender.com` origins from `WEB_ORIGINS` once the domains serve all traffic.
 - Revoke anonymous access to the retired backup tables on Supabase before it is ever unpaused (separate approval; unrelated to this repository).

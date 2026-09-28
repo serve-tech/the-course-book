@@ -4,7 +4,7 @@ coursebook.golf is a JSON API with clients. The API (`apps/api`, Hono on Node) o
 
 ## Status
 
-Built and tested on `feat/render-clerk-rebuild`: the API with its read and write operations and account deletion, the published contract, the static web app on the API, the API Docker image and the Render Blueprint. Still open: the first Render deploy (maintainer approval), the data import rehearsal and cutover ([cutover.md](cutover.md)), and the native apps (their own plan).
+Built and tested on `feat/render-clerk-rebuild`: the API with its read and write operations and account deletion, the published contract, the static web app on the API, the API Docker image and the Render Blueprint. Staging runs on Render from the branch (URLs in the [README](../README.md)). Still open: import reconciliation and the rehearsal, the cutover ([cutover.md](cutover.md)), and the native apps (their own plan, with the release requirements in [cutover.md](cutover.md#6-after-cutover)).
 
 ## Deployables
 
@@ -128,7 +128,9 @@ Validate untrusted input at boundaries: request parameters and bodies (contract 
 - **Cold starts:** a free web service sleeps after 15 idle minutes and takes up to about a minute to wake (Render's figure; 12.5 s measured on staging, 2026-09-28); the web app shows "Waking the server…" when a request is slow and waits up to 90 seconds. The static site never sleeps. Before the native apps ship, the API moves to a paid plan so phones never wait.
 - **Migrations** run in the API process before it listens (free plans have no pre-deploy step), under a session advisory lock, so an overlapping deploy migrates once. Migrations must stay backward-compatible with the previous release, which keeps serving while the new one starts.
 - **Per-process caches:** the catalog snapshot (10 minutes, invalidated after a course is created), the search dataset and the provisioning cache assume one API instance; correctness never depends on them.
-- **Logs:** one JSON line per API request with its request id, which also appears in every error envelope and the `X-Request-Id` header.
+- **Logs:** one JSON line per API request with its request id, which also appears in every error envelope and the `X-Request-Id` header. Server-side failures (unexpected errors and 5xx `AppError`s) are also logged with the request id and their cause; 4xx errors are not.
+- **Account lifecycle:** delete members only through the API (`DELETE /v1/me`: the Account page, or an admin acting as the member), never in Clerk's dashboard. Deleting only the Clerk user leaves a member row that no one can sign in to or remove, and provisioning has no reconciliation for it. Keep Clerk's self-service account deletion off for the same reason.
+- **Friends directory:** the Friends page loads every page of `GET /v1/members` (200 members each) on each visit. Fine at today's size; replace it with a searched or paged picker as membership grows.
 
 ## Appearance
 
@@ -136,4 +138,4 @@ Reuse the existing markup, element ids, shared primitives and `legacy.css`. The 
 
 ## Cutover
 
-The retired Supabase project is read-only for this repository. [cutover.md](cutover.md) is the step-by-step runbook: Render staging from the branch, the Clerk production instance, an import rehearsal with `pnpm import:supabase --dry-run` (planning rules in `apps/api/scripts/import/plan.ts`, tested), the database upgrade, the freeze and real import, the domains, and the switch of `render.yaml` and the deploy to `main`. Keep Supabase paused, not deleted, until a Render database restore has been tested.
+The retired Supabase project is read-only for this repository, apart from the approved write freeze during cutover. [cutover.md](cutover.md) is the step-by-step runbook: Render staging from the branch, the Clerk production instance, an import rehearsal with `pnpm import:supabase --dry-run` (planning rules in `apps/api/scripts/import/plan.ts`, tested), the database upgrade, the freeze and real import, the domains, and the switch of `render.yaml` and the deploy to `main`. Keep Supabase paused, not deleted, until a Render database restore has been tested.
