@@ -1,6 +1,6 @@
 import { count, eq } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { courses, rounds, userCourses, users } from "../../src/db/schema";
+import { courses, friendships, rounds, userCourses, users } from "../../src/db/schema";
 import { resetMemberData, testDatabase } from "../../src/test/db";
 import type { SupabaseExport } from "./rows";
 import { runImport, verifyImport, type ExistingAccount, type ImportAccounts, type NewAccount } from "./run";
@@ -121,6 +121,7 @@ describe("member import", () => {
     expect(dated?.playedAt).toBe("2026-05-02");
     const [custom] = await db.select().from(courses).where(eq(courses.id, CUSTOM));
     expect(custom).toMatchObject({ name: "Backyard Nine", isCustom: true });
+    expect(await db.select({ status: friendships.status }).from(friendships)).toEqual([{ status: "accepted" }]);
   });
 
   it("reruns without creating accounts again or duplicating rows", async () => {
@@ -132,6 +133,7 @@ describe("member import", () => {
     expect(again.created).toBe(0);
     expect(created).toHaveLength(2);
     expect([await total(users), await total(userCourses), await total(rounds)]).toEqual([2, 5, 5]);
+    expect(await db.select().from(friendships)).toHaveLength(1);
   });
 
   it("keeps an existing Clerk account and its username", async () => {
@@ -164,6 +166,15 @@ describe("member import", () => {
     expect(result.accounts.get(U1)).toBe(`dry-run:${U1}`);
     expect(created).toEqual([]);
     expect(await total(users)).toBe(0);
+  });
+
+  it("verification catches a missing friendship between imported members", async () => {
+    const { accounts } = fakeAccounts();
+    const result = await runImport({ db, accounts, log }, await exportFixture(), { dryRun: false });
+    await db.delete(friendships);
+    expect(await verifyImport(db, result.plan, result.accounts)).toEqual([
+      "friendships: 0 accepted among imported members, expected 1",
+    ]);
   });
 
   it("verification catches a database that differs from the plan", async () => {

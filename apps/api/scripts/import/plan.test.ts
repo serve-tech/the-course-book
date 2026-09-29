@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   assignUsernames,
+  friendPairs,
   planImport,
   planMemberships,
   summarizeLedger,
@@ -226,6 +227,17 @@ describe("import planning", () => {
     const plan = planImport(exported({ profiles: [profile("u1", { email: "p@example.com" })] }), catalog);
     expect(plan.members[0]?.email).toBe("p@example.com");
     expect(plan.notices).toContain("member u1: no auth.users row; imported from the profile without a password");
+  });
+});
+
+describe("friend pairs", () => {
+  it.each<[string[], [string, string][]]>([
+    [[], []],
+    [["only"], []],
+    [["user_b", "user_a"], [["user_a", "user_b"]]],
+    [["c", "a", "b", "a"], [["a", "b"], ["a", "c"], ["b", "c"]]],
+  ])("pairs %j once each, smaller id first", (ids, pairs) => {
+    expect(friendPairs(ids)).toEqual(pairs);
   });
 });
 

@@ -12,11 +12,11 @@
  * Password digests pass straight from the plan to Clerk and are never logged.
  */
 import type { ClerkClient } from "@clerk/backend";
-import { asc, eq, inArray, isNull, notInArray, or } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, notInArray, or } from "drizzle-orm";
 import { normalizeName } from "@coursebook/domain/catalog/course";
 import type { Database } from "../../src/db/client";
-import { courses, rounds, userCourses, users } from "../../src/db/schema";
-import { assignUsernames, planImport, summarizeLedger, type ImportPlan, type PlannedMember } from "./plan";
+import { courses, friendships, rounds, userCourses, users } from "../../src/db/schema";
+import { assignUsernames, friendPairs, planImport, summarizeLedger, type ImportPlan, type PlannedMember } from "./plan";
 import type { SupabaseExport } from "./rows";
 
 /** A Clerk account that already has the member's email address. */
@@ -212,6 +212,21 @@ export async function runImport(deps: Dependencies, data: SupabaseExport, option
   }
   log(`written: ${String(plan.members.length)} members (${String(created)} Clerk accounts created)`);
 
+  // Imported members start as friends with each other; a rerun adds none twice.
+  const pairs = friendPairs([...accountIds.values()]);
+  if (pairs.length) {
+    await db
+      .insert(friendships)
+      .values(pairs.map(([requesterId, addresseeId]) => ({ requesterId, addresseeId, status: "accepted" as const })))
+      .onConflictDoNothing();
+    const ids = [...accountIds.values()];
+    await db
+      .update(friendships)
+      .set({ status: "accepted" })
+      .where(and(eq(friendships.status, "pending"), inArray(friendships.requesterId, ids), inArray(friendships.addresseeId, ids)));
+  }
+  log(`friendships: ${String(pairs.length)} pairs among imported members`);
+
   const mismatches = await verifyImport(db, plan, accountIds);
   if (mismatches.length) {
     log(`\n${String(mismatches.length)} mismatches between the database and the plan:`);
@@ -233,12 +248,23 @@ function newAccount(member: PlannedMember, username: string): NewAccount {
 }
 
 /**
- * Compare the database with the plan: every new course exists, and each
+ * Compare the database with the plan: every new course exists, each
  * member's list (course order and ranks) and set of round ids are exactly
- * the planned ones.
+ * the planned ones, and every pair of imported members is an accepted
+ * friendship.
  */
 export async function verifyImport(db: Database, plan: ImportPlan, accountIds: ReadonlyMap<string, string>): Promise<string[]> {
   const mismatches: string[] = [];
+  const ids = [...accountIds.values()];
+  const expectedPairs = friendPairs(ids).length;
+  if (ids.length > 1) {
+    const accepted = await db
+      .select({ id: friendships.id })
+      .from(friendships)
+      .where(and(eq(friendships.status, "accepted"), inArray(friendships.requesterId, ids), inArray(friendships.addresseeId, ids)));
+    if (accepted.length !== expectedPairs)
+      mismatches.push(`friendships: ${String(accepted.length)} accepted among imported members, expected ${String(expectedPairs)}`);
+  }
   const newIds = plan.newCourses.map((row) => row.id);
   if (newIds.length) {
     const present = await db.select({ id: courses.id }).from(courses).where(inArray(courses.id, newIds));
