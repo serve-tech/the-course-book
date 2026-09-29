@@ -1,22 +1,27 @@
 /**
- * Execute the member import: plan it, stop on any problem, resolve or create
- * each member's Clerk account, write courses, users, lists and rounds, then
- * verify the database against the plan.
+ * Execute the member import: plan it, stop on any problem or on a database
+ * schema that differs from this checkout's (preflight.ts), resolve or create
+ * each member's Clerk account, write courses, users, lists and rounds, make
+ * the imported members friends with each other, then verify the database
+ * against the plan.
  *
  * Clerk sits behind `ImportAccounts`, so the database test runs the real
  * writes with a fake directory. Reruns are safe before launch: accounts are
- * found by email, missing courses are inserted once, and each member's list
- * and rounds are replaced in one transaction. Once members use the new site a
+ * found by email, missing courses are inserted once, each member's list
+ * and rounds are replaced in one transaction, and friendships among imported
+ * members are added once (a pending request between two of them is accepted). Once members use the new site a
  * rerun would replace their new lists, so it must not run then.
  *
  * Password digests pass straight from the plan to Clerk and are never logged.
  */
 import type { ClerkClient } from "@clerk/backend";
-import { asc, eq, inArray, isNull, notInArray, or } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, notInArray, or } from "drizzle-orm";
 import { normalizeName } from "@coursebook/domain/catalog/course";
 import type { Database } from "../../src/db/client";
-import { courses, rounds, userCourses, users } from "../../src/db/schema";
-import { assignUsernames, planImport, summarizeLedger, type ImportPlan, type PlannedMember } from "./plan";
+import { courses, friendships, rounds, userCourses, users } from "../../src/db/schema";
+import { FriendshipStatus } from "../../src/domain/friendship";
+import { assignUsernames, friendPairs, planImport, summarizeLedger, type ImportPlan, type PlannedMember } from "./plan";
+import { appliedMigrations, journalMigrations, schemaMismatch } from "./preflight";
 import type { SupabaseExport } from "./rows";
 
 /** A Clerk account that already has the member's email address. */
@@ -120,6 +125,11 @@ export async function runImport(deps: Dependencies, data: SupabaseExport, option
     for (const problem of plan.problems) log(`  ${problem}`);
     return { ok: false, plan, mismatches: [], accounts: new Map(), created: 0 };
   }
+  const schema = schemaMismatch(journalMigrations(), await appliedMigrations(db));
+  if (schema) {
+    log(`\nschema: ${schema}; nothing was written`);
+    return { ok: false, plan, mismatches: [], accounts: new Map(), created: 0 };
+  }
 
   // Accounts first, so usernames of existing Clerk accounts are known before any are chosen.
   const found = new Map<string, ExistingAccount>();
@@ -212,12 +222,29 @@ export async function runImport(deps: Dependencies, data: SupabaseExport, option
   }
   log(`written: ${String(plan.members.length)} members (${String(created)} Clerk accounts created)`);
 
+  // Imported members start as friends with each other (they could all see each
+  // other's lists on the old site); a rerun adds none twice and accepts any
+  // request one of them sent another on the new site in between.
+  const pairs = friendPairs([...accountIds.values()]);
+  if (pairs.length) {
+    await db
+      .insert(friendships)
+      .values(pairs.map(([requesterId, addresseeId]) => ({ requesterId, addresseeId, status: FriendshipStatus.Accepted })))
+      .onConflictDoNothing();
+    const ids = [...accountIds.values()];
+    await db
+      .update(friendships)
+      .set({ status: FriendshipStatus.Accepted })
+      .where(and(eq(friendships.status, FriendshipStatus.Pending), inArray(friendships.requesterId, ids), inArray(friendships.addresseeId, ids)));
+  }
+  log(`friendships: ${String(pairs.length)} pairs among imported members`);
+
   const mismatches = await verifyImport(db, plan, accountIds);
   if (mismatches.length) {
     log(`\n${String(mismatches.length)} mismatches between the database and the plan:`);
     for (const mismatch of mismatches) log(`  ${mismatch}`);
   } else {
-    log("verified: every list, rank and round matches the plan");
+    log("verified: every list, rank, round and friendship matches the plan");
   }
   return { ok: mismatches.length === 0, plan, mismatches, accounts: accountIds, created };
 }
@@ -233,12 +260,23 @@ function newAccount(member: PlannedMember, username: string): NewAccount {
 }
 
 /**
- * Compare the database with the plan: every new course exists, and each
+ * Compare the database with the plan: every new course exists, each
  * member's list (course order and ranks) and set of round ids are exactly
- * the planned ones.
+ * the planned ones, and every pair of imported members is an accepted
+ * friendship.
  */
 export async function verifyImport(db: Database, plan: ImportPlan, accountIds: ReadonlyMap<string, string>): Promise<string[]> {
   const mismatches: string[] = [];
+  const ids = [...accountIds.values()];
+  const expectedPairs = friendPairs(ids).length;
+  if (ids.length > 1) {
+    const accepted = await db
+      .select({ id: friendships.id })
+      .from(friendships)
+      .where(and(eq(friendships.status, FriendshipStatus.Accepted), inArray(friendships.requesterId, ids), inArray(friendships.addresseeId, ids)));
+    if (accepted.length !== expectedPairs)
+      mismatches.push(`friendships: ${String(accepted.length)} accepted among imported members, expected ${String(expectedPairs)}`);
+  }
   const newIds = plan.newCourses.map((row) => row.id);
   if (newIds.length) {
     const present = await db.select({ id: courses.id }).from(courses).where(inArray(courses.id, newIds));

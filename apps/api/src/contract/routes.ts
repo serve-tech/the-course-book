@@ -8,10 +8,14 @@ import {
   ClientConfigSchema,
   CourseIdParamsSchema,
   DeletedRoundSchema,
+  FriendRequestsSchema,
   LoggedRoundsSchema,
   LogRoundsRequestSchema,
   MeSchema,
   MemberListSchema,
+  MemberRelationshipSchema,
+  MemberSearchQuerySchema,
+  MemberSearchResultsSchema,
   MembersQuerySchema,
   MembersSchema,
   MovedCourseSchema,
@@ -128,7 +132,8 @@ export const listMembers = createRoute({
   path: "/v1/members",
   operationId: "listMembers",
   tags: ["Members"],
-  summary: "The member directory, a page at a time",
+  summary: "The member's friends, a page at a time",
+  description: "Only accepted friends are listed; pending requests are in `listFriendRequests`.",
   security: MEMBER,
   request: { query: MembersQuerySchema },
   responses: { 200: json(MembersSchema, "One page of members."), 400: invalid, 401: unauthenticated, 403: forbidden },
@@ -139,15 +144,78 @@ export const getMemberList = createRoute({
   path: "/v1/members/{username}",
   operationId: "getMemberList",
   tags: ["Members"],
-  summary: "Another member's list, read-only",
-  description: "Usernames match case-insensitively.",
+  summary: "A friend's list (or the member's own), read-only",
+  description: "Usernames match case-insensitively. A member who is not a friend is indistinguishable from no member.",
   security: MEMBER,
   request: { params: UsernameParamsSchema },
   responses: {
     200: json(MemberListSchema, "The member and their list, with on-my-list flags for the viewer."),
     401: unauthenticated,
     403: forbidden,
+    404: failure("No such member, or not a friend: `member_not_found`."),
+  },
+});
+
+export const searchMembers = createRoute({
+  method: "get",
+  path: "/v1/member-search",
+  operationId: "searchMembers",
+  tags: ["Members"],
+  summary: "Find members by username to send a friend request",
+  description: "Returns usernames, display names and the viewer's relationship; never a list.",
+  security: MEMBER,
+  request: { query: MemberSearchQuerySchema },
+  responses: {
+    200: json(MemberSearchResultsSchema, "Matching members."),
+    400: invalid,
+    401: unauthenticated,
+    403: forbidden,
+  },
+});
+
+export const listFriendRequests = createRoute({
+  method: "get",
+  path: "/v1/me/friend-requests",
+  operationId: "listFriendRequests",
+  tags: ["Members"],
+  summary: "The member's pending friend requests, incoming and outgoing",
+  security: MEMBER,
+  responses: { 200: json(FriendRequestsSchema, "Pending requests."), 401: unauthenticated, 403: forbidden },
+});
+
+export const befriendMember = createRoute({
+  method: "put",
+  path: "/v1/me/friends/{username}",
+  operationId: "befriendMember",
+  tags: ["Members"],
+  summary: "Send a friend request, or accept one from that member",
+  description:
+    "Idempotent. If the other member already asked, this accepts and the two are friends; otherwise it sends a request. " +
+    "Usernames match case-insensitively.",
+  security: MEMBER,
+  request: { params: UsernameParamsSchema },
+  responses: {
+    200: json(MemberRelationshipSchema, "The relationship afterwards: requested or friends."),
+    400: failure("The member's own username: `validation_failed`."),
+    401: unauthenticated,
+    403: forbidden,
     404: failure("No such member: `member_not_found`."),
+  },
+});
+
+export const removeFriend = createRoute({
+  method: "delete",
+  path: "/v1/me/friends/{username}",
+  operationId: "removeFriend",
+  tags: ["Members"],
+  summary: "Remove a friend, cancel a request, or decline one",
+  security: MEMBER,
+  request: { params: UsernameParamsSchema },
+  responses: {
+    204: { description: "Nothing is left between the two members." },
+    401: unauthenticated,
+    403: forbidden,
+    404: failure("No such member: `member_not_found`; nothing between the two: `friendship_not_found`."),
   },
 });
 

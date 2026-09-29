@@ -1,10 +1,11 @@
 import { eq } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { courses, rounds, userCourses, users } from "../db/schema";
+import { courses, friendships, rounds, userCourses, users } from "../db/schema";
+import { FriendshipStatus } from "../domain/friendship";
 import { resetMemberData, testDatabase } from "../test/db";
 import { deleteAccountData } from "./accounts";
 import { ErrorCode } from "./errors";
-import { members } from "./friends";
+import { memberPage } from "./friends";
 import { addCourseByDetails, logRounds, moveCourse } from "./journal";
 
 const { db, pool } = testDatabase();
@@ -36,6 +37,7 @@ describe("account deletion", () => {
     const { courseId: customId } = await addCourseByDetails(db, USER, custom, { rank: null, quantity: 1 });
     await logRounds(db, "user_other", { courseId: customId }, 1);
 
+    await db.insert(friendships).values({ requesterId: "user_other", addresseeId: USER, status: FriendshipStatus.Accepted });
     await deleteAccountData(db, USER);
 
     expect(await db.select().from(userCourses).where(eq(userCourses.userId, USER))).toHaveLength(0);
@@ -47,7 +49,8 @@ describe("account deletion", () => {
     expect(row).toMatchObject({ displayName: "Deleted member", email: null, avatarUrl: null, legacySupabaseId: null });
     expect(row?.username).toMatch(/^deleted_[0-9a-f]{16}$/);
     expect(row?.deletedAt).not.toBeNull();
-    expect(await members(db, "user_other")).toEqual([]);
+    expect((await memberPage(db, "user_other", { after: null, limit: 50 })).members).toEqual([]);
+    expect(await db.select().from(friendships)).toEqual([]);
   });
 
   it("rejects list changes for a deleted account", async () => {

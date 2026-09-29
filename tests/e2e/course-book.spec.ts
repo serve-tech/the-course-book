@@ -1,17 +1,21 @@
 import { randomBytes } from "node:crypto";
 import { createClerkClient } from "@clerk/backend";
 import { users } from "@coursebook/api/db/schema";
+import { FriendshipStatus } from "@coursebook/api/domain/friendship";
 import { expect, test, type Page } from "@playwright/test";
 import { eq } from "drizzle-orm";
+import { clerk } from "@clerk/testing/playwright";
 import { authAvailable, clerkAvailable, signInAs } from "./auth";
 import {
   addHiddenCourse,
   connect,
   courseByName,
   fixtureCourses,
+  friendshipStatus,
   listOrder,
   resetScenario,
   type TestMember,
+  unfriend,
 } from "./db";
 
 /**
@@ -167,6 +171,42 @@ test.describe("signed in", () => {
     await page.locator("#friendsFilter").selectOption("notmine");
     await page.locator(".friend-list-action").click();
     await expect.poll(() => listOrder(db, owner.id)).toContain(fixtureCourses.gamma.id);
+  });
+
+  test("members befriend by username, accept, and remove a friend after confirming", async ({ page }) => {
+    const { owner, friend } = members();
+    await unfriend(db, owner, friend);
+    await signInAs(page, owner);
+    await page.getByRole("link", { name: "Friends", exact: true }).click();
+    await expect(page.locator("#friendSelect option")).toHaveCount(1);
+    await expect(page.locator("#friendsList")).toContainText("No friends yet");
+    await page.goto(`/friends/${friend.username}`);
+    await expect(page.getByRole("alert")).toContainText("None of your friends has that username.");
+
+    await page.getByRole("link", { name: "Friends", exact: true }).click();
+    await page.locator("#friendSearch").fill(friend.username);
+    const result = page.locator("#friendSearchResults .friend-person").filter({ hasText: friend.username });
+    await result.getByRole("button", { name: "Add friend" }).click();
+    await expect(result.getByRole("button", { name: "Requested" })).toBeDisabled();
+    await expect(page.locator('#friendRequests [data-request="outgoing"]')).toContainText(friend.username);
+    expect(await friendshipStatus(db, owner, friend)).toBe(FriendshipStatus.Pending);
+
+    await clerk.signOut({ page });
+    await signInAs(page, friend);
+    await page.getByRole("link", { name: "Friends", exact: true }).click();
+    const request = page.locator('#friendRequests [data-request="incoming"]').filter({ hasText: owner.username });
+    await request.getByRole("button", { name: "Accept" }).click();
+    await expect(page.locator("#friendRequests")).toHaveCount(0);
+    expect(await friendshipStatus(db, owner, friend)).toBe(FriendshipStatus.Accepted);
+    await page.locator("#friendSelect").selectOption(owner.username);
+    await expect(page.locator("#friendsList .friend-row")).toHaveCount(2);
+
+    await page.locator("#removeFriend").click();
+    await expect(page.locator("#confirmRemoveFriendRow")).toContainText(owner.username);
+    await page.locator("#confirmRemoveFriend").click();
+    await expect(page).toHaveURL(/\/friends$/);
+    await expect(page.locator("#friendSelect option")).toHaveCount(1);
+    await expect.poll(() => friendshipStatus(db, owner, friend)).toBeNull();
   });
 
   test("touch-handle drag reorders the full list and geographic filters remain read-only", async ({ page }) => {

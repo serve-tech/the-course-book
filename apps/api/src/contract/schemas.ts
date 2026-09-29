@@ -1,4 +1,5 @@
 import { z } from "@hono/zod-openapi";
+import { ErrorCode } from "../services/errors";
 
 /**
  * Named schemas of the public API contract (`contract/openapi.json`).
@@ -29,10 +30,8 @@ export const ApiErrorBodySchema = z
   .object({
     code: z.string().openapi({
       description:
-        "Stable machine-readable code. Current values: bad_request, validation_failed, us_state_required, " +
-        "unauthenticated, account_deleted, username_invalid, not_found, course_not_found, not_on_list, " +
-        "round_not_found, member_not_found, payload_too_large, unsupported_media_type, " +
-        "account_deletion_incomplete, search_unavailable, internal. New codes may appear; treat unknown codes by HTTP status.",
+        `Stable machine-readable code. Current values: ${Object.values(ErrorCode).join(", ")}. ` +
+        "New codes may appear; treat unknown codes by HTTP status.",
       example: "not_on_list",
     }),
     message: z.string().openapi({ description: "Explanation suitable to show to the member." }),
@@ -133,6 +132,28 @@ export const MembersSchema = z
     nextCursor: z.string().nullable().openapi({ description: "Pass as `cursor` for the next page; null on the last page." }),
   })
   .openapi("Members");
+
+export const MemberRelationshipSchema = z
+  .object({
+    member: MemberSchema,
+    relationship: z.string().openapi({
+      description:
+        "The viewer's relationship: none, friends, requested (the viewer asked; waiting for them) or " +
+        "incoming (they asked; the viewer can accept or decline). New values may appear.",
+    }),
+  })
+  .openapi("MemberRelationship");
+
+export const MemberSearchResultsSchema = z
+  .object({ results: z.array(MemberRelationshipSchema).openapi({ description: "At most 20, usernames starting with the query first." }) })
+  .openapi("MemberSearchResults");
+
+export const FriendRequestsSchema = z
+  .object({
+    incoming: z.array(MemberSchema).openapi({ description: "Members who asked the viewer, by username." }),
+    outgoing: z.array(MemberSchema).openapi({ description: "Members the viewer asked, by username." }),
+  })
+  .openapi("FriendRequests");
 
 export const MemberCourseSchema = z
   .object({ course: CourseSchema, rank, onMyList: z.boolean() })
@@ -261,6 +282,15 @@ export const SearchQuerySchema = z.object({
     .trim()
     .min(2, "Enter at least two characters.")
     .openapi({ param: { name: "q", in: "query" }, description: "Course name, at least two characters." }),
+});
+
+export const MemberSearchQuerySchema = z.object({
+  q: z
+    .string()
+    .trim()
+    .min(3, "Enter at least three characters.")
+    .max(64)
+    .openapi({ param: { name: "q", in: "query" }, description: "Text in the username, at least three characters." }),
 });
 
 export const MembersQuerySchema = z.object({

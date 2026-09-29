@@ -25,15 +25,15 @@ On `main` (PR #4, merged 2026-09-29): the API with its read and write operations
 | `apps/api/src/contract/` | Operation definitions and named schemas (no handler code), contract mappers, document settings | [routes.ts](../apps/api/src/contract/routes.ts), [schemas.ts](../apps/api/src/contract/schemas.ts), [mappers.ts](../apps/api/src/contract/mappers.ts) |
 | `apps/api/src/routes/` | Handlers attached to the operations; each calls one service | [journal.ts](../apps/api/src/routes/journal.ts), [account.ts](../apps/api/src/routes/account.ts) |
 | `apps/api/src/auth/` | Clerk token verification, the `azp` policy, session middleware, Clerk account deletion | [session.ts](../apps/api/src/auth/session.ts), [azp.ts](../apps/api/src/auth/azp.ts) |
-| `apps/api/src/services/` | Environment validation, user provisioning, catalog and search, journal transactions, friends reads, account data deletion, health. Framework-free; expected failures throw `AppError` | [journal.ts](../apps/api/src/services/journal.ts), [provisioning.ts](../apps/api/src/services/provisioning.ts) |
-| `apps/api/src/domain/` | API-only pure rules: course identity, OpenGolfAPI parsing, row-to-course views, the username rule | [identity.ts](../apps/api/src/domain/identity.ts) |
+| `apps/api/src/services/` | Environment validation, user provisioning, catalog and search, journal transactions, friendships and friends-only list access, account data deletion, health. Framework-free; expected failures throw `AppError` | [journal.ts](../apps/api/src/services/journal.ts), [provisioning.ts](../apps/api/src/services/provisioning.ts) |
+| `apps/api/src/domain/` | API-only pure rules: course identity, OpenGolfAPI parsing, row-to-course views, the username rule, friendship transitions | [identity.ts](../apps/api/src/domain/identity.ts) |
 | `apps/api/src/db/` | Drizzle schema, committed SQL migrations, seed data, migration runner | [schema.ts](../apps/api/src/db/schema.ts), [migrate.ts](../apps/api/src/db/migrate.ts) |
 | `apps/api/scripts/` | Contract emitter, seed builder, Supabase import | [emit-openapi.ts](../apps/api/scripts/emit-openapi.ts), [plan.ts](../apps/api/scripts/import/plan.ts) |
 | `packages/domain/src/` | Pure rules both sides run: course model, geography, ranking selectors, list reorder, shared types | [course.ts](../packages/domain/src/catalog/course.ts), [reorder.ts](../packages/domain/src/journal/reorder.ts) |
 | `apps/web/app/lib/api/` | The typed API client (generated `schema.d.ts`, bearer tokens, `ApiError`), contract-to-domain mappers, the slow-server notice | [client.ts](../apps/web/app/lib/api/client.ts), [mappers.ts](../apps/web/app/lib/api/mappers.ts) |
 | `apps/web/app/root.tsx`, `routes.ts`, `routes/` | Document shell with `ClerkProvider`, route configuration, per-route `clientLoader`/`clientAction` and pages | [root.tsx](../apps/web/app/root.tsx), [journal.ts](../apps/web/app/routes/journal.ts) |
 | `apps/web/app/features/<feature>/` | Pages, dialogs and hooks for catalog (Rankings), journal (My List), rounds, friends and auth | [JournalPage.tsx](../apps/web/app/features/journal/JournalPage.tsx), [LogRoundDialog.tsx](../apps/web/app/features/rounds/LogRoundDialog.tsx) |
-| `apps/web/app/shared/` | Modal, StateSelect, RouteError, SafeStorage, geolocation, error formatting, country data, `legacy.css` | [Modal.tsx](../apps/web/app/shared/ui/Modal.tsx), [storage.ts](../apps/web/app/shared/lib/storage.ts) |
+| `apps/web/app/shared/` | Modal, StateSelect, RouteError, SafeStorage, geolocation, error formatting, `useActionFetcher`, country data, `legacy.css` | [Modal.tsx](../apps/web/app/shared/ui/Modal.tsx), [storage.ts](../apps/web/app/shared/lib/storage.ts) |
 | `tests/e2e/` | Playwright user flows against the built API and web app | [course-book.spec.ts](../tests/e2e/course-book.spec.ts) |
 
 In the web app, feature folders are the organizational unit; avoid global `components/` folders that scatter one feature across the project.
@@ -45,7 +45,7 @@ In the web app, feature folders are the organizational unit; avoid global `compo
 3. Secured operations (those with `security` in the contract) pass through `memberOnly` before input validation, so an anonymous request is a 401 rather than a 400. The handler's `requireUser` provisions the member's `users` row from the token claims (cached a minute per user) and rejects deleted accounts.
 4. The route validates parameters and bodies against the contract schemas, calls one service, and maps the result to contract shapes. Every list change runs in one transaction under the member's advisory lock and returns the whole updated list read in that transaction.
 5. Failures return the envelope `{ error: { code, message, requestId, fields } }` with a stable `code`. Unexpected errors are logged with the request id and reported as `internal`.
-6. In the web app, route `clientLoader`s fetch page data and the `/journal` `clientAction` performs changes; React Router reloads the page's loaders after each change, so pages never keep a second copy of server data.
+6. In the web app, route `clientLoader`s fetch page data and route `clientAction`s perform changes (`/journal` for list and round changes, `/friends` for friend requests); React Router reloads the page's loaders after each change, so pages never keep a second copy of server data.
 
 API operations are listed in [api.md](api.md); the contract is authoritative.
 
@@ -54,7 +54,7 @@ API operations are listed in [api.md](api.md); the contract is authoritative.
 | State | Place |
 | --- | --- |
 | Open dialog, form fields, selected filter, temporary loading/error state | Component state |
-| Account, memberships, rounds, courses, rankings | Postgres, owned by the API; clients read them through the API on every load |
+| Account, memberships, rounds, friendships, courses, rankings | Postgres, owned by the API; clients read them through the API on every load |
 | Course identity mapping | `courses.stable_id` and `courses.name_key`, resolved in the API's catalog service |
 | Selected state for Best-in-State and My List filtering, geolocation prompt version | Browser storage through `SafeStorage` (keys `theCourseBookSelectedState`, `theCourseBookLocationPromptVersion`) |
 | Session | Clerk in the browser; a short-lived session token per API request |
@@ -71,8 +71,9 @@ Do not add a client store, a cache of API data or a persisted copy of the person
 | `course_rankings` | Published lists: `ranking_type` in world, usa, usa_public, state; unique per (type, scope, rank) and per (course, type). |
 | `user_courses` | Memberships. `personal_rank` is NOT NULL and contiguous 1..N per user (deferred unique constraint). |
 | `rounds` | One row per round; composite foreign key to the membership, so a round cannot exist without one. Carries `played_at`, `score`, `tees`, `notes`. |
+| `friendships` | One row per pair of members, whoever asked (unique index on the unordered pair): `requester_id`, `addressee_id`, `status` pending or accepted. Changes to a pair hold both members' locks, so crossing requests become one friendship. Rows cascade with their users and are removed when either member deletes their account. |
 
-Play count is always `COUNT(rounds)`; there is no stored counter. All list changes take `pg_advisory_xact_lock(hashtext(user_id))` so concurrent moves, logs and account deletion serialize.
+Play count is always `COUNT(rounds)`; there is no stored counter. All list changes take the member lock, `pg_advisory_xact_lock(hashtext(user_id))` ([member-lock.ts](../apps/api/src/services/member-lock.ts)), so concurrent moves, logs and account deletion serialize. Friendship changes take both members' locks, in key order so overlapping pairs cannot deadlock, and recheck that both accounts are active inside the transaction. A request queued before account deletion cannot recreate the deleted member's relationships.
 
 The seed migration (`0001_seed_catalog.sql`) carries the retired project's public catalog with original UUIDs, 281 bundled stable ids matched through the identity rules, and 24 bundled world-list courses the catalog lacked. Two bundled entries are duplicates of other bundled entries and carry no stable id. The catalog itself contains 13 pre-existing same-name, same-location duplicate pairs; the stable id went to the ranked or richer row, and merging duplicates is a separate data task. Services take a `Database` argument (`apps/api/src/db/client.ts`) so tests can pass the test database.
 
@@ -88,7 +89,7 @@ The seed migration (`0001_seed_catalog.sql`) carries the retired project's publi
 - **Search:** OpenGolfAPI results are resolved against the catalog so known courses carry their uuid (`courseId`); other hits carry only their details. When the REST endpoint fails, the CSV dataset is searched (parsed once per process). Both failing is `search_unavailable`.
 - **Rankings page:** progress uses the full list before search and "Show mine". World, USA and public lists render only with 100 unique ranks; state lists need a selected state and at least one row.
 - **My List:** geographic filters are read-only (no drag or count editing); text search keeps editing.
-- **Friends:** a paged directory of all other active members. Any signed-in member may view any member's list read-only; usernames match case-insensitively. Responses never include email addresses or user ids.
+- **Friends** ([decision](../.planning/decisions/2026-09-29-friends-only-visibility-with-mutual-friend-requests.md)): a member sees their own list and their friends' lists read-only, and no one else's; another member's list is 404 whether or not they exist. Friendships are mutual (request, then accept; either side can end it). Members find each other by username search (3+ characters, username and display name only). The imported members start as friends with each other; new sign-ups start with none. Usernames match case-insensitively. Responses never include email addresses or user ids.
 - **Account deletion** (`DELETE /v1/me`): data first, then the Clerk user; a retry after a Clerk failure finishes the job. Details under [Authentication and authorization](#authentication-and-authorization).
 - **Preferences:** manual state selection and optional geolocation stay in browser storage.
 - **Known data quirk:** the Pinehurst No. 4 alias resolves to the legacy `usa80` record; fixing it is a data change, not a code change.
@@ -100,8 +101,8 @@ Clerk holds credentials, Google sign-in, email verification and sessions. The AP
 - **Verification:** [session.ts](../apps/api/src/auth/session.ts) calls `@clerk/backend` `authenticateRequest` with `acceptsToken: "session_token"`, so pending sessions count as signed out. With `CLERK_JWT_KEY` set, tokens verify locally, with no JWKS fetch after a cold start.
 - **Authorized party:** `authorizedParties` is deliberately not passed: since `@clerk/backend` 3.11.1 it rejects every token without `azp`, and native app tokens have none. [azp.ts](../apps/api/src/auth/azp.ts) applies the policy instead: a token with `azp` must come from one of `WEB_ORIGINS`; a token without `azp` is accepted. The API accepts bearer tokens only and ignores cookies, so there is no cross-site request forgery surface.
 - **Provisioning:** [provisioning.ts](../apps/api/src/services/provisioning.ts) upserts the `users` row from the token claims (cached a minute per user) and never refreshes a deleted account, so a token that outlives a deletion cannot restore personal data. The product's username rule (`^[A-Za-z0-9_]{3,24}$`) is enforced here (`username_invalid`).
-- **Authorization rules:** anonymous clients may read the published rankings and client settings; everything under `/v1/me` and `/v1/members`, and search, needs a session; writes affect only the token's member; other members are exposed only as username and display name. [contract.test.ts](../apps/api/src/contract/contract.test.ts) proves every secured operation rejects anonymous calls.
-- **Account deletion:** `DELETE /v1/me` removes the list and rounds, detaches created courses and tombstones the `users` row in one locked transaction, forgets the cached user, then deletes the Clerk user (a 404 counts as done). If Clerk fails, the API answers 502 `account_deletion_incomplete` and a retry goes straight to Clerk. The web Account page is also the deletion link Google Play requires.
+- **Authorization rules:** anonymous clients may read the published rankings and client settings; everything under `/v1/me` and `/v1/members`, and both searches, needs a session; writes act only as the token's member, and friendship writes touch only pairs that include them; a list is visible only to its member and their accepted friends; other members are exposed only as username and display name. [contract.test.ts](../apps/api/src/contract/contract.test.ts) proves every secured operation rejects anonymous calls.
+- **Account deletion:** `DELETE /v1/me` removes the list, rounds, friendships and friend requests, detaches created courses and tombstones the `users` row in one locked transaction, forgets the cached user, then deletes the Clerk user (a 404 counts as done). If Clerk fails, the API answers 502 `account_deletion_incomplete` and a retry goes straight to Clerk. The web Account page is also the deletion link Google Play requires.
 
 Clerk dashboard configuration the code assumes:
 
@@ -131,7 +132,7 @@ Validate untrusted input at boundaries: request parameters and bodies (contract 
 - **Logs:** one JSON line per API request with its request id, which also appears in every error envelope and the `X-Request-Id` header. Server-side failures (unexpected errors and 5xx `AppError`s) are also logged with the request id and their cause; 4xx errors are not.
 - **Account lifecycle:** delete members only through the API (`DELETE /v1/me`: the Account page, or an admin acting as the member), never in Clerk's dashboard. Deleting only the Clerk user leaves a member row that no one can sign in to or remove, and provisioning has no reconciliation for it. Keep Clerk's self-service account deletion off for the same reason.
 - **Known data issue, kept as-is:** the canonical-location table in `apps/api/src/domain/identity.ts` matches on normalized names, so "The Glen Club" in Glenview, IL (Illinois list #32) shows as North Berwick, Scotland. The old app had the same table. It is left unchanged until the maintainer decides; see the [import decision](../.planning/decisions/2026-09-28-import-supabase-member-data-1-for-1.md) for this and the duplicate catalog rows members carry over.
-- **Friends directory:** the Friends page loads every page of `GET /v1/members` (200 members each) on each visit. Fine at today's size; replace it with a searched or paged picker as membership grows.
+- **Friends picker:** the Friends page loads every page of `GET /v1/members` (the member's friends, 200 each) on each visit. Fine at today's size; page the picker if members gather hundreds of friends.
 
 ## Appearance
 

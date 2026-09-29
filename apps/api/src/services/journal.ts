@@ -1,6 +1,6 @@
 import { and, count, desc, eq, inArray, sql } from "drizzle-orm";
 import type { Database, Executor, Transaction } from "../db/client";
-import { courses, rounds, userCourses, users } from "../db/schema";
+import { courses, rounds, userCourses } from "../db/schema";
 import { courseView } from "../domain/course-view";
 import { insertAt, reorder } from "@coursebook/domain/journal/reorder";
 import type { ListEntry, RoundEntry } from "@coursebook/domain/journal/types";
@@ -12,6 +12,7 @@ import {
   type CourseInput,
 } from "./catalog";
 import { AppError, ErrorCode } from "./errors";
+import { lockMembers } from "./member-lock";
 
 /**
  * Journal transactions: memberships (a member's personal list) and rounds.
@@ -65,11 +66,11 @@ export async function roundHistory(
 }
 
 /**
- * Run `work` in one transaction that holds the member's journal lock.
+ * Run `work` in one transaction that holds the member's lock (member-lock.ts).
  *
- * Account deletion takes the same lock, so after acquiring it a deleted
- * account is rejected: a request that raced the deletion cannot recreate
- * rows for it.
+ * Account deletion and friendship changes take the same lock, so after
+ * acquiring it a deleted account is rejected: a request that raced the
+ * deletion cannot recreate rows for it.
  *
  * Raises:
  *     AppError: 401 `account_deleted` when the account was deleted.
@@ -80,11 +81,7 @@ export function withJournalLock<T>(
   work: (tx: Transaction) => Promise<T>,
 ): Promise<T> {
   return db.transaction(async (tx) => {
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${userId}))`);
-    const [account] = await tx
-      .select({ deletedAt: users.deletedAt })
-      .from(users)
-      .where(eq(users.id, userId));
+    const [account] = await lockMembers(tx, [userId]);
     if (account?.deletedAt) throw new AppError(401, ErrorCode.AccountDeleted, "This account was deleted.");
     return work(tx);
   });

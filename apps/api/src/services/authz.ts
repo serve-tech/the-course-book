@@ -6,7 +6,9 @@ import type { PublicMember } from "@coursebook/domain/friends/types";
  *
  * - Anonymous visitors may read the index (empty personal data) and the
  *   published rankings.
- * - Any signed-in member may read any member's list and the directory.
+ * - A signed-in member reads their own list and their accepted friends'
+ *   lists; the member directory lists only friends, and anyone else is
+ *   "not found". Member search reveals usernames and display names only.
  * - A member's journal is written only by that member; the acting user is
  *   always taken from the request context, never from form input.
  * - Nothing about another member is exposed beyond username and display name.

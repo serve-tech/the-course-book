@@ -21,20 +21,21 @@ export default function Privacy() {
         <h3>What coursebook.golf stores</h3>
         <p>
           Your username, display name, email address and profile image from your sign-in; the courses on your list
-          and their order; and the rounds you log, with their dates. Courses you add by hand join the shared course
-          catalog.
+          and their order; the rounds you log, with their dates; and your friends and friend requests. Courses you add
+          by hand join the shared course catalog.
         </p>
         <h3>Who sees it</h3>
         <p>
-          Other members can see your username, display name and your list with its order. No one else sees your email
-          address. Nothing is sold or used for advertising.
+          Signed-in members can find you by username and see your username and display name. Only your friends (members
+          whose friend request you accepted, or who accepted yours) see your list and its order. No one else sees your
+          email address. Nothing is sold or used for advertising.
         </p>
         <h3>Service providers</h3>
         <p>Sign-in is provided by Clerk. The app and its database run on Render in the United States.</p>
         <h3>Deleting your data</h3>
         <p>
-          Delete your account on the <Link to="/account">Account</Link> page. That removes your list, rounds, name and
-          email address and your sign-in. Courses you added by hand stay in the catalog without your name.
+          Delete your account on the <Link to="/account">Account</Link> page. That removes your list, rounds, friends,
+          friend requests, name and email address and your sign-in. Courses you added by hand stay in the catalog without your name.
         </p>
       </div>
     </section>

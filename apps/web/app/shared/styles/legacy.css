@@ -443,3 +443,26 @@ h1 { font: 600 clamp(40px, 5vw, 60px) / 0.98 "Playfair Display"; letter-spacing:
 .account-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; flex-wrap: wrap; }
 .error-text { color: rgb(240, 202, 202); font-size: 13px; margin: 8px 0 0; }
 #authProblem { max-width: 1120px; margin: 8px auto 0; padding: 0 20px; }
+
+/* Additions for friend search and requests (2026-09-29). */
+.friend-panel { margin: 28px 0 0; }
+.friend-panel > label { display: block; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 1.4px; margin: 0 0 8px; }
+.friend-panel > .label { margin-top: 0; }
+#friendSearch { box-sizing: border-box; width: 100%; max-width: 420px; height: 43px; padding: 0 13px; background: rgba(255, 255, 255, 0.04); border: 1px solid var(--line); border-radius: 8px; color: var(--cream); outline: 0; }
+#friendSearch:focus { border-color: rgba(199, 170, 107, 0.5); }
+.friend-people { display: grid; gap: 8px; margin-top: 10px; }
+.friend-person { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 10px 13px; background: rgba(255, 255, 255, 0.035); border: 1px solid rgba(255, 255, 255, 0.055); border-radius: 11px; }
+.friend-person .course, .friend-person .loc { min-width: 0; overflow-wrap: anywhere; }
+.friend-person > .friend-list-action { width: 120px; }
+.friend-person-actions { display: flex; gap: 8px; }
+.friend-person-actions .friend-list-action { width: auto; padding: 8px 14px; }
+.friend-person .secondary { min-height: 38px; padding: 8px 14px; font-size: 12px; }
+.friend-remove { display: flex; justify-content: flex-end; margin: -4px 0 12px; }
+.friend-remove .actions { align-items: center; flex-wrap: wrap; margin-top: 0; }
+@media (max-width: 760px) {
+  #friendSearch { max-width: none; font-size: 16px; }
+  .friend-person > .friend-list-action { width: 104px; }
+  .friend-person-actions { flex-direction: column; }
+  .friend-remove .actions { justify-content: stretch; }
+  .friend-remove .actions > span { flex: 1 1 100%; }
+}

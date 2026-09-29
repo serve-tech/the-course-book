@@ -408,6 +408,17 @@ export function assignUsernames(
   return usernames;
 }
 
+/**
+ * Every unordered pair of members, each as [smaller id, larger id]: the
+ * friendships that make imported members friends with each other (decision
+ * 2026-09-29, friends-only visibility; the old app let every member see
+ * every list).
+ */
+export function friendPairs(ids: readonly string[]): [string, string][] {
+  const sorted = [...new Set(ids)].sort();
+  return sorted.flatMap((a, index) => sorted.slice(index + 1).map((b): [string, string] => [a, b]));
+}
+
 /** Row counts per table and outcome, for the report. */
 export function summarizeLedger(ledger: readonly LedgerEntry[]): Map<ImportTable, Map<Outcome["kind"], number>> {
   const summary = new Map<ImportTable, Map<Outcome["kind"], number>>();

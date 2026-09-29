@@ -25,7 +25,7 @@ The application was rebuilt from a static Supabase SPA per [the rebuild decision
 - The API contract (`contract/openapi.json`) is generated from the route definitions and only grows: add operations, fields and error codes; never rename, retype or remove them. Follow [contract/README.md](contract/README.md) and run `pnpm contract:emit` after changing a route or schema. Installed app builds depend on it.
 - Validate every boundary with Zod: request parameters and bodies through the contract schemas, form data in the web's `clientAction`, environment variables at startup, external API responses and token claims. Keep contract shapes, domain models and Drizzle row types separate; mappers translate between them.
 - Schema changes ship as Drizzle migration files generated from `apps/api/src/db/schema.ts` and committed with the change. Never edit an applied migration; never use `drizzle-kit push` outside a throwaway local database. Migrations run when the API starts, while the previous release still serves, so they must stay backward-compatible.
-- Components own presentation and transient interaction state. Data arrives from route `clientLoader`s as `loaderData`; changes go through `useFetcher` to the `/journal` `clientAction`, which calls the API. Preserve the existing markup, element ids and `legacy.css`; a visual redesign is a separate, explicitly scoped change.
+- Components own presentation and transient interaction state. Data arrives from route `clientLoader`s as `loaderData`; changes go through `useFetcher` (`useActionFetcher`) to a route `clientAction`, which calls the API: `/journal` for list and round changes, `/friends` for friend requests. Preserve the existing markup, element ids and `legacy.css`; a visual redesign is a separate, explicitly scoped change.
 - Do not introduce a state library, UI framework, second router, alternate package manager, ORM, API framework or hosting change incidentally. If a requirement needs an architectural change, explain the tradeoff and record the agreed decision.
 
 ## TypeScript and UI conventions
@@ -48,7 +48,7 @@ Read the detailed rules in [docs/architecture.md](docs/architecture.md#data-rule
 - Personal rank is independent of published rankings. Logging a round or editing a count never changes rank. Only an explicit move renumbers, and it renumbers the whole list so filtered-out courses keep their positions.
 - A round cannot exist without a membership; the schema enforces it. Deleting the last round deletes the membership.
 - Course identity is resolved through `identity.ts` before a course row is created. Keep canonical geography and aliases.
-- Any signed-in member may view any member's list read-only. No API response exposes another member's email address or id.
+- A signed-in member may view their own list and their accepted friends' lists (read-only), no one else's ([decision](.planning/decisions/2026-09-29-friends-only-visibility-with-mutual-friend-requests.md)). No API response exposes another member's email address or id.
 - Custom courses are shared catalog rows visible to everyone; they stay, unattributed, when their creator deletes the account.
 - Deleted accounts are tombstones: they cannot sign back in to data or be re-provisioned.
 

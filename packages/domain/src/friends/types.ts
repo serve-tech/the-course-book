@@ -11,6 +11,35 @@ export interface PublicMember {
   displayName: string;
 }
 
+/**
+ * The viewer's relationship to another member. Friendships are mutual and
+ * start as a request (decision 2026-09-29, friends-only visibility).
+ */
+export enum Relationship {
+  /** No friendship and no pending request. */
+  None = "none",
+  /** Mutual friends: each sees the other's list. */
+  Friends = "friends",
+  /** The viewer asked; waiting for the other member to accept. */
+  Requested = "requested",
+  /** The other member asked; the viewer can accept or decline. */
+  Incoming = "incoming",
+}
+
+/** Another member together with the viewer's relationship to them. */
+export interface MemberRelationship {
+  member: PublicMember;
+  relationship: Relationship;
+}
+
+/** The viewer's pending friend requests. */
+export interface FriendRequests {
+  /** Members who asked the viewer. */
+  incoming: PublicMember[];
+  /** Members the viewer asked. */
+  outgoing: PublicMember[];
+}
+
 /** One course on another member's list, relative to the viewer. */
 export interface MemberListRow {
   course: Course;

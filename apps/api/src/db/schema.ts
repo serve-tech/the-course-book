@@ -1,4 +1,5 @@
 import { sql } from "drizzle-orm";
+import { FriendshipStatus } from "../domain/friendship";
 import {
   boolean,
   check,
@@ -59,6 +60,39 @@ export const users = pgTable(
   (table) => [
     uniqueIndex("users_username_lower_idx").on(sql`lower(${table.username})`),
     uniqueIndex("users_legacy_supabase_id_idx").on(table.legacySupabaseId),
+  ],
+);
+
+/** Friendship status column type; values from `FriendshipStatus` (domain/friendship.ts). */
+export const friendshipStatus = pgEnum("friendship_status", FriendshipStatus);
+
+/**
+ * One row per pair of members who are friends or have a pending request,
+ * in either direction (decision 2026-09-29, friends-only visibility).
+ * `requester_id` asked `addressee_id`; `accepted` rows are mutual. The
+ * unique index on the unordered pair allows one row per pair, so a request
+ * back to someone who asked you is an accept, never a second row.
+ */
+export const friendships = pgTable(
+  "friendships",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    requesterId: text("requester_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    addresseeId: text("addressee_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    status: friendshipStatus("status").notNull().default(FriendshipStatus.Pending),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("friendships_pair_idx").on(
+      sql`least(${table.requesterId}, ${table.addresseeId})`,
+      sql`greatest(${table.requesterId}, ${table.addresseeId})`,
+    ),
+    index("friendships_addressee_idx").on(table.addresseeId),
+    check("friendships_not_self", sql`${table.requesterId} <> ${table.addresseeId}`),
   ],
 );
 
@@ -177,3 +211,4 @@ export type CourseRow = typeof courses.$inferSelect;
 export type CourseRankingRow = typeof courseRankings.$inferSelect;
 export type UserCourseRow = typeof userCourses.$inferSelect;
 export type RoundRow = typeof rounds.$inferSelect;
+export type FriendshipRow = typeof friendships.$inferSelect;
