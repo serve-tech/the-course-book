@@ -111,7 +111,7 @@ export function createApp(deps: AppDependencies): OpenAPIHono<AppEnv> {
     }),
   );
   app.use("/v1/*", sessionMiddleware(deps.verifySession));
-  for (const path of ["/v1/me", "/v1/me/*", "/v1/members", "/v1/members/*", "/v1/course-search"])
+  for (const path of ["/v1/me", "/v1/me/*", "/v1/members", "/v1/members/*", "/v1/member-search", "/v1/course-search"])
     app.use(path, noStore);
 
   app.get("/healthz", async (c) => {

@@ -201,7 +201,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The member directory, a page at a time */
+        /**
+         * The member's friends, a page at a time
+         * @description Only accepted friends are listed; pending requests are in `listFriendRequests`.
+         */
         get: operations["listMembers"];
         put?: never;
         post?: never;
@@ -219,13 +222,71 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Another member's list, read-only
-         * @description Usernames match case-insensitively.
+         * A friend's list (or the member's own), read-only
+         * @description Usernames match case-insensitively. A member who is not a friend is indistinguishable from no member.
          */
         get: operations["getMemberList"];
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/member-search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Find members by username to send a friend request
+         * @description Returns usernames, display names and the viewer's relationship; never a list.
+         */
+        get: operations["searchMembers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/friend-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The member's pending friend requests, incoming and outgoing */
+        get: operations["listFriendRequests"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/friends/{username}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Send a friend request, or accept one from that member
+         * @description Idempotent. If the other member already asked, this accepts and the two are friends; otherwise it sends a request. Usernames match case-insensitively.
+         */
+        put: operations["befriendMember"];
+        post?: never;
+        /** Remove a friend, cancel a request, or decline one */
+        delete: operations["removeFriend"];
         options?: never;
         head?: never;
         patch?: never;
@@ -264,7 +325,7 @@ export interface components {
         };
         ApiErrorBody: {
             /**
-             * @description Stable machine-readable code. Current values: bad_request, validation_failed, us_state_required, unauthenticated, account_deleted, username_invalid, not_found, course_not_found, not_on_list, round_not_found, member_not_found, payload_too_large, unsupported_media_type, account_deletion_incomplete, search_unavailable, internal. New codes may appear; treat unknown codes by HTTP status.
+             * @description Stable machine-readable code. Current values: bad_request, validation_failed, us_state_required, unauthenticated, account_deleted, username_invalid, not_found, course_not_found, not_on_list, round_not_found, member_not_found, friendship_not_found, payload_too_large, unsupported_media_type, account_deletion_incomplete, search_unavailable, internal. New codes may appear; treat unknown codes by HTTP status.
              * @example not_on_list
              */
             code: string;
@@ -463,6 +524,21 @@ export interface components {
             course: components["schemas"]["Course"];
             rank: number;
             onMyList: boolean;
+        };
+        MemberSearchResults: {
+            /** @description At most 20, usernames starting with the query first. */
+            results: components["schemas"]["MemberRelationship"][];
+        };
+        MemberRelationship: {
+            member: components["schemas"]["Member"];
+            /** @description The viewer's relationship: none, friends, requested (the viewer asked; waiting for them) or incoming (they asked; the viewer can accept or decline). New values may appear. */
+            relationship: string;
+        };
+        FriendRequests: {
+            /** @description Members who asked the viewer, by username. */
+            incoming: components["schemas"]["Member"][];
+            /** @description Members the viewer asked, by username. */
+            outgoing: components["schemas"]["Member"][];
         };
         ClientConfig: {
             minimumVersions: components["schemas"]["MinimumVersions"];
@@ -1245,7 +1321,200 @@ export interface operations {
                     "application/json": components["schemas"]["ApiError"];
                 };
             };
+            /** @description No such member, or not a friend: `member_not_found`. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    searchMembers: {
+        parameters: {
+            query: {
+                /** @description Text in the username, at least three characters. */
+                q: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Matching members. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberSearchResults"];
+                };
+            };
+            /** @description Invalid parameters: `validation_failed`. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description No valid session: `unauthenticated`, or `account_deleted` after the account was deleted. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description The Clerk account cannot use the app: `username_invalid`. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    listFriendRequests: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Pending requests. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FriendRequests"];
+                };
+            };
+            /** @description No valid session: `unauthenticated`, or `account_deleted` after the account was deleted. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description The Clerk account cannot use the app: `username_invalid`. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    befriendMember: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                username: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The relationship afterwards: requested or friends. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberRelationship"];
+                };
+            };
+            /** @description The member's own username: `validation_failed`. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description No valid session: `unauthenticated`, or `account_deleted` after the account was deleted. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description The Clerk account cannot use the app: `username_invalid`. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
             /** @description No such member: `member_not_found`. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    removeFriend: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                username: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Nothing is left between the two members. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No valid session: `unauthenticated`, or `account_deleted` after the account was deleted. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description The Clerk account cannot use the app: `username_invalid`. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description No such member: `member_not_found`; nothing between the two: `friendship_not_found`. */
             404: {
                 headers: {
                     [name: string]: unknown;

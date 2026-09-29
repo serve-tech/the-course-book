@@ -13,7 +13,7 @@ import {
   RoundsSchema,
   SearchResultsSchema,
 } from "../contract/schemas";
-import { courseRankings, courses, users } from "../db/schema";
+import { courseRankings, courses, friendships, users } from "../db/schema";
 import { invalidateCatalog } from "../services/catalog";
 import { logRounds } from "../services/journal";
 import { createTestApp, TEST_CLIENT_CONFIG } from "../test/app";
@@ -175,9 +175,14 @@ describe("members", () => {
     await member("user_1", "golfer_1");
     await member("user_2", "Bravo");
     await member("user_3", "charlie");
+    await member("user_4", "stranger");
+    await db.insert(friendships).values([
+      { requesterId: "user_1", addresseeId: "user_2", status: "accepted" },
+      { requesterId: "user_3", addresseeId: "user_1", status: "accepted" },
+    ]);
   });
 
-  it("pages the directory without the viewer or any email", async () => {
+  it("pages the viewer's friends without the viewer, strangers or any email", async () => {
     const t = createTestApp(db);
     const first = MembersSchema.parse((await t.get("/v1/members?limit=1", t.bearer("user_1", "golfer_1"))).body);
     expect(first).toEqual({ members: [{ username: "Bravo", displayName: "Bravo Name" }], nextCursor: "Bravo" });
@@ -207,11 +212,13 @@ describe("members", () => {
     expect(body.courses[0]?.course.ranks.usa).toBe(1);
   });
 
-  it("answers member_not_found for an unknown username", async () => {
+  it.each(["nobody", "stranger"])("answers member_not_found for %s (unknown and non-friends look the same)", async (username) => {
     const t = createTestApp(db);
-    const result = await t.get("/v1/members/nobody", t.bearer("user_1", "golfer_1"));
+    await logRounds(db, "user_4", { courseId: await seeded("usa1") }, 1);
+    const result = await t.get(`/v1/members/${username}`, t.bearer("user_1", "golfer_1"));
     expect(result.status).toBe(404);
     expect(ApiErrorSchema.parse(result.body).error.code).toBe("member_not_found");
+    expect(JSON.stringify(result.body)).not.toContain("usa1");
   });
 });
 
