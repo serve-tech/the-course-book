@@ -6,6 +6,7 @@
   "description": "coursebook.golf data, services and (soon) the JSON API: schema, migrations, journal and catalog transactions.",
   "exports": {
     "./db/*": "./src/db/*.ts",
+    "./domain/*": "./src/domain/*.ts",
     "./services/*": "./src/services/*.ts",
     "./test/*": "./src/test/*.ts"
   },

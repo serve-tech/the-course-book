@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { createClerkClient } from "@clerk/backend";
 import { users } from "@coursebook/api/db/schema";
+import { FriendshipStatus } from "@coursebook/api/domain/friendship";
 import { expect, test, type Page } from "@playwright/test";
 import { eq } from "drizzle-orm";
 import { clerk } from "@clerk/testing/playwright";
@@ -188,7 +189,7 @@ test.describe("signed in", () => {
     await result.getByRole("button", { name: "Add friend" }).click();
     await expect(result.getByRole("button", { name: "Requested" })).toBeDisabled();
     await expect(page.locator('#friendRequests [data-request="outgoing"]')).toContainText(friend.username);
-    expect(await friendshipStatus(db, owner, friend)).toBe("pending");
+    expect(await friendshipStatus(db, owner, friend)).toBe(FriendshipStatus.Pending);
 
     await clerk.signOut({ page });
     await signInAs(page, friend);
@@ -196,7 +197,7 @@ test.describe("signed in", () => {
     const request = page.locator('#friendRequests [data-request="incoming"]').filter({ hasText: owner.username });
     await request.getByRole("button", { name: "Accept" }).click();
     await expect(page.locator("#friendRequests")).toHaveCount(0);
-    expect(await friendshipStatus(db, owner, friend)).toBe("accepted");
+    expect(await friendshipStatus(db, owner, friend)).toBe(FriendshipStatus.Accepted);
     await page.locator("#friendSelect").selectOption(owner.username);
     await expect(page.locator("#friendsList .friend-row")).toHaveCount(2);
 

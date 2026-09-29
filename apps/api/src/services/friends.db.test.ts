@@ -2,6 +2,7 @@ import { and, eq, or } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { Relationship } from "@coursebook/domain/friends/types";
 import { courses, friendships, users } from "../db/schema";
+import { FriendshipStatus } from "../domain/friendship";
 import { resetMemberData, testDatabase } from "../test/db";
 import { deleteAccountData } from "./accounts";
 import { ErrorCode } from "./errors";
@@ -40,7 +41,7 @@ const seeded = async (stableId: string) => {
 
 /** Make two members friends directly, as an accepted row. */
 const friends = (requesterId: string, addresseeId: string) =>
-  db.insert(friendships).values({ requesterId, addresseeId, status: "accepted" });
+  db.insert(friendships).values({ requesterId, addresseeId, status: FriendshipStatus.Accepted });
 
 /**
  * Hold member locks from a separate session, as another transaction would.
@@ -181,7 +182,7 @@ describe("friend requests", () => {
     expect(await memberList(db, "user_a", "bravo")).toBeNull();
 
     expect((await befriendMember(db, "user_b", "alpha")).relationship).toBe(Relationship.Friends);
-    expect(await rowsBetween("user_a", "user_b")).toMatchObject([{ requesterId: "user_a", status: "accepted" }]);
+    expect(await rowsBetween("user_a", "user_b")).toMatchObject([{ requesterId: "user_a", status: FriendshipStatus.Accepted }]);
     expect(await friendRequests(db, "user_b")).toEqual({ incoming: [], outgoing: [] });
     expect(await memberList(db, "user_a", "bravo")).not.toBeNull();
     expect(await memberList(db, "user_b", "alpha")).not.toBeNull();
@@ -206,7 +207,7 @@ describe("friend requests", () => {
       await blocker.release();
       const [first, second] = await requests;
       expect([first.relationship, second.relationship].sort()).toEqual([Relationship.Friends, Relationship.Requested].sort());
-      expect(await rowsBetween("user_a", "user_b")).toMatchObject([{ status: "accepted" }]);
+      expect(await rowsBetween("user_a", "user_b")).toMatchObject([{ status: FriendshipStatus.Accepted }]);
     } finally {
       await blocker.release();
     }

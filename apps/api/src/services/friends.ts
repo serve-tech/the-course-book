@@ -2,7 +2,7 @@ import { and, asc, desc, eq, exists, gt, isNull, ne, or, sql, type AnyColumn, ty
 import type { Database, Executor, Transaction } from "../db/client";
 import { courses, friendships, userCourses, users } from "../db/schema";
 import { courseView } from "../domain/course-view";
-import { BefriendChange, befriend, relationshipFor } from "../domain/friendship";
+import { BefriendChange, FriendshipStatus, befriend, relationshipFor } from "../domain/friendship";
 import { equivalentCourses } from "../domain/identity";
 import type {
   FriendRequests,
@@ -31,7 +31,7 @@ function isFriendOf(db: Executor, viewerId: string): SQL {
       .from(friendships)
       .where(
         and(
-          eq(friendships.status, "accepted"),
+          eq(friendships.status, FriendshipStatus.Accepted),
           or(
             and(eq(friendships.requesterId, viewerId), eq(friendships.addresseeId, users.id)),
             and(eq(friendships.addresseeId, viewerId), eq(friendships.requesterId, users.id)),
@@ -125,7 +125,7 @@ export async function memberList(
     const [friendship] = await db
       .select({ id: friendships.id })
       .from(friendships)
-      .where(and(eq(friendships.status, "accepted"), pair(viewerId, member.id)));
+      .where(and(eq(friendships.status, FriendshipStatus.Accepted), pair(viewerId, member.id)));
     if (!friendship) return null;
   }
   const [list, own] = await Promise.all([
@@ -211,7 +211,7 @@ export async function friendRequests(db: Database, viewerId: string): Promise<Fr
       .select({ username: users.username, displayName: users.displayName })
       .from(friendships)
       .innerJoin(users, eq(users.id, other))
-      .where(and(eq(friendships.status, "pending"), eq(self, viewerId), isNull(users.deletedAt)))
+      .where(and(eq(friendships.status, FriendshipStatus.Pending), eq(self, viewerId), isNull(users.deletedAt)))
       .orderBy(asc(key));
   const [incoming, outgoing] = await Promise.all([
     pending(friendships.requesterId, friendships.addresseeId),
@@ -271,7 +271,7 @@ export async function befriendMember(db: Database, viewerId: string, username: s
     if (change === BefriendChange.Request) {
       await tx.insert(friendships).values({ requesterId: viewerId, addresseeId: target.id });
     } else if (change === BefriendChange.Accept && row) {
-      await tx.update(friendships).set({ status: "accepted", updatedAt: sql`now()` }).where(eq(friendships.id, row.id));
+      await tx.update(friendships).set({ status: FriendshipStatus.Accepted, updatedAt: sql`now()` }).where(eq(friendships.id, row.id));
     }
     return { member, relationship };
   });

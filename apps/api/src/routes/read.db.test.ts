@@ -14,6 +14,7 @@ import {
   SearchResultsSchema,
 } from "../contract/schemas";
 import { courseRankings, courses, friendships, users } from "../db/schema";
+import { FriendshipStatus } from "../domain/friendship";
 import { invalidateCatalog } from "../services/catalog";
 import { logRounds } from "../services/journal";
 import { createTestApp, TEST_CLIENT_CONFIG } from "../test/app";
@@ -177,8 +178,8 @@ describe("members", () => {
     await member("user_3", "charlie");
     await member("user_4", "stranger");
     await db.insert(friendships).values([
-      { requesterId: "user_1", addresseeId: "user_2", status: "accepted" },
-      { requesterId: "user_3", addresseeId: "user_1", status: "accepted" },
+      { requesterId: "user_1", addresseeId: "user_2", status: FriendshipStatus.Accepted },
+      { requesterId: "user_3", addresseeId: "user_1", status: FriendshipStatus.Accepted },
     ]);
   });
 

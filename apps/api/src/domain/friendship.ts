@@ -7,11 +7,19 @@ import { Relationship } from "@coursebook/domain/friends/types";
  * alone; the service reads and writes it under both members' locks.
  */
 
+/** Where a pair stands; the values of the `friendship_status` database enum. */
+export enum FriendshipStatus {
+  /** The requester asked; the addressee has not answered. */
+  Pending = "pending",
+  /** Both are friends. */
+  Accepted = "accepted",
+}
+
 /** The parts of a friendship row the rules need. */
 export interface FriendshipState {
   requesterId: string;
   addresseeId: string;
-  status: "pending" | "accepted";
+  status: FriendshipStatus;
 }
 
 /**
@@ -27,7 +35,7 @@ export interface FriendshipState {
  */
 export function relationshipFor(row: FriendshipState | null | undefined, viewerId: string): Relationship {
   if (!row) return Relationship.None;
-  if (row.status === "accepted") return Relationship.Friends;
+  if (row.status === FriendshipStatus.Accepted) return Relationship.Friends;
   return row.requesterId === viewerId ? Relationship.Requested : Relationship.Incoming;
 }
 

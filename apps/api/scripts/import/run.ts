@@ -19,6 +19,7 @@ import { and, asc, eq, inArray, isNull, notInArray, or } from "drizzle-orm";
 import { normalizeName } from "@coursebook/domain/catalog/course";
 import type { Database } from "../../src/db/client";
 import { courses, friendships, rounds, userCourses, users } from "../../src/db/schema";
+import { FriendshipStatus } from "../../src/domain/friendship";
 import { assignUsernames, friendPairs, planImport, summarizeLedger, type ImportPlan, type PlannedMember } from "./plan";
 import { appliedMigrations, journalMigrations, schemaMismatch } from "./preflight";
 import type { SupabaseExport } from "./rows";
@@ -228,13 +229,13 @@ export async function runImport(deps: Dependencies, data: SupabaseExport, option
   if (pairs.length) {
     await db
       .insert(friendships)
-      .values(pairs.map(([requesterId, addresseeId]) => ({ requesterId, addresseeId, status: "accepted" as const })))
+      .values(pairs.map(([requesterId, addresseeId]) => ({ requesterId, addresseeId, status: FriendshipStatus.Accepted })))
       .onConflictDoNothing();
     const ids = [...accountIds.values()];
     await db
       .update(friendships)
-      .set({ status: "accepted" })
-      .where(and(eq(friendships.status, "pending"), inArray(friendships.requesterId, ids), inArray(friendships.addresseeId, ids)));
+      .set({ status: FriendshipStatus.Accepted })
+      .where(and(eq(friendships.status, FriendshipStatus.Pending), inArray(friendships.requesterId, ids), inArray(friendships.addresseeId, ids)));
   }
   log(`friendships: ${String(pairs.length)} pairs among imported members`);
 
@@ -272,7 +273,7 @@ export async function verifyImport(db: Database, plan: ImportPlan, accountIds: R
     const accepted = await db
       .select({ id: friendships.id })
       .from(friendships)
-      .where(and(eq(friendships.status, "accepted"), inArray(friendships.requesterId, ids), inArray(friendships.addresseeId, ids)));
+      .where(and(eq(friendships.status, FriendshipStatus.Accepted), inArray(friendships.requesterId, ids), inArray(friendships.addresseeId, ids)));
     if (accepted.length !== expectedPairs)
       mismatches.push(`friendships: ${String(accepted.length)} accepted among imported members, expected ${String(expectedPairs)}`);
   }

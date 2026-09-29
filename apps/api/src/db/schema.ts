@@ -1,4 +1,5 @@
 import { sql } from "drizzle-orm";
+import { FriendshipStatus } from "../domain/friendship";
 import {
   boolean,
   check,
@@ -62,7 +63,8 @@ export const users = pgTable(
   ],
 );
 
-export const friendshipStatus = pgEnum("friendship_status", ["pending", "accepted"]);
+/** Friendship status column type; values from `FriendshipStatus` (domain/friendship.ts). */
+export const friendshipStatus = pgEnum("friendship_status", FriendshipStatus);
 
 /**
  * One row per pair of members who are friends or have a pending request,
@@ -81,7 +83,7 @@ export const friendships = pgTable(
     addresseeId: text("addressee_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    status: friendshipStatus("status").notNull().default("pending"),
+    status: friendshipStatus("status").notNull().default(FriendshipStatus.Pending),
     ...timestamps,
   },
   (table) => [

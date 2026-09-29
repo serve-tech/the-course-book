@@ -5,6 +5,7 @@
 import { and, eq, inArray, or, sql } from "drizzle-orm";
 import { createDatabase } from "@coursebook/api/db/client";
 import { courses, friendships, rounds, userCourses, users } from "@coursebook/api/db/schema";
+import { FriendshipStatus } from "@coursebook/api/domain/friendship";
 import { normalizeName } from "@coursebook/domain/catalog/course";
 
 export const TEST_DATABASE_URL =
@@ -90,7 +91,7 @@ export async function resetScenario(
 ): Promise<void> {
   const ids = [owner.id, friend.id];
   await db.delete(friendships).where(or(inArray(friendships.requesterId, ids), inArray(friendships.addresseeId, ids)));
-  await db.insert(friendships).values({ requesterId: owner.id, addresseeId: friend.id, status: "accepted" });
+  await db.insert(friendships).values({ requesterId: owner.id, addresseeId: friend.id, status: FriendshipStatus.Accepted });
   await db.delete(rounds).where(inArray(rounds.userId, ids));
   await db.delete(userCourses).where(inArray(userCourses.userId, ids));
   await db.delete(courses).where(sql`${courses.createdBy} = any(array[${sql.join(ids.map((id) => sql`${id}`), sql`, `)}]::text[])`);
@@ -125,7 +126,7 @@ export async function friendshipStatus(
   db: ReturnType<typeof connect>["db"],
   a: TestMember,
   b: TestMember,
-): Promise<string | null> {
+): Promise<FriendshipStatus | null> {
   const [row] = await db.select({ status: friendships.status }).from(friendships).where(between(a, b));
   return row?.status ?? null;
 }

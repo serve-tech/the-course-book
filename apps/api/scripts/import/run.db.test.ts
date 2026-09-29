@@ -1,6 +1,7 @@
 import { count, eq, sql } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { courses, friendships, rounds, userCourses, users } from "../../src/db/schema";
+import { FriendshipStatus } from "../../src/domain/friendship";
 import { resetMemberData, testDatabase } from "../../src/test/db";
 import { appliedMigrations, journalMigrations, schemaMismatch } from "./preflight";
 import type { SupabaseExport } from "./rows";
@@ -122,7 +123,7 @@ describe("member import", () => {
     expect(dated?.playedAt).toBe("2026-05-02");
     const [custom] = await db.select().from(courses).where(eq(courses.id, CUSTOM));
     expect(custom).toMatchObject({ name: "Backyard Nine", isCustom: true });
-    expect(await db.select({ status: friendships.status }).from(friendships)).toEqual([{ status: "accepted" }]);
+    expect(await db.select({ status: friendships.status }).from(friendships)).toEqual([{ status: FriendshipStatus.Accepted }]);
   });
 
   it("reruns without creating accounts again or duplicating rows", async () => {
@@ -143,13 +144,13 @@ describe("member import", () => {
     const first = await runImport({ db, accounts, log }, data, { dryRun: false });
     const [a = "", b = ""] = [...first.accounts.values()].sort();
     await db.delete(friendships);
-    await db.insert(friendships).values({ requesterId: b, addresseeId: a, status: "pending" });
+    await db.insert(friendships).values({ requesterId: b, addresseeId: a, status: FriendshipStatus.Pending });
 
     const again = await runImport({ db, accounts, log }, data, { dryRun: false });
 
     expect(again.mismatches).toEqual([]);
     expect(await db.select({ requesterId: friendships.requesterId, status: friendships.status }).from(friendships)).toEqual([
-      { requesterId: b, status: "accepted" },
+      { requesterId: b, status: FriendshipStatus.Accepted },
     ]);
   });
 

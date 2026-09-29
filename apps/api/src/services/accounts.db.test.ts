@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { courses, friendships, rounds, userCourses, users } from "../db/schema";
+import { FriendshipStatus } from "../domain/friendship";
 import { resetMemberData, testDatabase } from "../test/db";
 import { deleteAccountData } from "./accounts";
 import { ErrorCode } from "./errors";
@@ -36,7 +37,7 @@ describe("account deletion", () => {
     const { courseId: customId } = await addCourseByDetails(db, USER, custom, { rank: null, quantity: 1 });
     await logRounds(db, "user_other", { courseId: customId }, 1);
 
-    await db.insert(friendships).values({ requesterId: "user_other", addresseeId: USER, status: "accepted" });
+    await db.insert(friendships).values({ requesterId: "user_other", addresseeId: USER, status: FriendshipStatus.Accepted });
     await deleteAccountData(db, USER);
 
     expect(await db.select().from(userCourses).where(eq(userCourses.userId, USER))).toHaveLength(0);
