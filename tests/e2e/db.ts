@@ -2,9 +2,9 @@
  * Database access for browser tests: fixture courses and member data in the
  * test database the app server is pointed at.
  */
-import { eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, or, sql } from "drizzle-orm";
 import { createDatabase } from "@coursebook/api/db/client";
-import { courses, rounds, userCourses, users } from "@coursebook/api/db/schema";
+import { courses, friendships, rounds, userCourses, users } from "@coursebook/api/db/schema";
 import { normalizeName } from "@coursebook/domain/catalog/course";
 
 export const TEST_DATABASE_URL =
@@ -49,7 +49,7 @@ export async function ensureFixtureCourses(db: ReturnType<typeof connect>["db"])
  * Delete every member except the given ones, with the courses they created.
  *
  * The Vitest database suites share this database and leave their last test's
- * members behind; the Friends scenario asserts the exact member directory.
+ * members behind; the Friends scenarios search the whole membership.
  * Courses go first because deleting a user nulls `created_by`, after which
  * they could no longer be identified.
  */
@@ -79,8 +79,9 @@ export async function ensureMembers(
 }
 
 /**
- * Reset both members to the baseline scenario: the owner has Beta at rank 1
- * and Alpha at rank 2 with one round each; the friend has Alpha then Gamma.
+ * Reset both members to the baseline scenario: they are friends; the owner
+ * has Beta at rank 1 and Alpha at rank 2 with one round each; the friend has
+ * Alpha then Gamma.
  */
 export async function resetScenario(
   db: ReturnType<typeof connect>["db"],
@@ -88,6 +89,8 @@ export async function resetScenario(
   friend: TestMember,
 ): Promise<void> {
   const ids = [owner.id, friend.id];
+  await db.delete(friendships).where(or(inArray(friendships.requesterId, ids), inArray(friendships.addresseeId, ids)));
+  await db.insert(friendships).values({ requesterId: owner.id, addresseeId: friend.id, status: "accepted" });
   await db.delete(rounds).where(inArray(rounds.userId, ids));
   await db.delete(userCourses).where(inArray(userCourses.userId, ids));
   await db.delete(courses).where(sql`${courses.createdBy} = any(array[${sql.join(ids.map((id) => sql`${id}`), sql`, `)}]::text[])`);
@@ -103,6 +106,28 @@ export async function resetScenario(
     { userId: friend.id, courseId: fixtureCourses.alpha.id },
     { userId: friend.id, courseId: fixtureCourses.gamma.id },
   ]);
+}
+
+/** The friendship row between two members, whoever asked. */
+const between = (a: TestMember, b: TestMember) =>
+  or(
+    and(eq(friendships.requesterId, a.id), eq(friendships.addresseeId, b.id)),
+    and(eq(friendships.requesterId, b.id), eq(friendships.addresseeId, a.id)),
+  );
+
+/** Delete the friendship or request between two members, if any. */
+export async function unfriend(db: ReturnType<typeof connect>["db"], a: TestMember, b: TestMember): Promise<void> {
+  await db.delete(friendships).where(between(a, b));
+}
+
+/** The status of the friendship row between two members; null without one. */
+export async function friendshipStatus(
+  db: ReturnType<typeof connect>["db"],
+  a: TestMember,
+  b: TestMember,
+): Promise<string | null> {
+  const [row] = await db.select({ status: friendships.status }).from(friendships).where(between(a, b));
+  return row?.status ?? null;
 }
 
 /** Ordered course ids on a member's list. */
