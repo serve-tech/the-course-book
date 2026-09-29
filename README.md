@@ -1,6 +1,6 @@
 # coursebook.golf
 
-A golf course journal: log rounds, rank the courses you have played, compare against published Top 100 lists and see what other members are playing. Built by Serve Electric: a JSON API (Hono, Drizzle over Postgres, Clerk) and a React Router web app, on Render; native iOS and Android apps will use the same API.
+A golf course journal: log rounds, rank the courses you have played, compare against published Top 100 lists and see what your friends are playing. Built by Serve Electric: a JSON API (Hono, Drizzle over Postgres, Clerk) and a React Router web app, on Render; native iOS and Android apps will use the same API.
 
 - Repository: https://github.com/serve-tech/the-course-book
 - Production: https://serve-tech.github.io/the-course-book/ (retired static build, still live until cutover); coursebook.golf will point at Render after cutover.

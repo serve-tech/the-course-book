@@ -48,7 +48,7 @@ Read the detailed rules in [docs/architecture.md](docs/architecture.md#data-rule
 - Personal rank is independent of published rankings. Logging a round or editing a count never changes rank. Only an explicit move renumbers, and it renumbers the whole list so filtered-out courses keep their positions.
 - A round cannot exist without a membership; the schema enforces it. Deleting the last round deletes the membership.
 - Course identity is resolved through `identity.ts` before a course row is created. Keep canonical geography and aliases.
-- Any signed-in member may view any member's list read-only. No API response exposes another member's email address or id.
+- A signed-in member may view their own list and their accepted friends' lists (read-only), no one else's ([decision](.planning/decisions/2026-09-29-friends-only-visibility-with-mutual-friend-requests.md)). No API response exposes another member's email address or id.
 - Custom courses are shared catalog rows visible to everyone; they stay, unattributed, when their creator deletes the account.
 - Deleted accounts are tombstones: they cannot sign back in to data or be re-provisioned.
 

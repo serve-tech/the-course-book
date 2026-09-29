@@ -24,7 +24,7 @@ Every failure returns:
 | 400 | `bad_request` (unreadable JSON), `validation_failed` (with `fields`), `us_state_required` |
 | 401 | `unauthenticated`, `account_deleted` |
 | 403 | `username_invalid` |
-| 404 | `not_found`, `course_not_found`, `not_on_list`, `round_not_found`, `member_not_found` |
+| 404 | `not_found`, `course_not_found`, `not_on_list`, `round_not_found`, `member_not_found`, `friendship_not_found` |
 | 413 | `payload_too_large` |
 | 415 | `unsupported_media_type` |
 | 500 | `internal` |
@@ -51,8 +51,14 @@ Every failure returns:
 | `POST /v1/me/courses/{courseId}/rounds` | `logRounds` | member | Log rounds at a catalog course |
 | `DELETE /v1/me/rounds/{roundId}` | `deleteRound` | member | Delete one round; the last one removes the course |
 | `GET /v1/course-search?q=` | `searchCourses` | member | Up to ten hits; catalog hits carry `courseId` |
-| `GET /v1/members?cursor=&limit=` | `listMembers` | member | Paged directory (limit 1–200, default 50) |
-| `GET /v1/members/{username}` | `getMemberList` | member | Another member's list with `onMyList` flags |
+| `GET /v1/members?cursor=&limit=` | `listMembers` | member | The member's friends, paged by username (limit 1–200, default 50) |
+| `GET /v1/members/{username}` | `getMemberList` | member | The member's own list or a friend's, with `onMyList` flags; anyone else is 404 `member_not_found` |
+| `GET /v1/member-search?q=` | `searchMembers` | member | Up to 20 other members whose username contains `q` (3–64 characters), prefix matches first, each with the viewer's `relationship`; `no-store` |
+| `GET /v1/me/friend-requests` | `listFriendRequests` | member | Pending requests: `incoming` (they asked) and `outgoing` (the viewer asked) |
+| `PUT /v1/me/friends/{username}` | `befriendMember` | member | Send a request, or accept theirs; returns the resulting `relationship`; idempotent. 400 for the viewer's own username |
+| `DELETE /v1/me/friends/{username}` | `removeFriend` | member | End the friendship, cancel the viewer's request or decline theirs; 204, or 404 `friendship_not_found` |
+
+`relationship` is one of `none`, `friends`, `requested` (the viewer asked) and `incoming` (they asked); treat an unknown value as `none`. Friendships are mutual: one member asks, the other accepts, and either can end it. When both ask each other, they are friends ([decision](../.planning/decisions/2026-09-29-friends-only-visibility-with-mutual-friend-requests.md)).
 
 `POST` operations are not idempotent: a retry after a lost response logs the rounds again. `PUT` and `DELETE` operations are safe to retry; a `DELETE` retried after success answers 404.
 
