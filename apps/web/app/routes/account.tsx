@@ -53,8 +53,8 @@ export default function Account() {
         <div className="prose">
           <h3>Delete your account</h3>
           <p>
-            Deleting your account removes your list, your rounds, your name and your email address, and deletes your
-            sign-in. Courses you added by hand stay in the shared catalog without your name. This cannot be undone.
+            Deleting your account removes your list, your rounds, your friends and friend requests, your name and your
+            email address, and deletes your sign-in. Courses you added by hand stay in the shared catalog without your name. This cannot be undone.
           </p>
           <div className="account-actions">
             <button

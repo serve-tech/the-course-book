@@ -36,7 +36,7 @@ Local development never connects to production data. Automated tests use the loc
 1. Start from current `main` on a descriptive `feat/`, `fix/` or `hotfix/` branch.
 2. Read [agent instructions](AGENTS.md), [architecture](docs/architecture.md) and the relevant existing feature/tests.
 3. Identify the behavior to preserve and the acceptance checks for the requested change.
-4. Keep feature code together. Extract pure logic and test it; put database work in `apps/api/src/services/`, expose it as an API operation (then `pnpm contract:emit`), and call it from the web app through `app/lib/api` in a `clientLoader` or the journal `clientAction`.
+4. Keep feature code together. Extract pure logic and test it; put database work in `apps/api/src/services/`, expose it as an API operation (then `pnpm contract:emit`), and call it from the web app through `app/lib/api` in a `clientLoader` or a route `clientAction` (`/journal` for list and round changes, `/friends` for friend requests).
 5. Run the checks in [testing](docs/testing.md), review the diff and update documentation affected by the change.
 6. Commit logical units with Conventional Commits, push the branch and open a PR against `main`. Include what changed, why, test results and remaining limitations. `main` is protected: a PR merges only when its `verify`, `browser` and `docker` checks pass and the branch is up to date with `main`; direct pushes are rejected, for administrators too.
 
