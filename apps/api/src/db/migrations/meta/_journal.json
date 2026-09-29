@@ -22,6 +22,13 @@
       "when": 1790112919646,
       "tag": "0002_deferred_rank_unique",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1790697260347,
+      "tag": "0003_friendships",
+      "breakpoints": true
     }
   ]
 }
