@@ -33,7 +33,7 @@ Local development never connects to production data. Automated tests use the loc
 
 ## Make a change
 
-1. Start from current `main` (or the rebuild branch while the rebuild is in progress) on a descriptive `feat/`, `fix/` or `hotfix/` branch.
+1. Start from current `main` on a descriptive `feat/`, `fix/` or `hotfix/` branch.
 2. Read [agent instructions](AGENTS.md), [architecture](docs/architecture.md) and the relevant existing feature/tests.
 3. Identify the behavior to preserve and the acceptance checks for the requested change.
 4. Keep feature code together. Extract pure logic and test it; put database work in `apps/api/src/services/`, expose it as an API operation (then `pnpm contract:emit`), and call it from the web app through `app/lib/api` in a `clientLoader` or the journal `clientAction`.
@@ -46,7 +46,7 @@ Avoid "cleanup" of course identities, rank semantics or migration history alongs
 
 `pnpm build` produces the API bundle (`apps/api/dist`, what the Docker image runs) and the static web app (`apps/web/build/client`). `apps/api/Dockerfile` and `render.yaml` describe the production build and infrastructure.
 
-Render deploys both services from the branch named in `render.yaml`, and only after that commit's CI checks pass. During the rebuild that is `feat/render-clerk-rebuild`, which acts as the staging deployment; at cutover it becomes `main`. Until cutover, `main` still publishes the retired static application to GitHub Pages through `pages.yml` and is frozen to hotfixes.
+Render deploys both services from `main`, and only after that commit's CI checks pass, so merging to `main` deploys production. The retired static application stays on GitHub Pages as last deployed until Pages is disabled at cutover; nothing publishes it any more.
 
 **Check the PR's "Verify application" result before an authorized merge.** Failed verification must not be merged.
 

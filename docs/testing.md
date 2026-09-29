@@ -75,6 +75,4 @@ Do not sign into production or create/delete real records as part of an automate
 
 [Verify application](../.github/workflows/ci.yml) runs lint, typecheck, the migration drift gate, the API contract drift gate, migrations against a Postgres service, all tests and the build on working branches and PRs, then a `browser` job with the Playwright suite and a `docker` job that builds and smoke-tests the API image.
 
-[Deploy GitHub Pages](../.github/workflows/pages.yml) still publishes the retired static application from `main` until cutover; it does not run on the rebuild branch.
-
 Report checks actually run, their outcomes and any remaining gaps.

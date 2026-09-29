@@ -30,7 +30,7 @@ services:
     runtime: docker
     plan: free
     region: oregon
-    branch: feat/render-clerk-rebuild # switch to main at cutover
+    branch: main
     dockerContext: .
     dockerfilePath: ./apps/api/Dockerfile
     healthCheckPath: /healthz
@@ -79,7 +79,7 @@ services:
   - type: web
     name: coursebook-golf-web
     runtime: static
-    branch: feat/render-clerk-rebuild # switch to main at cutover
+    branch: main
     autoDeployTrigger: checksPass
     buildCommand: corepack pnpm install --frozen-lockfile --filter @coursebook/web... && corepack pnpm --filter @coursebook/web build
     staticPublishPath: ./apps/web/build/client
