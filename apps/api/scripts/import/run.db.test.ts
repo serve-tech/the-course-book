@@ -1,7 +1,8 @@
-import { count, eq } from "drizzle-orm";
+import { count, eq, sql } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { courses, friendships, rounds, userCourses, users } from "../../src/db/schema";
 import { resetMemberData, testDatabase } from "../../src/test/db";
+import { appliedMigrations, journalMigrations, schemaMismatch } from "./preflight";
 import type { SupabaseExport } from "./rows";
 import { runImport, verifyImport, type ExistingAccount, type ImportAccounts, type NewAccount } from "./run";
 
@@ -136,6 +137,22 @@ describe("member import", () => {
     expect(await db.select().from(friendships)).toHaveLength(1);
   });
 
+  it("accepts a request between imported members on a rerun", async () => {
+    const data = await exportFixture();
+    const { accounts } = fakeAccounts();
+    const first = await runImport({ db, accounts, log }, data, { dryRun: false });
+    const [a = "", b = ""] = [...first.accounts.values()].sort();
+    await db.delete(friendships);
+    await db.insert(friendships).values({ requesterId: b, addresseeId: a, status: "pending" });
+
+    const again = await runImport({ db, accounts, log }, data, { dryRun: false });
+
+    expect(again.mismatches).toEqual([]);
+    expect(await db.select({ requesterId: friendships.requesterId, status: friendships.status }).from(friendships)).toEqual([
+      { requesterId: b, status: "accepted" },
+    ]);
+  });
+
   it("keeps an existing Clerk account and its username", async () => {
     const data = await exportFixture();
     const { accounts, created } = fakeAccounts([{ id: "user_existing", email: "TWO@example.com", username: "golfer", fullName: "Bee Existing" }]);
@@ -184,5 +201,26 @@ describe("member import", () => {
     expect(await verifyImport(db, result.plan, result.accounts)).toEqual([
       `member ${U1}: rounds differ (3 stored, expected 4)`,
     ]);
+  });
+});
+
+describe("schema preflight", () => {
+  it("reads the migrated test database as matching this checkout", async () => {
+    expect(schemaMismatch(journalMigrations(), await appliedMigrations(db))).toBeNull();
+  });
+
+  it("stops before any Clerk or database write when the schema differs", async () => {
+    // created_at 1 sorts before every real migration, and drizzle's migrator
+    // only reads the newest row, so this cannot hide a pending migration.
+    await db.execute(sql`insert into drizzle.__drizzle_migrations (hash, created_at) values ('preflight-test', 1)`);
+    try {
+      const { accounts, created } = fakeAccounts();
+      const result = await runImport({ db, accounts, log }, await exportFixture(), { dryRun: false });
+      expect(result.ok).toBe(false);
+      expect(created).toEqual([]);
+      expect(await total(users)).toBe(0);
+    } finally {
+      await db.execute(sql`delete from drizzle.__drizzle_migrations where hash = 'preflight-test'`);
+    }
   });
 });
