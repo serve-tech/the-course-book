@@ -50,7 +50,7 @@ The rebuild and the split into an API with clients are on `main` ([rebuild decis
 
 ## Deployment and data
 
-`render.yaml` is the Render Blueprint: the API as a Docker web service (`apps/api/Dockerfile`), the web app as a static site (`apps/web/build/client`) and a Postgres 17 database, all in Oregon and on free plans for now (the database must move to a paid plan before 2026-10-28). Non-secret settings (Clerk publishable and JWT public keys, `WEB_ORIGINS`, `PUBLIC_WEB_URL`, `VITE_API_URL`) are values in `render.yaml`; the only secret, `CLERK_SECRET_KEY`, is entered in the Render dashboard; the database URL is wired from the database resource. The API runs its migrations on start. Create or update the infrastructure by syncing the Blueprint from the Render dashboard, never by hand-creating services. Both services deploy from `main` after its CI checks pass.
+`render.yaml` is the Render Blueprint: the API as a Docker web service (`apps/api/Dockerfile`), the web app as a static site (`apps/web/build/client`) and a Postgres 17 database, the API and database in Ohio (the static site is on Render's global CDN), all on free plans for now (the database must move to a paid plan before it expires, 30 days after creation). Non-secret settings (Clerk publishable and JWT public keys, `WEB_ORIGINS`, `PUBLIC_WEB_URL`, `VITE_API_URL`) are values in `render.yaml`; the only secret, `CLERK_SECRET_KEY`, is entered in the Render dashboard; the database URL is wired from the database resource. The API runs its migrations on start. Create or update the infrastructure by syncing the Blueprint from the Render dashboard, never by hand-creating services. Both services deploy from `main` after its CI checks pass.
 
 Local check of the API image:
 
