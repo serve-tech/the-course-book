@@ -1,5 +1,5 @@
-import { and, asc, desc, eq, exists, gt, isNull, ne, or, sql, type AnyColumn, type SQL } from "drizzle-orm";
-import type { Database, Executor } from "../db/client";
+import { and, asc, desc, eq, exists, gt, inArray, isNull, ne, or, sql, type AnyColumn, type SQL } from "drizzle-orm";
+import type { Database, Executor, Transaction } from "../db/client";
 import { courses, friendships, userCourses, users } from "../db/schema";
 import { courseView } from "../domain/course-view";
 import { BefriendChange, befriend, pairKey, relationshipFor } from "../domain/friendship";
@@ -220,11 +220,39 @@ export async function friendRequests(db: Database, viewerId: string): Promise<Fr
 }
 
 /**
+ * Serialize pair changes with each other and with account deletion. Take
+ * the pair lock first, then both journal locks in id order to avoid cycles
+ * between pairs that share a member. Recheck both accounts after waiting:
+ * the initial username lookup and session may predate account deletion.
+ */
+async function withFriendshipLock<T>(
+  db: Database,
+  viewerId: string,
+  targetId: string,
+  work: (tx: Transaction, target: PublicMember) => Promise<T>,
+): Promise<T> {
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${pairKey(viewerId, targetId)}))`);
+    const ids = [...new Set([viewerId, targetId])].sort();
+    for (const id of ids) await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${id}))`);
+    const accounts = await tx
+      .select({ id: users.id, username: users.username, displayName: users.displayName, deletedAt: users.deletedAt })
+      .from(users)
+      .where(inArray(users.id, ids));
+    const viewer = accounts.find((account) => account.id === viewerId);
+    if (!viewer || viewer.deletedAt) throw new AppError(401, ErrorCode.AccountDeleted, "This account was deleted.");
+    const target = accounts.find((account) => account.id === targetId);
+    if (!target || target.deletedAt) throw new AppError(404, ErrorCode.MemberNotFound, "No member with that username.");
+    return work(tx, toPublicMember(target));
+  });
+}
+
+/**
  * Befriend a member: send a request, or accept theirs if they already asked.
  * Idempotent: repeating it changes nothing.
  *
- * Runs in one transaction under an advisory lock on the pair, so crossing
- * requests from both members end as one accepted friendship.
+ * Runs under the pair and account locks, so crossing requests become one
+ * accepted friendship and a deleted account cannot regain relationships.
  *
  * Raises:
  *     AppError: 404 `member_not_found` for an unknown or deleted username;
@@ -234,8 +262,7 @@ export async function befriendMember(db: Database, viewerId: string, username: s
   const target = await findMember(db, username);
   if (!target) throw new AppError(404, ErrorCode.MemberNotFound, "No member with that username.");
   if (target.id === viewerId) throw new AppError(400, ErrorCode.ValidationFailed, "You can't add yourself as a friend.");
-  return db.transaction(async (tx) => {
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${pairKey(viewerId, target.id)}))`);
+  return withFriendshipLock(db, viewerId, target.id, async (tx, member) => {
     const [row] = await tx.select().from(friendships).where(pair(viewerId, target.id));
     const { change, relationship } = befriend(row, viewerId);
     if (change === BefriendChange.Request) {
@@ -243,7 +270,7 @@ export async function befriendMember(db: Database, viewerId: string, username: s
     } else if (change === BefriendChange.Accept && row) {
       await tx.update(friendships).set({ status: "accepted", updatedAt: sql`now()` }).where(eq(friendships.id, row.id));
     }
-    return { member: toPublicMember(target), relationship };
+    return { member, relationship };
   });
 }
 
@@ -258,8 +285,7 @@ export async function befriendMember(db: Database, viewerId: string, username: s
 export async function removeFriend(db: Database, viewerId: string, username: string): Promise<void> {
   const target = await findMember(db, username);
   if (!target) throw new AppError(404, ErrorCode.MemberNotFound, "No member with that username.");
-  await db.transaction(async (tx) => {
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${pairKey(viewerId, target.id)}))`);
+  await withFriendshipLock(db, viewerId, target.id, async (tx) => {
     const removed = await tx.delete(friendships).where(pair(viewerId, target.id)).returning({ id: friendships.id });
     if (!removed.length) throw new AppError(404, ErrorCode.FriendshipNotFound, "You are not friends and have no pending request.");
   });

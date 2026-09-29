@@ -3,6 +3,7 @@ import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { Relationship } from "@coursebook/domain/friends/types";
 import { courses, friendships, users } from "../db/schema";
 import { resetMemberData, testDatabase } from "../test/db";
+import { pairKey } from "../domain/friendship";
 import { deleteAccountData } from "./accounts";
 import { ErrorCode } from "./errors";
 import {
@@ -208,6 +209,51 @@ describe("member search", () => {
 });
 
 describe("account deletion", () => {
+  it.each([
+    ["requester", "user_a", ErrorCode.AccountDeleted, 401],
+    ["addressee", "user_b", ErrorCode.MemberNotFound, 404],
+  ])("rejects a queued request after the %s deletes their account", async (_role, deletedId, code, status) => {
+    const blocker = await pool.connect();
+    let request: Promise<unknown> | undefined;
+    try {
+      await blocker.query("begin");
+      await blocker.query("select pg_advisory_xact_lock(hashtext($1))", [pairKey("user_a", "user_b")]);
+      const { rows: blockers } = await blocker.query<{ pid: number }>("select pg_backend_pid() as pid");
+      const blockerId = blockers[0]?.pid;
+      if (!blockerId) throw new Error("missing blocker pid");
+      // Observe the actual lock wait: the member lookup has finished, but
+      // the friendship transaction cannot proceed until deletion commits.
+      request = befriendMember(db, "user_a", "bravo").then(
+        (value) => value,
+        (error: unknown) => error,
+      );
+      await expect.poll(async () => {
+        const { rows } = await pool.query<{ waiting: boolean }>(
+          "select exists(select 1 from pg_stat_activity where datname = current_database() and $1 = any(pg_blocking_pids(pid))) as waiting",
+          [blockerId],
+        );
+        return rows[0]?.waiting;
+      }).toBe(true);
+      await deleteAccountData(db, deletedId);
+      await blocker.query("commit");
+      expect(await request).toMatchObject({ code, status });
+      expect(await db.select().from(friendships)).toEqual([]);
+    } finally {
+      await blocker.query("rollback");
+      blocker.release();
+      await request;
+    }
+  });
+
+  it.each([
+    ["befriending", befriendMember],
+    ["removal", removeFriend],
+  ])("rejects %s for a deleted requester", async (_action, mutate) => {
+    await deleteAccountData(db, "user_a");
+    await expect(mutate(db, "user_a", "bravo")).rejects.toMatchObject({ status: 401, code: ErrorCode.AccountDeleted });
+    expect(await db.select().from(friendships)).toEqual([]);
+  });
+
   it("removes the member's friendships and requests in both directions", async () => {
     await friends("user_a", "user_b");
     await db.insert(friendships).values({ requesterId: "user_c", addresseeId: "user_a" });
