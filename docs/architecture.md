@@ -4,7 +4,7 @@ coursebook.golf is a JSON API with clients. The API (`apps/api`, Hono on Node) o
 
 ## Status
 
-Built and tested on `feat/render-clerk-rebuild`: the API with its read and write operations and account deletion, the published contract, the static web app on the API, the API Docker image and the Render Blueprint. Staging runs on Render from the branch (URLs in the [README](../README.md)). Still open: import reconciliation and the rehearsal, the cutover ([cutover.md](cutover.md)), and the native apps (their own plan, with the release requirements in [cutover.md](cutover.md#6-after-cutover)).
+On `main` (PR #4, merged 2026-09-29): the API with its read and write operations and account deletion, the published contract, the static web app on the API, the API Docker image, the Render Blueprint and the member importer. The Render services deploy from `main` (URLs in the [README](../README.md)); the members were imported in a first pass on 2026-09-28. Still open: the launch ([cutover.md](cutover.md) steps 4-5) and the native apps (their own plan, with the release requirements in [cutover.md](cutover.md#6-after-cutover)).
 
 ## Deployables
 
