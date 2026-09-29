@@ -100,7 +100,7 @@ describe("friend action serialization", () => {
       transport.mockImplementation(serve);
       return Promise.resolve(new Response(null, { status: 204 }));
     };
-    fireEvent.click(screen.getByRole("button", { name: "Remove friend", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove friend" }));
     expect(person("bravo").getByRole("button", { name: "Accept" })).toBeDisabled();
     expect(person("charlie").getByRole("button", { name: "Cancel" })).toBeDisabled();
     expect(transport.mock.calls.filter(([request]) => request.method !== "GET")).toHaveLength(0);
