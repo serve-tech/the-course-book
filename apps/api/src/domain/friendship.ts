@@ -4,7 +4,7 @@ import { Relationship } from "@coursebook/domain/friends/types";
  * Friendship rules (decision 2026-09-29, friends-only visibility). A pair of
  * members has at most one row: a pending request from one to the other, or
  * an accepted, mutual friendship. These functions decide from that row
- * alone; the service reads and writes it under a per-pair lock.
+ * alone; the service reads and writes it under both members' locks.
  */
 
 /** The parts of a friendship row the rules need. */
@@ -63,9 +63,4 @@ export function befriend(
     case Relationship.Friends:
       return { change: BefriendChange.Nothing, relationship: Relationship.Friends };
   }
-}
-
-/** Lock key for a pair of members, the same whichever of them acts. */
-export function pairKey(a: string, b: string): string {
-  return a < b ? `friendship:${a}|${b}` : `friendship:${b}|${a}`;
 }

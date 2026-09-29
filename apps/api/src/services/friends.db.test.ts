@@ -3,7 +3,6 @@ import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { Relationship } from "@coursebook/domain/friends/types";
 import { courses, friendships, users } from "../db/schema";
 import { resetMemberData, testDatabase } from "../test/db";
-import { pairKey } from "../domain/friendship";
 import { deleteAccountData } from "./accounts";
 import { ErrorCode } from "./errors";
 import {
@@ -42,6 +41,51 @@ const seeded = async (stableId: string) => {
 /** Make two members friends directly, as an accepted row. */
 const friends = (requesterId: string, addresseeId: string) =>
   db.insert(friendships).values({ requesterId, addresseeId, status: "accepted" });
+
+/**
+ * Hold member locks from a separate session, as another transaction would.
+ * `pid` is the holder's backend; `release` rolls back once, however often it is called.
+ */
+async function lockHolder() {
+  const client = await pool.connect();
+  await client.query("begin");
+  const { rows } = await client.query<{ pid: number }>("select pg_backend_pid() as pid");
+  const pid = rows[0]?.pid;
+  if (!pid) throw new Error("missing blocker pid");
+  let released = false;
+  return {
+    pid,
+    hold: (id: string) => client.query("select pg_advisory_xact_lock(hashtext($1))", [id]),
+    release: async () => {
+      if (released) return;
+      released = true;
+      try {
+        await client.query("rollback");
+      } finally {
+        client.release();
+      }
+    },
+  };
+}
+
+/** Backends waiting on a lock: those blocked by `pid`, and those blocked by anyone else. */
+async function lockWaits(pid: number): Promise<{ onBlocker: number; onOthers: number }> {
+  const { rows } = await pool.query<{ on_blocker: string; on_others: string }>(
+    `select count(*) filter (where $1 = any(pg_blocking_pids(pid))) as on_blocker,
+            count(*) filter (where cardinality(pg_blocking_pids(pid)) > 0 and not $1 = any(pg_blocking_pids(pid))) as on_others
+       from pg_stat_activity where datname = current_database()`,
+    [pid],
+  );
+  return { onBlocker: Number(rows[0]?.on_blocker), onOthers: Number(rows[0]?.on_others) };
+}
+
+/** Whether `a`'s member lock comes before `b`'s (locks are taken in key order). */
+async function locksBefore(a: string, b: string): Promise<boolean> {
+  const { rows } = await pool.query<{ before: boolean }>("select hashtext($1) < hashtext($2) as before", [a, b]);
+  return rows[0]?.before ?? false;
+}
+
+const settle = <T>(promise: Promise<T>) => promise.then((value) => value, (error: unknown) => error);
 
 const rowsBetween = (a: string, b: string) =>
   db
@@ -152,9 +196,20 @@ describe("friend requests", () => {
   });
 
   it("ends as one friendship when both members ask at the same time", async () => {
-    const [first, second] = await Promise.all([befriendMember(db, "user_a", "bravo"), befriendMember(db, "user_b", "alpha")]);
-    expect([first.relationship, second.relationship].sort()).toEqual([Relationship.Friends, Relationship.Requested].sort());
-    expect(await rowsBetween("user_a", "user_b")).toMatchObject([{ status: "accepted" }]);
+    // Both requests queue on the pair's first member lock, then run one at a
+    // time: the second sees the first's request and accepts it.
+    const blocker = await lockHolder();
+    try {
+      await blocker.hold((await locksBefore("user_a", "user_b")) ? "user_a" : "user_b");
+      const requests = Promise.all([befriendMember(db, "user_a", "bravo"), befriendMember(db, "user_b", "alpha")]);
+      await expect.poll(async () => (await lockWaits(blocker.pid)).onBlocker).toBe(2);
+      await blocker.release();
+      const [first, second] = await requests;
+      expect([first.relationship, second.relationship].sort()).toEqual([Relationship.Friends, Relationship.Requested].sort());
+      expect(await rowsBetween("user_a", "user_b")).toMatchObject([{ status: "accepted" }]);
+    } finally {
+      await blocker.release();
+    }
   });
 
   it.each([
@@ -174,6 +229,14 @@ describe("friend requests", () => {
     await removeFriend(db, "user_a", "bravo");
     expect(await rowsBetween("user_a", "user_b")).toEqual([]);
     await expect(removeFriend(db, "user_a", "bravo")).rejects.toMatchObject({ status: 404, code: ErrorCode.FriendshipNotFound });
+  });
+
+  it.each([
+    ["an unknown username", "nobody", { status: 404, code: ErrorCode.MemberNotFound }],
+    ["a deleted member", "gone", { status: 404, code: ErrorCode.MemberNotFound }],
+    ["the viewer's own username", "alpha", { status: 404, code: ErrorCode.FriendshipNotFound }],
+  ])("refuses to remove %s", async (_label, username, expected) => {
+    await expect(removeFriend(db, "user_a", username)).rejects.toMatchObject(expected);
   });
 });
 
@@ -202,46 +265,65 @@ describe("member search", () => {
   });
 
   it("matches % and _ literally", async () => {
-    await db.insert(users).values({ id: "user_f", username: "under_score", displayName: "Under" });
+    await db.insert(users).values([
+      { id: "user_f", username: "under_score", displayName: "Under" },
+      { id: "user_g", username: "rxsample", displayName: "Sample" },
+      { id: "user_h", username: "rsvp", displayName: "Rsvp" },
+    ]);
     expect((await searchMembers(db, "user_a", "r_s")).map((hit) => hit.member.username)).toEqual(["under_score"]);
+    expect(await searchMembers(db, "user_a", "___")).toEqual([]);
     expect(await searchMembers(db, "user_a", "%%%")).toEqual([]);
+    expect(await searchMembers(db, "user_a", "r\\s")).toEqual([]);
+  });
+
+  it("returns at most 20, usernames starting with the text first", async () => {
+    const names = [
+      ...Array.from({ length: 12 }, (_, i) => `arav${String(i).padStart(2, "0")}`),
+      ...Array.from({ length: 12 }, (_, i) => `ravi${String(i).padStart(2, "0")}`),
+    ];
+    await db.insert(users).values(names.map((username) => ({ id: `user_${username}`, username, displayName: username })));
+    const hits = (await searchMembers(db, "user_a", "rav")).map((hit) => hit.member.username);
+    expect(hits).toHaveLength(20);
+    expect(hits.slice(0, 12)).toEqual(names.slice(12));
+    expect(hits.slice(12)).toEqual(names.slice(0, 8));
   });
 });
 
 describe("account deletion", () => {
+  // Deletion holds the deleted member's lock; befriend holds both members'.
+  // The blocker holds the other member's lock, so befriend queues on it and
+  // which of befriend and deletion runs first depends on the lock key order.
   it.each([
-    ["requester", "user_a", ErrorCode.AccountDeleted, 401],
-    ["addressee", "user_b", ErrorCode.MemberNotFound, 404],
-  ])("rejects a queued request after the %s deletes their account", async (_role, deletedId, code, status) => {
-    const blocker = await pool.connect();
+    ["requester", "user_a", "user_b", ErrorCode.AccountDeleted, 401],
+    ["addressee", "user_b", "user_a", ErrorCode.MemberNotFound, 404],
+  ])("leaves no friendship when the %s deletes their account mid-request", async (_role, deletedId, otherId, code, status) => {
+    const blocker = await lockHolder();
     let request: Promise<unknown> | undefined;
+    let deletion: Promise<unknown> | undefined;
     try {
-      await blocker.query("begin");
-      await blocker.query("select pg_advisory_xact_lock(hashtext($1))", [pairKey("user_a", "user_b")]);
-      const { rows: blockers } = await blocker.query<{ pid: number }>("select pg_backend_pid() as pid");
-      const blockerId = blockers[0]?.pid;
-      if (!blockerId) throw new Error("missing blocker pid");
-      // Observe the actual lock wait: the member lookup has finished, but
-      // the friendship transaction cannot proceed until deletion commits.
-      request = befriendMember(db, "user_a", "bravo").then(
-        (value) => value,
-        (error: unknown) => error,
-      );
-      await expect.poll(async () => {
-        const { rows } = await pool.query<{ waiting: boolean }>(
-          "select exists(select 1 from pg_stat_activity where datname = current_database() and $1 = any(pg_blocking_pids(pid))) as waiting",
-          [blockerId],
-        );
-        return rows[0]?.waiting;
-      }).toBe(true);
-      await deleteAccountData(db, deletedId);
-      await blocker.query("commit");
-      expect(await request).toMatchObject({ code, status });
+      await blocker.hold(otherId);
+      request = settle(befriendMember(db, "user_a", "bravo"));
+      await expect.poll(async () => (await lockWaits(blocker.pid)).onBlocker).toBe(1);
+      deletion = settle(deleteAccountData(db, deletedId));
+      if (await locksBefore(deletedId, otherId)) {
+        // Befriend already holds the deleted member's lock: deletion waits
+        // for it, then removes the request befriend made.
+        await expect.poll(async () => (await lockWaits(blocker.pid)).onOthers).toBe(1);
+        await blocker.release();
+        expect(await request).toMatchObject({ relationship: Relationship.Requested });
+      } else {
+        // Befriend has no lock yet: deletion commits first, and befriend
+        // rejects the deleted account once it gets the locks.
+        expect(await deletion).toBeUndefined();
+        await blocker.release();
+        expect(await request).toMatchObject({ code, status });
+      }
+      expect(await deletion).toBeUndefined();
       expect(await db.select().from(friendships)).toEqual([]);
     } finally {
-      await blocker.query("rollback");
-      blocker.release();
+      await blocker.release();
       await request;
+      await deletion;
     }
   });
 

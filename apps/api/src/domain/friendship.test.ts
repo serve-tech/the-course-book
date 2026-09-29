@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Relationship } from "@coursebook/domain/friends/types";
-import { BefriendChange, befriend, pairKey, relationshipFor, type FriendshipState } from "./friendship";
+import { BefriendChange, befriend, relationshipFor, type FriendshipState } from "./friendship";
 
 const row = (requesterId: string, addresseeId: string, status: FriendshipState["status"]): FriendshipState => ({
   requesterId,
@@ -18,10 +18,5 @@ describe("friendship rules", () => {
   ])("%s", (_label, state, relationship, change, after) => {
     expect(relationshipFor(state, "me")).toBe(relationship);
     expect(befriend(state, "me")).toEqual({ change, relationship: after });
-  });
-
-  it("keys a pair the same way whichever member acts", () => {
-    expect(pairKey("user_a", "user_b")).toBe(pairKey("user_b", "user_a"));
-    expect(pairKey("user_a", "user_b")).not.toBe(pairKey("user_a", "user_c"));
   });
 });

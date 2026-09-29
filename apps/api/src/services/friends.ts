@@ -1,8 +1,8 @@
-import { and, asc, desc, eq, exists, gt, inArray, isNull, ne, or, sql, type AnyColumn, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, exists, gt, isNull, ne, or, sql, type AnyColumn, type SQL } from "drizzle-orm";
 import type { Database, Executor, Transaction } from "../db/client";
 import { courses, friendships, userCourses, users } from "../db/schema";
 import { courseView } from "../domain/course-view";
-import { BefriendChange, befriend, pairKey, relationshipFor } from "../domain/friendship";
+import { BefriendChange, befriend, relationshipFor } from "../domain/friendship";
 import { equivalentCourses } from "../domain/identity";
 import type {
   FriendRequests,
@@ -14,6 +14,7 @@ import { toPublicMember } from "./authz";
 import { rankedViews } from "./catalog";
 import { AppError, ErrorCode } from "./errors";
 import { personalList } from "./journal";
+import { lockMembers } from "./member-lock";
 
 /**
  * Friends and read-only views of their lists (decision 2026-09-29,
@@ -220,10 +221,17 @@ export async function friendRequests(db: Database, viewerId: string): Promise<Fr
 }
 
 /**
- * Serialize pair changes with each other and with account deletion. Take
- * the pair lock first, then both journal locks in id order to avoid cycles
- * between pairs that share a member. Recheck both accounts after waiting:
- * the initial username lookup and session may predate account deletion.
+ * Run `work` in one transaction holding both members' locks (member-lock.ts).
+ *
+ * Every change to a pair holds both locks, so changes to the same pair
+ * serialize (crossing requests become one friendship) and each one also
+ * serializes with either member's account deletion. Both accounts are
+ * rechecked after the locks are granted, because the username lookup and
+ * the session may predate a deletion.
+ *
+ * Raises:
+ *     AppError: 401 `account_deleted` when the viewer's account was deleted;
+ *         404 `member_not_found` when the target's was.
  */
 async function withFriendshipLock<T>(
   db: Database,
@@ -232,13 +240,7 @@ async function withFriendshipLock<T>(
   work: (tx: Transaction, target: PublicMember) => Promise<T>,
 ): Promise<T> {
   return db.transaction(async (tx) => {
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${pairKey(viewerId, targetId)}))`);
-    const ids = [...new Set([viewerId, targetId])].sort();
-    for (const id of ids) await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${id}))`);
-    const accounts = await tx
-      .select({ id: users.id, username: users.username, displayName: users.displayName, deletedAt: users.deletedAt })
-      .from(users)
-      .where(inArray(users.id, ids));
+    const accounts = await lockMembers(tx, [viewerId, targetId]);
     const viewer = accounts.find((account) => account.id === viewerId);
     if (!viewer || viewer.deletedAt) throw new AppError(401, ErrorCode.AccountDeleted, "This account was deleted.");
     const target = accounts.find((account) => account.id === targetId);
@@ -251,12 +253,13 @@ async function withFriendshipLock<T>(
  * Befriend a member: send a request, or accept theirs if they already asked.
  * Idempotent: repeating it changes nothing.
  *
- * Runs under the pair and account locks, so crossing requests become one
- * accepted friendship and a deleted account cannot regain relationships.
+ * Runs under both members' locks, so crossing requests become one accepted
+ * friendship and a deleted account cannot regain relationships.
  *
  * Raises:
  *     AppError: 404 `member_not_found` for an unknown or deleted username;
- *         400 `validation_failed` for the viewer's own username.
+ *         400 `validation_failed` for the viewer's own username; 401
+ *         `account_deleted` when the viewer's account was deleted.
  */
 export async function befriendMember(db: Database, viewerId: string, username: string): Promise<MemberRelationship> {
   const target = await findMember(db, username);
@@ -276,11 +279,14 @@ export async function befriendMember(db: Database, viewerId: string, username: s
 
 /**
  * End a friendship or pending request with a member, whichever direction:
- * unfriend, cancel your request, or decline theirs.
+ * unfriend, cancel your request, or decline theirs. Runs under both
+ * members' locks.
  *
  * Raises:
  *     AppError: 404 `member_not_found` for an unknown or deleted username;
- *         404 `friendship_not_found` when there is nothing between you.
+ *         404 `friendship_not_found` when there is nothing between you
+ *         (including your own username); 401 `account_deleted` when the
+ *         viewer's account was deleted.
  */
 export async function removeFriend(db: Database, viewerId: string, username: string): Promise<void> {
   const target = await findMember(db, username);
@@ -291,7 +297,12 @@ export async function removeFriend(db: Database, viewerId: string, username: str
   });
 }
 
-/** Delete every friendship and request of a member (account deletion). */
+/**
+ * Delete every friendship and request of a member (account deletion).
+ *
+ * Call it inside the member's lock (`withJournalLock`): friendship changes
+ * take the same lock, so none can add a row for the member afterwards.
+ */
 export async function removeAllFriendships(tx: Executor, userId: string): Promise<void> {
   await tx.delete(friendships).where(or(eq(friendships.requesterId, userId), eq(friendships.addresseeId, userId)));
 }
