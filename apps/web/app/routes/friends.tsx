@@ -13,6 +13,7 @@ import {
 import { FriendsPage } from "../features/friends/FriendsPage";
 import { api, ApiError, expectOk, unwrap, type ApiSchemas } from "../lib/api";
 import { fromMemberList } from "../lib/api/mappers";
+import { apiFailureMessage } from "../shared/lib/errors";
 import { RouteError } from "../shared/ui/RouteError";
 import { useShell } from "../shared/ui/shell";
 
@@ -72,10 +73,8 @@ const friendForm = z.discriminatedUnion("intent", [
  * reported, never rethrown, so a failure never replaces the page.
  */
 function friendFailure(error: unknown): FriendReply {
-  if (error instanceof ApiError) return { error: error.message };
-  if (error instanceof DOMException && error.name === "TimeoutError")
-    return { error: "The server took too long to answer. Please try again." };
-  if (error instanceof TypeError) return { error: "Could not reach the server. Check your connection and try again." };
+  const message = apiFailureMessage(error);
+  if (message !== null) return { error: message };
   console.error("Friend action failed", error);
   return { error: "Something went wrong. Please try again." };
 }

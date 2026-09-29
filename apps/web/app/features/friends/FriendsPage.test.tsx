@@ -26,6 +26,7 @@ const routers: ReturnType<typeof createMemoryRouter>[] = [];
 let requests: FriendRequests;
 let members: PublicMember[];
 let hits: MemberRelationship[];
+let aliceIsFriend: boolean;
 let write: (request: Request) => Promise<Response>;
 
 /** Controlled HTTP response; the component, action, fetcher and loader stay real. */
@@ -63,6 +64,7 @@ beforeEach(() => {
   requests = { incoming: [alice, bravo], outgoing: [charlie] };
   members = [];
   hits = [];
+  aliceIsFriend = true;
   notify.mockReset();
   write = () => Promise.reject(new Error("unexpected mutation"));
   transport.mockReset();
@@ -72,7 +74,10 @@ beforeEach(() => {
     if (path === "/v1/members") return Promise.resolve(Response.json({ members, nextCursor: null }));
     if (path === "/v1/me/friend-requests") return Promise.resolve(Response.json(requests));
     if (path === "/v1/member-search") return Promise.resolve(Response.json({ results: hits }));
-    if (path === "/v1/members/alice") return Promise.resolve(Response.json({ member: alice, courses: [] }));
+    if (path === "/v1/members/alice")
+      return Promise.resolve(aliceIsFriend
+        ? Response.json({ member: alice, courses: [] })
+        : Response.json({ error: { code: "member_not_found", message: "No member with that username.", requestId: null, fields: null } }, { status: 404 }));
     throw new Error("unexpected request: " + path);
   });
 });
@@ -96,11 +101,16 @@ describe("friend action serialization", () => {
       ? navigation.promise
       : serve(request));
     write = () => {
+      // As the API does: once removed, alice's list is 404 for this viewer.
       members = [];
+      aliceIsFriend = false;
       transport.mockImplementation(serve);
       return Promise.resolve(new Response(null, { status: 204 }));
     };
+    const listLoads = () => transport.mock.calls.filter(([request]) => new URL(request.url).pathname === "/v1/members").length;
+    const loadsBefore = listLoads();
     fireEvent.click(screen.getByRole("button", { name: "Remove friend" }));
+    await waitFor(() => { expect(listLoads()).toBeGreaterThan(loadsBefore); });
     expect(person("bravo").getByRole("button", { name: "Accept" })).toBeDisabled();
     expect(person("charlie").getByRole("button", { name: "Cancel" })).toBeDisabled();
     expect(transport.mock.calls.filter(([request]) => request.method !== "GET")).toHaveLength(0);
@@ -108,6 +118,10 @@ describe("friend action serialization", () => {
     navigation.resolve(Response.json({ members: [alice], nextCursor: null }));
     await waitFor(() => { expect(notify).toHaveBeenCalledWith("alice is no longer your friend."); });
     expect(transport.mock.calls.filter(([request]) => request.method === "DELETE")).toHaveLength(1);
+    const [router] = routers;
+    expect(router?.state.location.pathname).toBe("/friends");
+    expect(router?.state.historyAction).toBe("REPLACE");
+    expect(router?.state.errors).toBeNull();
     expect(person("bravo").getByRole("button", { name: "Accept" })).toBeEnabled();
     expect(screen.queryByRole("option", { name: "alice" })).not.toBeInTheDocument();
   });
@@ -173,5 +187,85 @@ describe("search relationship refresh", () => {
     });
     expect(await screen.findByRole("button", { name: "Add friend" })).toBeEnabled();
     expect(transport.mock.calls.filter(([request]) => request.method === "PUT")).toHaveLength(0);
+  });
+});
+
+describe("member search", () => {
+  const searches = () =>
+    transport.mock.calls.map(([request]) => request).filter((request) => new URL(request.url).pathname === "/v1/member-search");
+
+  it("asks nothing below three characters", async () => {
+    await openFriends();
+    fireEvent.change(screen.getByLabelText("Add a friend"), { target: { value: "al" } });
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect(searches()).toHaveLength(0);
+    expect(document.querySelector("#friendSearchResults")).toBeNull();
+  });
+
+  it("shows only the latest query's answer when an older one arrives late", async () => {
+    const early = deferredResponse();
+    const serve = transport.getMockImplementation();
+    if (!serve) throw new Error("missing HTTP transport");
+    transport.mockImplementation((request) => new URL(request.url).searchParams.get("q") === "alp" ? early.promise : serve(request));
+    hits = [{ member: alice, relationship: Relationship.None }];
+    await openFriends();
+
+    fireEvent.change(screen.getByLabelText("Add a friend"), { target: { value: "alp" } });
+    await waitFor(() => { expect(searches()).toHaveLength(1); });
+    fireEvent.change(screen.getByLabelText("Add a friend"), { target: { value: "alice" } });
+    await screen.findByText("alice", { selector: "#friendSearchResults .course" });
+    expect(searches()[0]?.signal.aborted).toBe(true);
+
+    await act(async () => {
+      early.resolve(Response.json({ results: [{ member: bravo, relationship: Relationship.None }] }));
+      await early.promise;
+    });
+    expect(screen.queryByText("bravo", { selector: "#friendSearchResults .course" })).not.toBeInTheDocument();
+  });
+
+  it("explains a failed search in words, not the browser's", async () => {
+    const serve = transport.getMockImplementation();
+    if (!serve) throw new Error("missing HTTP transport");
+    transport.mockImplementation((request) =>
+      new URL(request.url).pathname === "/v1/member-search" ? Promise.reject(new TypeError("Failed to fetch")) : serve(request),
+    );
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    await openFriends();
+    fireEvent.change(screen.getByLabelText("Add a friend"), { target: { value: "alice" } });
+    expect(await screen.findByText("Could not reach the server. Check your connection and try again.")).toBeInTheDocument();
+    warn.mockRestore();
+  });
+});
+
+describe("friend action failures", () => {
+  it("reports a network failure and keeps the page usable", async () => {
+    write = () => Promise.reject(new TypeError("Failed to fetch"));
+    await openFriends();
+    fireEvent.click(person("alice").getByRole("button", { name: "Accept" }));
+    await waitFor(() => { expect(notify).toHaveBeenCalledWith("Could not reach the server. Check your connection and try again."); });
+    expect(person("alice").getByRole("button", { name: "Accept" })).toBeEnabled();
+  });
+
+  it("logs an unexpected error and reports it without replacing the page", async () => {
+    write = () => Promise.reject(new RangeError("boom"));
+    const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    await openFriends();
+    fireEvent.click(person("alice").getByRole("button", { name: "Accept" }));
+    await waitFor(() => { expect(notify).toHaveBeenCalledWith("Something went wrong. Please try again."); });
+    expect(logged).toHaveBeenCalled();
+    expect(screen.getByLabelText("Add a friend")).toBeInTheDocument();
+    logged.mockRestore();
+  });
+
+  it("cancels the viewer's own request", async () => {
+    write = (request) => {
+      expect([request.method, new URL(request.url).pathname]).toEqual(["DELETE", "/v1/me/friends/charlie"]);
+      requests = { ...requests, outgoing: [] };
+      return Promise.resolve(new Response(null, { status: 204 }));
+    };
+    await openFriends();
+    fireEvent.click(person("charlie").getByRole("button", { name: "Cancel" }));
+    await waitFor(() => { expect(notify).toHaveBeenCalledWith("Request to charlie canceled."); });
+    expect(screen.queryByText("charlie", { selector: ".course" })).not.toBeInTheDocument();
   });
 });

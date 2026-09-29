@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import type { FriendRequests, MemberList, MemberRelationship, PublicMember } from "@coursebook/domain/friends/types";
 import { api, unwrap } from "../../lib/api";
-import { errorMessage } from "../../shared/lib/errors";
+import { apiFailureMessage } from "../../shared/lib/errors";
 import { useActionFetcher } from "../../shared/lib/use-action-fetcher";
 import type { FriendReply } from "../../routes/friends";
 import { replyMessage, useJournalFetcher } from "../journal/use-journal-fetcher";
@@ -53,7 +53,7 @@ function useMemberSearch(query: string, version: number): MemberSearch {
           (error: unknown) => {
             if (controller.signal.aborted) return;
             console.warn("Member search failed", error);
-            setAnswer({ query: text, version, results: [], error: errorMessage(error, "Search is temporarily unavailable.") });
+            setAnswer({ query: text, version, results: [], error: apiFailureMessage(error) ?? "Search is temporarily unavailable. Please try again." });
           },
         );
     }, SEARCH_DEBOUNCE_MS);
@@ -118,21 +118,18 @@ export function FriendsPage({
     friend.submit({ intent: FriendIntent.Unfriend, username, reason });
   };
 
+  // Leave their page before sending the removal: the action revalidates the
+  // current route, and /friends/<them> would then 404 into the error boundary.
+  // `leavingFriend` keeps every friend button disabled meanwhile, because a
+  // second submission on the shared fetcher would abort this one. Replace the
+  // history entry so Back does not return to the removed friend's page.
   const removeSelectedFriend = async (username: string) => {
     if (friendBusy) return;
     setLeavingFriend(true);
     setConfirmingRemove(false);
-    try {
-      // Reserve the shared fetcher while leaving their page: revalidating
-      // /friends/<them> after removal would hit the route's 404 boundary.
-      await navigate("/friends");
-      friend.submit({ intent: FriendIntent.Unfriend, username, reason: UnfriendReason.Remove });
-    } catch (error) {
-      console.error("Could not leave the friend's list", error);
-      notify(errorMessage(error, "Could not remove this friend. Please try again."));
-    } finally {
-      setLeavingFriend(false);
-    }
+    await navigate("/friends", { replace: true });
+    friend.submit({ intent: FriendIntent.Unfriend, username, reason: UnfriendReason.Remove });
+    setLeavingFriend(false);
   };
 
   return (

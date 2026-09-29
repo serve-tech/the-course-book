@@ -4,7 +4,8 @@ import { z } from "zod";
 import type { Route } from "./+types/journal";
 import { replyMessages } from "../features/journal/reply-message";
 import type { JournalReply } from "../features/journal/use-journal-fetcher";
-import { api, ApiError, unwrap } from "../lib/api";
+import { api, unwrap } from "../lib/api";
+import { apiFailureMessage } from "../shared/lib/errors";
 import { fromRound, toCourseDetailsRequest } from "../lib/api/mappers";
 
 /**
@@ -67,13 +68,11 @@ function localDate(): string {
 
 const failure = (error: string): JournalReply => ({ error });
 
-/** Turn a failed call into a reply the dialogs can show. */
+/** Turn a failed call into a reply the dialogs can show; anything else is a bug and propagates. */
 function failureFrom(error: unknown): JournalReply {
-  if (error instanceof ApiError) return failure(error.message);
-  if (error instanceof DOMException && error.name === "TimeoutError")
-    return failure("The server took too long to answer. Please try again.");
-  if (error instanceof TypeError) return failure("Could not reach the server. Check your connection and try again.");
-  throw error;
+  const message = apiFailureMessage(error);
+  if (message === null) throw error;
+  return failure(message);
 }
 
 async function perform(form: JournalIntent): Promise<JournalReply> {
