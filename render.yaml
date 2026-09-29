@@ -7,19 +7,24 @@
 # Service names set the onrender.com hostnames. coursebook-api.onrender.com is
 # taken by another account, hence the coursebook-golf- prefix.
 #
-# Staging runs on free plans (.planning/research/2026-09-25-free-tier-hosting.md):
-# the API sleeps after 15 idle minutes and takes about a minute to wake, and
-# free Postgres expires 30 days after creation. At cutover (docs/cutover.md):
-# coursebook-db moves to basic-256mb with diskSizeGB 1 before real data is
-# imported, and coursebook-golf-api moves to starter before the mobile apps ship.
-# Omitting `plan` selects a paid plan, so every resource states one.
+# Production runs on free plans for now (.planning/research/2026-09-25-free-tier-hosting.md):
+# the API sleeps after 15 idle minutes and takes seconds to about a minute to
+# wake, and free Postgres has no backups and expires 30 days after creation, so
+# coursebook-db must move to basic-256mb with diskSizeGB 1 before it expires
+# (docs/cutover.md). coursebook-golf-api moves to starter before the mobile apps
+# ship. Omitting `plan` selects a paid plan, so every resource states one.
 #
-# Both services deploy only after the branch's CI checks pass
-# (autoDeployTrigger: checksPass), so a red commit never reaches Render.
+# The API and database run in Ohio (us-east-2), closest to most members; the
+# static site is served from Render's global CDN and has no region. Render
+# cannot change a region in place: moving means recreating the resource.
+#
+# Commit-triggered deploys wait for the commit's CI checks (autoDeployTrigger:
+# checksPass). Blueprint syncs deploy without waiting, so branch protection on
+# main (required checks) is what keeps failing commits out.
 databases:
   - name: coursebook-db
     plan: free
-    region: oregon
+    region: ohio
     postgresMajorVersion: "17"
 
 services:
@@ -29,7 +34,7 @@ services:
     name: coursebook-golf-api
     runtime: docker
     plan: free
-    region: oregon
+    region: ohio
     branch: main
     dockerContext: .
     dockerfilePath: ./apps/api/Dockerfile
