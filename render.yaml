@@ -75,9 +75,9 @@ services:
           -----END PUBLIC KEY-----
       # Exact origins of the web app, comma-separated, no trailing slash.
       - key: WEB_ORIGINS
-        value: https://coursebook-golf-web.onrender.com
+        value: https://coursebook.golf,https://www.coursebook.golf,https://coursebook-golf-web.onrender.com
       - key: PUBLIC_WEB_URL
-        value: https://coursebook-golf-web.onrender.com
+        value: https://coursebook.golf
 
   # The web app: a static single-page app on Render's CDN. Free, and it does
   # not sleep; its data comes from coursebook-golf-api.
