@@ -32,7 +32,7 @@ interface MemberSearch {
  * again for the same query after a friend action changed a relationship.
  */
 function useMemberSearch(query: string, version: number): MemberSearch {
-  const [answer, setAnswer] = useState<{ query: string; results: MemberRelationship[]; error: string | null } | null>(
+  const [answer, setAnswer] = useState<{ query: string; version: number; results: MemberRelationship[]; error: string | null } | null>(
     null,
   );
   const text = query.trim();
@@ -48,12 +48,12 @@ function useMemberSearch(query: string, version: number): MemberSearch {
         .then(
           (results) => {
             if (controller.signal.aborted) return;
-            setAnswer({ query: text, results, error: null });
+            setAnswer({ query: text, version, results, error: null });
           },
           (error: unknown) => {
             if (controller.signal.aborted) return;
             console.warn("Member search failed", error);
-            setAnswer({ query: text, results: [], error: errorMessage(error, "Search is temporarily unavailable.") });
+            setAnswer({ query: text, version, results: [], error: errorMessage(error, "Search is temporarily unavailable.") });
           },
         );
     }, SEARCH_DEBOUNCE_MS);
@@ -62,7 +62,8 @@ function useMemberSearch(query: string, version: number): MemberSearch {
       controller.abort();
     };
   }, [text, version]);
-  if (text.length < SEARCH_MIN_LENGTH || answer?.query !== text) return { results: [], error: null, answered: false };
+  if (text.length < SEARCH_MIN_LENGTH || answer?.query !== text || answer.version !== version)
+    return { results: [], error: null, answered: false };
   return { results: answer.results, error: answer.error, answered: true };
 }
 
@@ -90,6 +91,7 @@ export function FriendsPage({
   const [query, setQuery] = useState("");
   const [searchVersion, setSearchVersion] = useState(0);
   const [confirmingRemove, setConfirmingRemove] = useState(false);
+  const [leavingFriend, setLeavingFriend] = useState(false);
   const search = useMemberSearch(query, searchVersion);
   const journal = useJournalFetcher((reply) => {
     notify(replyMessage(reply));
@@ -99,7 +101,7 @@ export function FriendsPage({
     setSearchVersion((version) => version + 1);
   });
   const adding = journal.busy ? journal.fetcher.formData?.get("courseId") : null;
-  const pendingFor = friend.busy ? friend.fetcher.formData?.get("username") : null;
+  const friendBusy = friend.busy || leavingFriend;
   const rows = selected?.rows ?? [];
   const visible = rows.filter(
     (row) =>
@@ -108,10 +110,29 @@ export function FriendsPage({
   );
 
   const befriend = (username: string) => {
+    if (friendBusy) return;
     friend.submit({ intent: FriendIntent.Befriend, username });
   };
   const unfriend = (username: string, reason: UnfriendReason) => {
+    if (friendBusy) return;
     friend.submit({ intent: FriendIntent.Unfriend, username, reason });
+  };
+
+  const removeSelectedFriend = async (username: string) => {
+    if (friendBusy) return;
+    setLeavingFriend(true);
+    setConfirmingRemove(false);
+    try {
+      // Reserve the shared fetcher while leaving their page: revalidating
+      // /friends/<them> after removal would hit the route's 404 boundary.
+      await navigate("/friends");
+      friend.submit({ intent: FriendIntent.Unfriend, username, reason: UnfriendReason.Remove });
+    } catch (error) {
+      console.error("Could not leave the friend's list", error);
+      notify(errorMessage(error, "Could not remove this friend. Please try again."));
+    } finally {
+      setLeavingFriend(false);
+    }
   };
 
   return (
@@ -152,7 +173,7 @@ export function FriendsPage({
                       </div>
                       <button
                         className="friend-list-action"
-                        disabled={!intent || pendingFor === hit.member.username}
+                        disabled={!intent || friendBusy}
                         onClick={() => {
                           if (intent) befriend(hit.member.username);
                         }}
@@ -183,7 +204,7 @@ export function FriendsPage({
                 <div className="friend-person-actions">
                   <button
                     className="friend-list-action"
-                    disabled={pendingFor === member.username}
+                    disabled={friendBusy}
                     onClick={() => {
                       befriend(member.username);
                     }}
@@ -192,7 +213,7 @@ export function FriendsPage({
                   </button>
                   <button
                     className="secondary"
-                    disabled={pendingFor === member.username}
+                    disabled={friendBusy}
                     onClick={() => {
                       unfriend(member.username, UnfriendReason.Decline);
                     }}
@@ -210,7 +231,7 @@ export function FriendsPage({
                 </div>
                 <button
                   className="secondary"
-                  disabled={pendingFor === member.username}
+                  disabled={friendBusy}
                   onClick={() => {
                     unfriend(member.username, UnfriendReason.Cancel);
                   }}
@@ -280,15 +301,9 @@ export function FriendsPage({
               <button
                 className="primary"
                 id="confirmRemoveFriend"
-                disabled={friend.busy}
+                disabled={friendBusy}
                 onClick={() => {
-                  const username = selected.member.username;
-                  setConfirmingRemove(false);
-                  // Leave their page first: revalidating /friends/<them> after
-                  // the removal would 404 into the route's error boundary.
-                  void Promise.resolve(navigate("/friends")).then(() => {
-                    unfriend(username, UnfriendReason.Remove);
-                  });
+                  void removeSelectedFriend(selected.member.username);
                 }}
               >
                 Remove friend
@@ -298,6 +313,7 @@ export function FriendsPage({
             <button
               className="secondary"
               id="removeFriend"
+              disabled={friendBusy}
               onClick={() => {
                 setConfirmingRemove(true);
               }}
