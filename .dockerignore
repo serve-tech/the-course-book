@@ -1,0 +1,15 @@
+# Build context is the repository root (apps/api/Dockerfile).
+**/node_modules
+**/dist
+**/build
+**/.react-router
+**/test-results
+.git
+.github
+.idea
+.planning
+.import
+.env
+.env.*
+docs
+contract

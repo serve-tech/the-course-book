@@ -1,0 +1,121 @@
+# Render Blueprint for coursebook.golf. This file is the source of truth for
+# Render infrastructure and every non-secret setting. The only secret,
+# CLERK_SECRET_KEY, is entered in the dashboard (sync: false); Render prompts for
+# it once, when the Blueprint is created, and ignores it on later syncs.
+# Schema: https://render.com/schema/render.yaml.json
+#
+# Service names set the onrender.com hostnames. coursebook-api.onrender.com is
+# taken by another account, hence the coursebook-golf- prefix.
+#
+# Staging runs on free plans (.planning/research/2026-09-25-free-tier-hosting.md):
+# the API sleeps after 15 idle minutes and takes about a minute to wake, and
+# free Postgres expires 30 days after creation. At cutover (docs/cutover.md):
+# coursebook-db moves to basic-256mb with diskSizeGB 1 before real data is
+# imported, and coursebook-golf-api moves to starter before the mobile apps ship.
+# Omitting `plan` selects a paid plan, so every resource states one.
+#
+# Both services deploy only after the branch's CI checks pass
+# (autoDeployTrigger: checksPass), so a red commit never reaches Render.
+databases:
+  - name: coursebook-db
+    plan: free
+    region: oregon
+    postgresMajorVersion: "17"
+
+services:
+  # JSON API for the web, iOS and Android clients. Migrations run when the
+  # container starts (free plans have no pre-deploy step).
+  - type: web
+    name: coursebook-golf-api
+    runtime: docker
+    plan: free
+    region: oregon
+    branch: feat/render-clerk-rebuild # switch to main at cutover
+    dockerContext: .
+    dockerfilePath: ./apps/api/Dockerfile
+    healthCheckPath: /healthz
+    autoDeployTrigger: checksPass
+    buildFilter:
+      paths:
+        - apps/api/**
+        - packages/domain/**
+        - package.json
+        - pnpm-lock.yaml
+        - pnpm-workspace.yaml
+        - tsconfig.base.json
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: coursebook-db
+          property: connectionString
+      # Clerk development instance until cutover (docs/cutover.md step 5).
+      # Publishable keys are public: they ship in every browser bundle.
+      - key: CLERK_PUBLISHABLE_KEY
+        value: pk_test_dGFsZW50ZWQtc3dpbmUtMTI3Ni5jbGVyay5hY2NvdW50cy5kZXYk
+      - key: CLERK_SECRET_KEY
+        sync: false
+      # The instance's JWT public key (PEM, Clerk API keys, "Show JWT public
+      # key"; equal to the key served by GET https://api.clerk.com/v1/jwks) so
+      # tokens verify without a network call after a cold start.
+      - key: CLERK_JWT_KEY
+        value: |-
+          -----BEGIN PUBLIC KEY-----
+          MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEApNM1XwUiXtIuU5/lT8Eu
+          OWvCCd5Ryz8toSJ9onfon4Nq3/OrSBhwg3s6Ye8xpcYDRSW4sRdYkR5pp+trj5S0
+          /uhbWzKrqchLddgttsEMrNFSnP84zMa1cHslPQ9lMV4fm4ARUDri4Likmck43WQ3
+          ptYAboMKW4fbbGcajW/Lxy6+GMwb55lpAutpC6EoVdU7RdT6TW1yw4fvLiElWAhI
+          3U5HGF/tnn9uYL7PuVGajt2YT7wj7FBQX9AwggXddh3FHj1WnXpMwDhJeJr38Xct
+          81SKMg8VG+3+oyYFxXE0xu82VMA2Vwd4fUtXDI9ATcg21CEIxzlk69Ph5nC8CsSI
+          1QIDAQAB
+          -----END PUBLIC KEY-----
+      # Exact origins of the web app, comma-separated, no trailing slash.
+      - key: WEB_ORIGINS
+        value: https://coursebook-golf-web.onrender.com
+      - key: PUBLIC_WEB_URL
+        value: https://coursebook-golf-web.onrender.com
+
+  # The web app: a static single-page app on Render's CDN. Free, and it does
+  # not sleep; its data comes from coursebook-golf-api.
+  - type: web
+    name: coursebook-golf-web
+    runtime: static
+    branch: feat/render-clerk-rebuild # switch to main at cutover
+    autoDeployTrigger: checksPass
+    buildCommand: corepack pnpm install --frozen-lockfile --filter @coursebook/web... && corepack pnpm --filter @coursebook/web build
+    staticPublishPath: ./apps/web/build/client
+    buildFilter:
+      paths:
+        - apps/web/**
+        - packages/domain/**
+        - package.json
+        - pnpm-lock.yaml
+        - pnpm-workspace.yaml
+        - tsconfig.base.json
+    # Client-side routes (/friends/x, /account) load the app shell.
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    # Keep in step with tests/e2e/static-server.ts.
+    headers:
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+    envVars:
+      # corepack ships with Node 24, not 25+.
+      - key: NODE_VERSION
+        value: "24"
+      # VITE_* values are inlined into the bundle at build time; never a secret.
+      - key: VITE_API_URL
+        value: https://coursebook-golf-api.onrender.com
+      - key: VITE_CLERK_PUBLISHABLE_KEY
+        value: pk_test_dGFsZW50ZWQtc3dpbmUtMTI3Ni5jbGVyay5hY2NvdW50cy5kZXYk

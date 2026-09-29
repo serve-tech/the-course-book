@@ -1,5 +1,7 @@
 # React migration compatibility notes
 
+> **Retired architecture.** These notes describe the Supabase-backed static application that is being replaced; see [architecture.md](architecture.md) for the current design.
+
 Baseline: `b4b34b4`. Implementation branch: `feat/react-typescript`. The rewrite made no database changes.
 
 **Implemented:** [PR #1](https://github.com/serve-tech/the-course-book/pull/1) merged on 2026-09-18 and the React app is deployed through GitHub Pages. These notes record migration compatibility and verification limits. For current working instructions, see [AGENTS.md](../AGENTS.md) and the [architecture guide](architecture.md).

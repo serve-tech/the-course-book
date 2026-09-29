@@ -1,12 +1,14 @@
 .planning/STATE-*.md
 .planning/sessions/
 .planning/lessons.md
-supabase/.temp/
 .env
 .env.*
 !.env.example
+.import/
 
 node_modules/
 dist/
+build/
+.react-router/
 playwright-report/
 test-results/
