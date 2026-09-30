@@ -62,6 +62,7 @@ export default function ProfileTimeline({ loaderData, params }: Route.ComponentP
             username={params.username}
             first={loaderData}
             self={self}
+            name={name}
             deleting={deleting}
             onDelete={
               self

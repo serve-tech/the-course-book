@@ -8,6 +8,7 @@ import {
   listEntries,
   ListTab,
   parseListTab,
+  personalRankLabel,
   PlayedFilter,
   playedCount,
   rankBadges,
@@ -116,6 +117,16 @@ describe("rankBadges", () => {
 
   it("has none for an unranked course", () => {
     expect(rankBadges(course("muni"))).toEqual([]);
+  });
+});
+
+describe("personalRankLabel", () => {
+  it.each([
+    { owner: null, rank: 3, label: "Your ranking #3" },
+    { owner: "Dan Whitaker", rank: 12, label: "Dan Whitaker's ranking #12" },
+    { owner: "James", rank: 1, label: "James's ranking #1" },
+  ])("$label", ({ owner, rank, label }) => {
+    expect(personalRankLabel(owner, rank)).toBe(label);
   });
 });
 

@@ -6,6 +6,7 @@ import { fromFeedItem } from "../../lib/api/mappers";
 import { apiFailureMessage } from "../../shared/lib/errors";
 import { Avatar } from "./Avatar";
 import { ComingSoon } from "./ComingSoon";
+import { RankPills } from "../top-lists/RankPills";
 import { CourseTile } from "./CourseTile";
 import { newFromFriends, relativeDay, shortDate, visitLabel, type FeedFirstPage } from "./format";
 import { displayName, logPath, profilePath } from "./paths";
@@ -78,7 +79,7 @@ export function HomeFeed({ first, hasFriends, me }: { first: FeedFirstPage; hasF
               <div className={feedStyles.strip}>
                 {picks.map(({ round, member }) => (
                   <Link key={round.id} className={feedStyles.pick} to={profilePath(member.username)}>
-                    <CourseTile course={round.course} number={round.rank} badge={<Avatar member={member} size={AvatarSize.Small} />} />
+                    <CourseTile course={round.course} badge={<Avatar member={member} size={AvatarSize.Small} />} />
                     <span className={feedStyles.pickCaption}>
                       <b>{displayName(member)}</b>
                       <span>{round.playedOn ? shortDate(round.playedOn, now) : "Date not recorded"}</span>
@@ -152,7 +153,7 @@ function FeedRow({ item, now }: { item: FeedItem; now: Date }) {
           <div className={feedStyles.samples}>
             {item.rounds.map((sample) => (
               <span key={sample.id} className={feedStyles.sample}>
-                <CourseTile course={sample.course} number={sample.rank} size={TileSize.Mini} />
+                <CourseTile course={sample.course} size={TileSize.Mini} />
                 <span>{sample.course.name}</span>
               </span>
             ))}
@@ -172,13 +173,13 @@ function FeedRow({ item, now }: { item: FeedItem; now: Date }) {
         <div className={feedStyles.meta}>
           <span className={[styles.tag, round.visit === 1 ? styles.tagGold : ""].join(" ")}>{visitLabel(round.visit)}</span>
           {round.playedOn && <span>{shortDate(round.playedOn, now)}</span>}
-          <span>#{round.rank} on their list</span>
         </div>
+        <RankPills course={round.course} personal={{ owner: name, rank: round.rank }} />
       </div>
       <div style={{ display: "grid", justifyItems: "end", gap: 8 }}>
         <span className={feedStyles.when}>{when}</span>
         <div className={feedStyles.itemTile}>
-          <CourseTile course={round.course} number={round.rank} size={TileSize.Thumb} />
+          <CourseTile course={round.course} size={TileSize.Thumb} />
         </div>
       </div>
     </article>

@@ -248,6 +248,8 @@ test.describe("signed in", () => {
     await expect(augustaRow).toHaveAttribute("data-played", "false");
 
     await page.goto(`/u/${owner.username}`);
+    // Personal ranks name whose ranking they are, like the published pills.
+    await expect(page.locator('[data-round="Test Beta Links"]')).toContainText("Your ranking #1");
     page.once("dialog", (dialog) => void dialog.accept());
     await page.getByRole("button", { name: "Delete your round at Test Beta Links on 2026-02-01" }).click();
     await expect(page.locator('[data-round="Test Beta Links"]')).toHaveCount(0);

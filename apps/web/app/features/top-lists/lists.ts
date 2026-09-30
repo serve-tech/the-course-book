@@ -144,6 +144,22 @@ export function rankBadges(course: Course): RankBadge[] {
 }
 
 /**
+ * A personal ranking pill's text, in the published pills' "{whose} #{n}"
+ * form, so a member's own order is never mistaken for a published rank.
+ *
+ * Args:
+ *     owner: The member's display name, or null for the viewer ("Your").
+ *     rank: The course's position on that member's Ranking.
+ *
+ * Example:
+ *     >>> personalRankLabel("Dan Whitaker", 3)
+ *     "Dan Whitaker's ranking #3"
+ */
+export function personalRankLabel(owner: string | null, rank: number): string {
+  return (owner === null ? "Your" : owner + "'s") + " ranking #" + String(rank);
+}
+
+/**
  * The US state where someone has played the most courses, for the Best in
  * State tab when no state is chosen. Ties go to the alphabetically first
  * state; "" when they have played no US course with a state.

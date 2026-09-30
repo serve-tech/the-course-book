@@ -4,7 +4,8 @@ import { CourseTile } from "../social/CourseTile";
 import { TileSize } from "../social/sizes";
 import { cx } from "../../shared/lib/cx";
 import { CheckIcon } from "./icons";
-import { rankBadges, sameList, type TopListRef } from "./lists";
+import type { TopListRef } from "./lists";
+import { RankPills } from "./RankPills";
 import styles from "./top-lists.module.css";
 
 /** A tick on a row: who played the course. */
@@ -46,7 +47,6 @@ export function CourseRow({
   note?: ReactNode;
   actions: ReactNode;
 }) {
-  const badges = rankBadges(course);
   return (
     <li className={styles.row} data-played={played} data-course={course.name}>
       <span className={styles.rank}>{rank ?? ""}</span>
@@ -54,18 +54,7 @@ export function CourseRow({
       <div className={styles.main}>
         <div className={styles.name}>{course.name}</div>
         <div className={styles.place}>{course.location}</div>
-        {badges.length > 0 && (
-          <ul className={styles.badges} aria-label="Ranks">
-            {badges.map((badge) => (
-              <li
-                key={badge.list.type + badge.list.scope}
-                className={cx(styles.badge, current && sameList(badge.list, current) && styles.badgeCurrent)}
-              >
-                {badge.label} #{badge.rank}
-              </li>
-            ))}
-          </ul>
-        )}
+        <RankPills course={course} current={current} />
       </div>
       <div className={styles.marks}>
         {note && <span className={styles.note}>{note}</span>}

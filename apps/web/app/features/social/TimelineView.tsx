@@ -4,6 +4,7 @@ import { api, unwrap } from "../../lib/api";
 import { fromTimelineRound } from "../../lib/api/mappers";
 import { apiFailureMessage } from "../../shared/lib/errors";
 import { TrashIcon } from "../top-lists/icons";
+import { RankPills } from "../top-lists/RankPills";
 import { CourseTile } from "./CourseTile";
 import { TileSize } from "./sizes";
 import { dayOfMonth, groupByMonth, visitLabel } from "./format";
@@ -20,7 +21,8 @@ const PAGE_SIZE = 20;
  *
  * @param username - Whose timeline.
  * @param first - The first page from the loader.
- * @param self - Whether it is the viewer's own timeline (changes the empty state).
+ * @param self - Whether it is the viewer's own timeline (changes the empty state and the rank pills' "Your").
+ * @param name - The member's display name, for "Dan Whitaker's ranking #3" on a friend's timeline.
  * @param onDelete - Deletes one of the viewer's own rounds; each entry gets a delete button when given.
  * @param deleting - The id of the round being deleted, if any.
  */
@@ -28,12 +30,14 @@ export function TimelineView({
   username,
   first,
   self,
+  name,
   onDelete,
   deleting = null,
 }: {
   username: string;
   first: { rounds: readonly TimelineRound[]; nextCursor: string | null };
   self: boolean;
+  name: string;
   onDelete?: ((round: TimelineRound) => void) | undefined;
   deleting?: string | null;
 }) {
@@ -97,18 +101,15 @@ export function TimelineView({
           {month.rounds.map((round) => (
             <div key={round.id} className={[profileStyles.entry, onDelete ? profileStyles.entryOwn : ""].join(" ")} data-round={round.course.name}>
               <span className={profileStyles.day}>{dayOfMonth(round.playedOn)}</span>
-              <CourseTile course={round.course} number={round.rank} size={TileSize.Thumb} />
+              <CourseTile course={round.course} size={TileSize.Thumb} />
               <div>
                 <span className={profileStyles.entryName}>{round.course.name}</span>
                 <span className={profileStyles.entryMeta}>
                   <span className={[styles.tag, round.visit === 1 ? styles.tagGold : ""].join(" ")}>{visitLabel(round.visit)}</span>
                   <span>{round.course.location}</span>
                 </span>
+                <RankPills course={round.course} personal={{ owner: self ? null : name, rank: round.rank }} />
               </div>
-              <span className={profileStyles.entryRank}>
-                <b>#{round.rank}</b>
-                ranked
-              </span>
               {onDelete && (
                 <button
                   type="button"
