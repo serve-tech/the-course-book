@@ -1,6 +1,6 @@
 import { getToken, useAuth, useClerk } from "@clerk/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, NavLink, Outlet, useLocation, useRevalidator, type ShouldRevalidateFunctionArgs } from "react-router";
+import { Link, Outlet, useLocation, useRevalidator, type ShouldRevalidateFunctionArgs } from "react-router";
 import type { Route } from "./+types/layout";
 import { AuthDialog } from "../features/auth/AuthDialog";
 import { api, ApiError, unwrap } from "../lib/api";
@@ -9,24 +9,41 @@ import { detectState } from "../shared/lib/geolocation";
 import { errorMessage } from "../shared/lib/errors";
 import { preferences } from "../shared/lib/storage";
 import { usePreference } from "../shared/lib/use-preference";
-import { Brand } from "../shared/ui/Brand";
+import { TabBar, TopBar } from "../features/shell/AppNav";
+import navStyles from "../features/shell/nav.module.css";
+import { cx } from "../shared/lib/cx";
 import type { Shell } from "../shared/ui/shell";
 
 const SELECTED_STATE_KEY = "theCourseBookSelectedState";
 const MOBILE_BREAKPOINT = 760;
 
 /**
- * The signed-in member from the API. An account the app cannot use (its
- * Clerk username breaks the product rule, or it was deleted) shows as signed
- * out with the reason, instead of failing every page.
+ * Pending friend requests to the member, for the Friends badge. A failure
+ * only hides the badge, so it is logged rather than failing every page.
+ */
+async function incomingRequests(): Promise<number> {
+  try {
+    return unwrap(await api.GET("/v1/me/friend-requests")).incoming.length;
+  } catch (error) {
+    console.warn("Could not load friend requests for the badge", error);
+    return 0;
+  }
+}
+
+/**
+ * The signed-in member from the API and their pending request count. An
+ * account the app cannot use (its Clerk username breaks the product rule, or
+ * it was deleted) shows as signed out with the reason, instead of failing
+ * every page.
  */
 export async function clientLoader() {
-  if (!(await getToken())) return { user: null, problem: null };
+  if (!(await getToken())) return { user: null, problem: null, requests: 0 };
   try {
-    return { user: unwrap(await api.GET("/v1/me")), problem: null };
+    const [user, requests] = await Promise.all([api.GET("/v1/me").then(unwrap), incomingRequests()]);
+    return { user, problem: null, requests };
   } catch (error) {
     if (error instanceof ApiError && (error.status === 401 || error.status === 403))
-      return { user: null, problem: error.message };
+      return { user: null, problem: error.message, requests: 0 };
     throw error;
   }
 }
@@ -44,7 +61,7 @@ export function shouldRevalidate({ formAction, defaultShouldRevalidate }: Should
  * client render the same markup.
  */
 export default function Layout({ loaderData }: Route.ComponentProps) {
-  const { user, problem } = loaderData;
+  const { user, problem, requests } = loaderData;
   const clerk = useClerk();
   const { userId } = useAuth();
   const revalidator = useRevalidator();
@@ -130,61 +147,24 @@ export default function Layout({ loaderData }: Route.ComponentProps) {
     });
   };
 
-  return (
-    <div className="app">
-      <Brand />
+  const navigate = () => {
+    searchFocus(false);
+  };
 
-      <div className="authbar" id="authbar">
-        <div>
-          <span
-            className="authdot"
-            style={{ background: user ? "#c7aa6b" : "#9a7b3f" }}
-          />
-          <span id="authLabel">{user ? user.username : "Not signed in"}</span>
-        </div>
-        <button
-          className="authbtn"
-          id="authOpen"
-          onClick={() => {
-            if (user) signOut();
-            else openAuthDialog();
-          }}
-        >
-          {user ? "Sign out" : "Sign in"}
-        </button>
-      </div>
+  return (
+    <div className={cx("app", navStyles.withTabs)}>
+      <TopBar member={user} incomingRequests={requests} onSignIn={openAuthDialog} onSignOut={signOut} onNavigate={navigate} />
       {problem && (
         <p className="error-text" id="authProblem" role="alert">
           {problem}
         </p>
       )}
 
-      <nav>
-        {(
-          [
-            ["/", "mine", "My List"],
-            ["/top-100", "top", "Top 100"],
-            ["/friends", "friends", "Friends"],
-          ] as const
-        ).map(([to, page, label]) => (
-          <NavLink
-            key={page}
-            to={to}
-            end={to === "/"}
-            className={({ isActive }) => "nav" + (isActive ? " active" : "")}
-            data-page={page}
-            onClick={() => {
-              searchFocus(false);
-            }}
-          >
-            {label}
-          </NavLink>
-        ))}
-      </nav>
-
-      <main>
+      <main className={navStyles.main}>
         <Outlet context={shell} />
       </main>
+
+      <TabBar member={user} incomingRequests={requests} onSignIn={openAuthDialog} onNavigate={navigate} />
 
       {authOpen && !user && (
         <AuthDialog

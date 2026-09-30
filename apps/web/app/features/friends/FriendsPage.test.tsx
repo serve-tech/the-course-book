@@ -26,7 +26,6 @@ const routers: ReturnType<typeof createMemoryRouter>[] = [];
 let requests: FriendRequests;
 let members: PublicMember[];
 let hits: MemberRelationship[];
-let aliceIsFriend: boolean;
 let write: (request: Request) => Promise<Response>;
 
 /** Controlled HTTP response; the component, action, fetcher and loader stay real. */
@@ -43,12 +42,12 @@ function Page() {
 
 async function openFriends(path = "/friends") {
   const router = createMemoryRouter([{
-    path: "/friends/:username?",
-    loader: (args) => clientLoader({ ...args, serverLoader: () => Promise.resolve(undefined) }),
+    path: "/friends",
+    loader: () => clientLoader(),
     action: (args) => clientAction({ ...args, serverAction: () => Promise.resolve(undefined) }),
     Component: Page,
     hydrateFallbackElement: <p>Loading friends…</p>,
-  }], { initialEntries: [path] });
+  }, { path: "/u/:username", Component: () => <p>Profile page</p> }], { initialEntries: [path] });
   routers.push(router);
   render(<RouterProvider router={router} />);
   await screen.findByLabelText("Add a friend");
@@ -64,7 +63,6 @@ beforeEach(() => {
   requests = { incoming: [alice, bravo], outgoing: [charlie] };
   members = [];
   hits = [];
-  aliceIsFriend = true;
   notify.mockReset();
   write = () => Promise.reject(new Error("unexpected mutation"));
   transport.mockReset();
@@ -74,10 +72,6 @@ beforeEach(() => {
     if (path === "/v1/members") return Promise.resolve(Response.json({ members, nextCursor: null }));
     if (path === "/v1/me/friend-requests") return Promise.resolve(Response.json(requests));
     if (path === "/v1/member-search") return Promise.resolve(Response.json({ results: hits }));
-    if (path === "/v1/members/alice")
-      return Promise.resolve(aliceIsFriend
-        ? Response.json({ member: alice, courses: [] })
-        : Response.json({ error: { code: "member_not_found", message: "No member with that username.", requestId: null, fields: null } }, { status: 404 }));
     throw new Error("unexpected request: " + path);
   });
 });
@@ -88,42 +82,24 @@ afterEach(() => {
 });
 
 describe("friend action serialization", () => {
-  it("reserves the shared action while navigating away before removal", async () => {
-    requests = { incoming: [bravo], outgoing: [charlie] };
-    members = [alice];
-    await openFriends("/friends/alice");
-    fireEvent.click(screen.getByRole("button", { name: "Remove friend…" }));
+  it("lists friends as cards that open their profiles", async () => {
+    members = [alice, bravo];
+    requests = { incoming: [], outgoing: [] };
+    await openFriends();
+    const list = within(await screen.findByRole("region", { name: /Your friends/ }));
+    expect(list.getByRole("heading")).toHaveTextContent("Your friends · 2");
+    fireEvent.click(list.getByRole("link", { name: /Alice/ }));
+    await screen.findByText("Profile page");
+    expect(routers[0]?.state.location.pathname).toBe("/u/alice");
+  });
 
-    const navigation = deferredResponse();
-    const serve = transport.getMockImplementation();
-    if (!serve) throw new Error("missing HTTP transport");
-    transport.mockImplementation((request) => new URL(request.url).pathname === "/v1/members"
-      ? navigation.promise
-      : serve(request));
-    write = () => {
-      // As the API does: once removed, alice's list is 404 for this viewer.
-      members = [];
-      aliceIsFriend = false;
-      transport.mockImplementation(serve);
-      return Promise.resolve(new Response(null, { status: 204 }));
-    };
-    const listLoads = () => transport.mock.calls.filter(([request]) => new URL(request.url).pathname === "/v1/members").length;
-    const loadsBefore = listLoads();
-    fireEvent.click(screen.getByRole("button", { name: "Remove friend" }));
-    await waitFor(() => { expect(listLoads()).toBeGreaterThan(loadsBefore); });
-    expect(person("bravo").getByRole("button", { name: "Accept" })).toBeDisabled();
-    expect(person("charlie").getByRole("button", { name: "Cancel" })).toBeDisabled();
-    expect(transport.mock.calls.filter(([request]) => request.method !== "GET")).toHaveLength(0);
-
-    navigation.resolve(Response.json({ members: [alice], nextCursor: null }));
-    await waitFor(() => { expect(notify).toHaveBeenCalledWith("alice is no longer your friend."); });
-    expect(transport.mock.calls.filter(([request]) => request.method === "DELETE")).toHaveLength(1);
-    const [router] = routers;
-    expect(router?.state.location.pathname).toBe("/friends");
-    expect(router?.state.historyAction).toBe("REPLACE");
-    expect(router?.state.errors).toBeNull();
-    expect(person("bravo").getByRole("button", { name: "Accept" })).toBeEnabled();
-    expect(screen.queryByRole("option", { name: "alice" })).not.toBeInTheDocument();
+  it("links a friend found by search to their profile instead of a dead button", async () => {
+    requests = { incoming: [], outgoing: [] };
+    hits = [{ member: alice, relationship: Relationship.Friends }];
+    await openFriends();
+    fireEvent.change(screen.getByLabelText("Add a friend"), { target: { value: "alice" } });
+    const link = await screen.findByRole("link", { name: "View profile" });
+    expect(link).toHaveAttribute("href", "/u/alice");
   });
 
   it.each([false, true])("keeps other member actions disabled until a request settles (failure=%s)", async (fails) => {
@@ -133,14 +109,14 @@ describe("friend action serialization", () => {
     await openFriends();
     fireEvent.change(screen.getByLabelText("Add a friend"), { target: { value: "delta" } });
     await screen.findByRole("button", { name: "Add friend" });
-    fireEvent.click(person("alice").getByRole("button", { name: "Accept" }));
+    fireEvent.click(person("Alice").getByRole("button", { name: "Accept" }));
     await waitFor(() => { expect(transport.mock.calls.filter(([request]) => request.method === "PUT")).toHaveLength(1); });
 
-    expect(person("bravo").getByRole("button", { name: "Accept" })).toBeDisabled();
-    expect(person("bravo").getByRole("button", { name: "Decline" })).toBeDisabled();
-    expect(person("charlie").getByRole("button", { name: "Cancel" })).toBeDisabled();
+    expect(person("Bravo").getByRole("button", { name: "Accept" })).toBeDisabled();
+    expect(person("Bravo").getByRole("button", { name: "Decline" })).toBeDisabled();
+    expect(person("Charlie").getByRole("button", { name: "Cancel" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Add friend" })).toBeDisabled();
-    fireEvent.click(person("bravo").getByRole("button", { name: "Accept" }));
+    fireEvent.click(person("Bravo").getByRole("button", { name: "Accept" }));
     expect(transport.mock.calls.filter(([request]) => request.method !== "GET")).toHaveLength(1);
 
     if (!fails) {
@@ -152,8 +128,8 @@ describe("friend action serialization", () => {
       : Response.json({ member: alice, relationship: Relationship.Friends }));
     await waitFor(() => { expect(notify).toHaveBeenCalledWith(fails ? "Could not accept Alice." : "You and alice are now friends."); });
     expect(notify).toHaveBeenCalledTimes(1);
-    expect(person("bravo").getByRole("button", { name: "Accept" })).toBeEnabled();
-    if (!fails) expect(screen.getByRole("option", { name: "alice" })).toBeInTheDocument();
+    expect(person("Bravo").getByRole("button", { name: "Accept" })).toBeEnabled();
+    if (!fails) expect(within(screen.getByRole("region", { name: /Your friends/ })).getByRole("link", { name: /Alice/ })).toBeInTheDocument();
   });
 });
 
@@ -213,14 +189,14 @@ describe("member search", () => {
     fireEvent.change(screen.getByLabelText("Add a friend"), { target: { value: "alp" } });
     await waitFor(() => { expect(searches()).toHaveLength(1); });
     fireEvent.change(screen.getByLabelText("Add a friend"), { target: { value: "alice" } });
-    await screen.findByText("alice", { selector: "#friendSearchResults .course" });
+    await screen.findByText("Alice", { selector: "#friendSearchResults .course" });
     expect(searches()[0]?.signal.aborted).toBe(true);
 
     await act(async () => {
       early.resolve(Response.json({ results: [{ member: bravo, relationship: Relationship.None }] }));
       await early.promise;
     });
-    expect(screen.queryByText("bravo", { selector: "#friendSearchResults .course" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Bravo", { selector: "#friendSearchResults .course" })).not.toBeInTheDocument();
   });
 
   it("explains a failed search in words, not the browser's", async () => {
@@ -241,16 +217,16 @@ describe("friend action failures", () => {
   it("reports a network failure and keeps the page usable", async () => {
     write = () => Promise.reject(new TypeError("Failed to fetch"));
     await openFriends();
-    fireEvent.click(person("alice").getByRole("button", { name: "Accept" }));
+    fireEvent.click(person("Alice").getByRole("button", { name: "Accept" }));
     await waitFor(() => { expect(notify).toHaveBeenCalledWith("Could not reach the server. Check your connection and try again."); });
-    expect(person("alice").getByRole("button", { name: "Accept" })).toBeEnabled();
+    expect(person("Alice").getByRole("button", { name: "Accept" })).toBeEnabled();
   });
 
   it("logs an unexpected error and reports it without replacing the page", async () => {
     write = () => Promise.reject(new RangeError("boom"));
     const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
     await openFriends();
-    fireEvent.click(person("alice").getByRole("button", { name: "Accept" }));
+    fireEvent.click(person("Alice").getByRole("button", { name: "Accept" }));
     await waitFor(() => { expect(notify).toHaveBeenCalledWith("Something went wrong. Please try again."); });
     expect(logged).toHaveBeenCalled();
     expect(screen.getByLabelText("Add a friend")).toBeInTheDocument();
@@ -264,8 +240,8 @@ describe("friend action failures", () => {
       return Promise.resolve(new Response(null, { status: 204 }));
     };
     await openFriends();
-    fireEvent.click(person("charlie").getByRole("button", { name: "Cancel" }));
+    fireEvent.click(person("Charlie").getByRole("button", { name: "Cancel" }));
     await waitFor(() => { expect(notify).toHaveBeenCalledWith("Request to charlie canceled."); });
-    expect(screen.queryByText("charlie", { selector: ".course" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Charlie", { selector: ".course" })).not.toBeInTheDocument();
   });
 });

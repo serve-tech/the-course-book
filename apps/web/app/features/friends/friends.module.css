@@ -1,0 +1,80 @@
+/*
+ * The Friends page: requests and friends in the main column, finding people
+ * in a sidebar (below them on phones).
+ */
+
+.page { display: grid; gap: 0; }
+.head { display: grid; gap: 6px; margin: 4px 0 26px; }
+.eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--gold); }
+.title {
+  margin: 0;
+  font: 600 clamp(30px, 4.2vw, 44px) / 1.05 "Playfair Display", Georgia, serif;
+  letter-spacing: -0.8px;
+  color: var(--cream);
+}
+.lede { margin: 0; color: #bfc6bf; font-size: 15px; max-width: 58ch; }
+
+.columns { display: grid; gap: 34px; }
+@media (min-width: 980px) {
+  .columns { grid-template-columns: minmax(0, 1fr) 320px; align-items: start; }
+}
+.main { display: grid; gap: 34px; min-width: 0; }
+.aside { min-width: 0; }
+
+.rows { display: grid; gap: 8px; }
+.row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+.who { min-width: 0; }
+.who :global(.course) { font: 600 16px "Playfair Display", Georgia, serif; color: var(--cream); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.who :global(.loc) { font-size: 12.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.actions { display: flex; gap: 8px; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
+.card {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 22px 12px 18px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(199, 170, 107, 0.05), transparent 60%), var(--panel);
+  text-align: center;
+  text-decoration: none;
+  transition: border-color 0.18s ease, transform 0.18s ease;
+  min-width: 0;
+}
+.card:hover { border-color: rgba(199, 170, 107, 0.5); transform: translateY(-2px); }
+.card:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+.cardName { max-width: 100%; font: 600 17px / 1.2 "Playfair Display", Georgia, serif; color: var(--cream); overflow-wrap: anywhere; }
+.cardHandle { max-width: 100%; font-size: 12.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.find { display: grid; gap: 10px; }
+.search {
+  width: 100%;
+  height: 46px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--cream);
+  font: 16px "DM Sans", Arial, sans-serif;
+  outline: none;
+}
+.search:focus { border-color: rgba(199, 170, 107, 0.55); box-shadow: 0 0 0 2px rgba(199, 170, 107, 0.1); }
+
+@media (max-width: 560px) {
+  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .row { padding: 10px 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .card { transition: none; }
+  .card:hover { transform: none; }
+}

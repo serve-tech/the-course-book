@@ -23,10 +23,15 @@ enum Dialog {
  * rank order. Drag or the details dialog post `move`; while a move is
  * pending the list is reordered optimistically from the full order, and the
  * loader's revalidation replaces it. Geographic filters are read-only.
+ *
+ * It is the Ranking tab of the member's own profile, whose header names the
+ * page and holds Log a round; `openLog` opens the Log dialog when it turns
+ * true (the Log a round buttons link to `?log=1`).
  */
 export function JournalPage({
   rows,
   signedIn,
+  openLog = false,
   selectedState,
   onState,
   notify,
@@ -35,6 +40,7 @@ export function JournalPage({
 }: {
   rows: readonly ListEntry[];
   signedIn: boolean;
+  openLog?: boolean;
   selectedState: string;
   onState: (value: string) => void;
   notify: (message: string) => void;
@@ -46,7 +52,14 @@ export function JournalPage({
     [details, setDetails] = useState<Course | null>(null),
     [history, setHistory] = useState<Course | null>(null),
     [editing, setEditing] = useState<string | null>(null),
-    [dialog, setDialog] = useState<Dialog | null>(null);
+    [dialog, setDialog] = useState<Dialog | null>(openLog ? Dialog.Log : null),
+    [logRequested, setLogRequested] = useState(openLog);
+  // Open the Log dialog each time `openLog` turns true, adjusting state
+  // during render rather than in an effect (react.dev, "You Might Not Need an Effect").
+  if (openLog !== logRequested) {
+    setLogRequested(openLog);
+    if (openLog) setDialog(Dialog.Log);
+  }
   const move = useJournalFetcher((reply) => {
     notify(reply.error ? replyMessage(reply) : "Ranking updated");
   });
@@ -108,23 +121,12 @@ export function JournalPage({
     <section id="mine" className="page active">
       <div className="listhead">
         <div>
-          <div className="eyebrow">Your courses</div>
-          <h2>My List</h2>
           <p>Press and drag a course to change your ranking.</p>
           <div className="course-count" aria-live="polite">
             <strong id="myCourseCount">{courses.length}</strong>
             <span>courses</span>
           </div>
         </div>
-        <button
-          className="primary"
-          id="log"
-          onClick={() => {
-            setDialog(Dialog.Log);
-          }}
-        >
-          + Log a Round
-        </button>
       </div>
       <div className="controls mine-controls">
         <div className="state-selector-row">

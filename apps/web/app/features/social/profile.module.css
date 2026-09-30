@@ -1,0 +1,263 @@
+/*
+ * Profile pages: hero, stats, tabs, Top Four, timeline, ranking and lists.
+ * Layout: one column on phones; from 980 px a content column and a 300 px
+ * sidebar, like Letterboxd's profile.
+ */
+
+.page { display: grid; gap: 0; }
+
+/* Hero: identity and stats over a faint contour map. */
+/* The band's background runs the full window width; legacy.css hides horizontal overflow on html and body. */
+.hero {
+  position: relative;
+  margin-top: -34px;
+  padding: 44px 0 30px;
+}
+.hero::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 100vw;
+  transform: translateX(-50%);
+  background:
+    radial-gradient(ellipse 60% 90% at 88% 0%, rgba(199, 170, 107, 0.1), transparent 70%),
+    repeating-radial-gradient(ellipse at 92% -30%, transparent 0 34px, rgba(244, 240, 230, 0.028) 34px 35px);
+  mask-image: linear-gradient(180deg, #000 55%, transparent);
+  pointer-events: none;
+}
+.heroInner {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 18px 22px;
+}
+.identity { display: grid; gap: 4px; min-width: 0; flex: 1 1 260px; }
+.eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+.name {
+  margin: 0;
+  font: 600 clamp(30px, 4.4vw, 46px) / 1.04 "Playfair Display", Georgia, serif;
+  letter-spacing: -0.8px;
+  color: var(--cream);
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+.handle { color: var(--muted); font-size: 14px; }
+.handle b { color: #cfd3cb; font-weight: 600; }
+.heroActions { display: flex; align-items: center; gap: 8px; }
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(64px, auto));
+  gap: 6px 26px;
+  margin: 0;
+}
+.stat { display: grid; justify-items: center; gap: 3px; }
+.statValue {
+  font: 600 28px / 1 "Playfair Display", Georgia, serif;
+  color: var(--cream);
+  font-variant-numeric: lining-nums tabular-nums;
+}
+.statLabel {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* Friend menu. */
+.menuWrap { position: relative; }
+.menuButton {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: #cfd3cb;
+  font-size: 18px;
+  line-height: 1;
+  letter-spacing: 1px;
+  cursor: pointer;
+}
+.menuButton:hover, .menuButton[aria-expanded="true"] { background: rgba(255, 255, 255, 0.06); }
+.menuButton:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 30;
+  width: 270px;
+  padding: 8px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: #10281c;
+  box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.9);
+}
+.menuItem {
+  display: block;
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #e6c2b6;
+  text-align: left;
+  font: 600 14px "DM Sans", Arial, sans-serif;
+  cursor: pointer;
+}
+.menuItem:hover, .menuItem:focus-visible { background: rgba(224, 145, 122, 0.12); outline: none; }
+.confirm { display: grid; gap: 10px; padding: 8px 6px 4px; font-size: 13px; color: #cfd3cb; line-height: 1.45; }
+.confirmActions { display: flex; justify-content: flex-end; gap: 8px; }
+.danger { border-color: rgba(224, 145, 122, 0.6); background: rgba(224, 145, 122, 0.14); color: #f0b3a1; }
+.danger:hover { background: rgba(224, 145, 122, 0.22); }
+
+/* Tabs. */
+.tabs {
+  display: flex;
+  gap: 26px;
+  margin: 0 0 26px;
+  padding: 0;
+  max-width: none;
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tab {
+  padding: 14px 0 12px;
+  color: var(--muted);
+  font-weight: 700;
+  font-size: 14px;
+  text-decoration: none;
+  white-space: nowrap;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.tab:hover { color: var(--cream); }
+.tab[aria-current="page"] { color: var(--cream); border-bottom-color: var(--gold); }
+.tab:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; border-radius: 4px; }
+
+.columns { display: grid; gap: 34px; }
+@media (min-width: 980px) {
+  .columns { grid-template-columns: minmax(0, 1fr) 300px; align-items: start; }
+}
+.section { display: grid; gap: 0; min-width: 0; }
+.section + .section { margin-top: 34px; }
+.aside { display: grid; gap: 28px; min-width: 0; }
+
+/* Top Four. */
+.topFour { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+@media (max-width: 560px) { .topFour { gap: 8px; } }
+
+/* Timeline. */
+.month {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin: 22px 0 4px;
+  font: 600 italic 18px "Playfair Display", Georgia, serif;
+  color: var(--gold);
+}
+.month:first-child { margin-top: 0; }
+.month small { font: 700 10px "DM Sans", Arial, sans-serif; letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted); font-style: normal; }
+.entry {
+  display: grid;
+  grid-template-columns: 38px 36px minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  padding: 11px 0;
+  border-top: 1px solid var(--line);
+}
+.month + .entry { border-top-color: rgba(199, 170, 107, 0.22); }
+.day {
+  font: 600 24px / 1 "Playfair Display", Georgia, serif;
+  color: var(--cream);
+  text-align: center;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+.entryName {
+  display: block;
+  font: 600 16px / 1.25 "Playfair Display", Georgia, serif;
+  color: var(--cream);
+  overflow-wrap: anywhere;
+}
+.entryMeta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 4px; color: var(--muted); font-size: 12.5px; }
+.entryRank { text-align: right; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.entryRank b { display: block; font: 600 18px / 1 "Playfair Display", Georgia, serif; color: var(--gold); }
+.more { display: flex; justify-content: center; margin-top: 18px; }
+
+/* A friend's ranking. */
+.filters { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 12px; }
+.filter {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: #bfc6bf;
+  font: 600 12.5px "DM Sans", Arial, sans-serif;
+  cursor: pointer;
+}
+.filter[aria-pressed="true"] { background: var(--cream); border-color: var(--cream); color: #0f2419; }
+.filter:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.rankRow {
+  display: grid;
+  grid-template-columns: 34px 26px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+.rankRow:first-of-type { border-top: 0; }
+.rankNumber {
+  font: 600 20px / 1 "Playfair Display", Georgia, serif;
+  color: var(--gold);
+  text-align: center;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+.rankPlace { color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+.you { text-align: right; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.you b { color: var(--cream); font-variant-numeric: tabular-nums; }
+.editHint { margin: 0 0 14px; color: var(--muted); font-size: 14px; }
+
+/* Comparison. */
+.compare { display: grid; gap: 12px; padding: 16px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); }
+.compareTop { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.compareBig { font: 600 34px / 1 "Playfair Display", Georgia, serif; color: var(--cream); }
+.compareBig small { font: 600 12px "DM Sans", Arial, sans-serif; color: var(--muted); margin-left: 4px; }
+.meter { height: 7px; border-radius: 99px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
+.meter span { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--green), var(--gold)); }
+.compareLine { margin: 0; color: #bfc6bf; font-size: 13px; line-height: 1.45; }
+.compareLine b { color: var(--cream); font-weight: 600; }
+
+/* Top list progress. */
+.progressList { display: grid; gap: 16px; }
+.progressRow { display: grid; gap: 7px; }
+.progressHead { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.progressTitle { font: 600 16px "Playfair Display", Georgia, serif; color: var(--cream); }
+.progressCount { font: 600 18px "Playfair Display", Georgia, serif; color: var(--cream); font-variant-numeric: lining-nums tabular-nums; }
+.progressCount small { font: 600 11px "DM Sans", Arial, sans-serif; color: var(--muted); }
+.bar { height: 6px; border-radius: 99px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
+.bar span { display: block; height: 100%; border-radius: 99px; background: var(--gold); }
+.soonStack { display: grid; gap: 12px; }
+
+@media (max-width: 760px) {
+  .hero { margin-top: -20px; padding: 28px 0 20px; }
+  .heroInner { gap: 14px 16px; }
+  .identity { flex-basis: 180px; }
+  .stats { width: 100%; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; padding-top: 14px; border-top: 1px solid var(--line); }
+  .statValue { font-size: 22px; }
+  .statLabel { font-size: 9px; letter-spacing: 1px; }
+  .entry { grid-template-columns: 30px 32px minmax(0, 1fr) auto; gap: 10px; }
+  .day { font-size: 20px; }
+  .tabs { gap: 20px; }
+}
