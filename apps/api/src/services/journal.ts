@@ -1,6 +1,6 @@
 import { and, count, desc, eq, inArray, sql } from "drizzle-orm";
 import type { Database, Executor, Transaction } from "../db/client";
-import { courses, rounds, userCourses } from "../db/schema";
+import { courses, rounds, userCourses, wantToPlay } from "../db/schema";
 import { courseView } from "../domain/course-view";
 import { insertAt, reorder } from "@coursebook/domain/journal/reorder";
 import type { ListEntry, RoundEntry } from "@coursebook/domain/journal/types";
@@ -113,7 +113,10 @@ async function renumber(tx: Transaction, userId: string, order: readonly string[
   `);
 }
 
-/** Insert `quantity` rounds sharing one played date; returns their ids. */
+/**
+ * Insert `quantity` rounds sharing one played date; returns their ids.
+ * Playing a course takes it off the member's Want to play list.
+ */
 export async function insertRounds(
   tx: Transaction,
   userId: string,
@@ -132,6 +135,7 @@ export async function insertRounds(
       })),
     )
     .returning({ id: rounds.id });
+  await tx.delete(wantToPlay).where(and(eq(wantToPlay.userId, userId), eq(wantToPlay.courseId, courseId)));
   return inserted.map((row) => row.id);
 }
 

@@ -9,6 +9,7 @@ import {
   integer,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   unique,
@@ -206,9 +207,31 @@ export const rounds = pgTable(
   ],
 );
 
+/**
+ * A member's Want to play list, like Letterboxd's watchlist (decision
+ * 2026-09-29, social redesign). A course may be on it whether or not the
+ * member has played it ("play it again"); logging a round there takes it off.
+ * Deleted accounts are tombstones, so their rows are deleted explicitly
+ * (`deleteAccountData`); the cascades cover hard deletes.
+ */
+export const wantToPlay = pgTable(
+  "want_to_play",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    courseId: uuid("course_id")
+      .notNull()
+      .references(() => courses.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.userId, table.courseId] }), index("want_to_play_user_created_idx").on(table.userId, table.createdAt)],
+);
+
 export type UserRow = typeof users.$inferSelect;
 export type CourseRow = typeof courses.$inferSelect;
 export type CourseRankingRow = typeof courseRankings.$inferSelect;
 export type UserCourseRow = typeof userCourses.$inferSelect;
 export type RoundRow = typeof rounds.$inferSelect;
 export type FriendshipRow = typeof friendships.$inferSelect;
+export type WantToPlayRow = typeof wantToPlay.$inferSelect;

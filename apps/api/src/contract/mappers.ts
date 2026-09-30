@@ -1,7 +1,7 @@
 import type { Course, RankedCourse } from "@coursebook/domain/catalog/course";
 import type { SearchResult } from "@coursebook/domain/catalog/search-results";
 import type { MemberList, MemberListRow } from "@coursebook/domain/friends/types";
-import type { FeedItem, Profile, TimelineRound } from "@coursebook/domain/social/types";
+import type { FeedItem, Profile, TimelineRound, WantToPlayEntry } from "@coursebook/domain/social/types";
 import type { ListEntry, RoundEntry } from "@coursebook/domain/journal/types";
 import { UNKNOWN_LOCATION } from "../domain/course-view";
 import type {
@@ -129,4 +129,8 @@ export function toFeedItem(item: FeedItem) {
     rounds: item.rounds.map(toTimelineRound),
     count: item.count,
   };
+}
+
+export function toWantToPlay(entries: readonly WantToPlayEntry[]) {
+  return { courses: entries.map((entry) => ({ course: toContractCourse(entry.course), addedAt: entry.addedAt })) };
 }

@@ -225,6 +225,17 @@ export const ProfileSchema = z
   })
   .openapi("Profile");
 
+export const WantToPlayEntrySchema = z
+  .object({
+    course: CourseSchema,
+    addedAt: z.iso.datetime().openapi({ description: "When the member added it." }),
+  })
+  .openapi("WantToPlayEntry");
+
+export const WantToPlaySchema = z
+  .object({ courses: z.array(WantToPlayEntrySchema).openapi({ description: "Courses the member wants to play, newest first." }) })
+  .openapi("WantToPlay");
+
 export const FeedItemSchema = z
   .object({
     id: z.string().openapi({ description: "Stable across pages." }),

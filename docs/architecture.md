@@ -100,6 +100,7 @@ The seed migration (`0001_seed_catalog.sql`) carries the retired project's publi
   - **Feed** (`getFeed`): friends' rounds by when they were logged. Rounds logged more than 14 days after they were played (or undated) collapse into one `backfill` item per friend and UTC day. It is derived on read; there is no event table.
   - **Paging:** cursors are opaque keyset keys (`domain/cursor.ts`) that carry timestamps as Postgres text with microseconds, never member ids.
   - **`MemberCourse`** carries the member's `played`, `lastPlayedOn` and the viewer's `myRank`.
+- **Want to play** (`listWantToPlay`, `addWantToPlay`, `removeWantToPlay`): each member's wishlist, newest first, readable by the member and their accepted friends (anyone else 404). Adding and removing are idempotent; adding again keeps the original date. A course may be on it after it was played ("play it again"); logging a round there takes it off, in the same transaction (`insertRounds`).
 - **Account deletion** (`DELETE /v1/me`): data first, then the Clerk user; a retry after a Clerk failure finishes the job. Details under [Authentication and authorization](#authentication-and-authorization).
 - **Preferences:** manual state selection and optional geolocation stay in browser storage.
 - **Known data quirk:** the Pinehurst No. 4 alias resolves to the legacy `usa80` record; fixing it is a data change, not a code change.

@@ -18,10 +18,10 @@ This is the API-first plan: the schema, contract and service rules the redesigne
 
 | Migration | Change | Notes |
 |---|---|---|
-| 0004 rounds and ratings | `rounds.played_at` drops NOT NULL (default stays `CURRENT_DATE`) | NULL means "date unknown". |
+| 0005 rounds and ratings | `rounds.played_at` drops NOT NULL (default stays `CURRENT_DATE`) | NULL means "date unknown". |
 | | `rounds.details_visibility` enum `round_visibility('friends','private')` NOT NULL default `'friends'` | Custom SQL backfill: `'private'` where `score`, `tees` or `notes` is not null. Only imported rounds have details, so this hides exactly what was written in private. |
 | | `user_courses.rating smallint` NULL, check 1–10; `user_courses.rated_at timestamptz` NULL | Half stars: 7 = ★★★½. The contract carries 0.5–5.0. |
-| 0005 want to play | `want_to_play(user_id → users cascade, course_id → courses cascade, created_at)`, PK `(user_id, course_id)` | |
+| 0004 want to play | `want_to_play(user_id → users cascade, course_id → courses cascade, created_at)`, PK `(user_id, course_id)` | |
 | 0006 member lists | `lists(id uuid, owner_id → users cascade, title text, description text NULL, ranked bool, visibility list_visibility('friends','private'), created_at, updated_at)` | Title 1–100 chars (check). |
 | | `list_courses(list_id → lists cascade, course_id → courses cascade, position int > 0, note text NULL, created_at)`, PK `(list_id, course_id)` | Unique `(list_id, position)` DEFERRABLE, in custom SQL like 0002. Positions are contiguous 1..N and reuse `reorder()`/`insertAt()`. |
 | 0007 invites | `invites(id uuid, inviter_id → users cascade, token_hash text unique, created_at, expires_at, redeemed_by → users set null, redeemed_at)` | Token: 32 random bytes, base64url; only its SHA-256 is stored. Single use, 7-day expiry. |
@@ -179,10 +179,10 @@ Record in contract/README.md that this was the last retype before native builds 
 ## Slices (one PR each, in order)
 
 1. **Rounds and ratings.**
-   - Scope: migration 0004; `Round` fields and the nullable date; round-detail request fields; `updateRound`; `setRating`; `rating` on `MyCourse`/`MemberCourse`; `roundIds`.
+   - Scope: migration 0005 (Want to play shipped first as 0004, 2026-09-30); `Round` fields and the nullable date; round-detail request fields; `updateRound`; `setRating`; `rating` on `MyCourse`/`MemberCourse`; `roundIds`.
    - Web keeps working: mappers accept a null date ("Date unknown" in round history).
    - Fixes the review's high-severity bug: the Friends and Top 100 buttons stop sending today's date.
-2. **Want to play and Top lists.** Migration 0005; Want to play operations; `listTopLists`; `getTopList`; `topListTitle()`; removal from Want to play on log.
+2. **Want to play and Top lists.** Migration 0004 (shipped before slice 1 at the maintainer's request, 2026-09-30); Want to play operations; `listTopLists`; `getTopList`; `topListTitle()`; removal from Want to play on log.
 3. **Profiles, timelines, course pages.**
    - Operations: `getMemberProfile`, `listMemberRounds`, `getCourse`; `MemberCourse.played`, `lastPlayedOn`, `myRank`.
    - Pure functions: `compareRankings()`, the timeline cursor, visit numbering.

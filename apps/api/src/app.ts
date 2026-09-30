@@ -19,6 +19,7 @@ import { registerClientRoutes } from "./routes/clients";
 import { registerFeedRoutes } from "./routes/feed";
 import { registerJournalRoutes } from "./routes/journal";
 import { registerMemberRoutes } from "./routes/members";
+import { registerWantToPlayRoutes } from "./routes/want-to-play";
 import { checkDatabase } from "./services/health";
 import type { Provisioner } from "./services/provisioning";
 import type { CourseSearch } from "./services/search";
@@ -129,6 +130,7 @@ export function createApp(deps: AppDependencies): OpenAPIHono<AppEnv> {
   registerJournalRoutes(app, deps);
   registerCatalogRoutes(app, deps);
   registerMemberRoutes(app, deps);
+  registerWantToPlayRoutes(app, deps);
   registerFeedRoutes(app, deps);
   registerClientRoutes(app, deps);
 
