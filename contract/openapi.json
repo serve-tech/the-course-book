@@ -287,6 +287,14 @@
             "type": "integer",
             "minimum": 1
           },
+          "roundIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Ids of the rounds just logged, so a client can offer Undo (`deleteRound` each one)."
+          },
           "courses": {
             "type": "array",
             "items": {
@@ -298,6 +306,7 @@
         "required": [
           "courseId",
           "rank",
+          "roundIds",
           "courses"
         ]
       },
@@ -389,6 +398,14 @@
             "minimum": 1,
             "description": "Rounds logged."
           },
+          "roundIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Ids of the rounds just logged, so a client can offer Undo (`deleteRound` each one)."
+          },
           "courses": {
             "type": "array",
             "items": {
@@ -399,6 +416,7 @@
         },
         "required": [
           "added",
+          "roundIds",
           "courses"
         ]
       },

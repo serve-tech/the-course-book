@@ -43,12 +43,12 @@ Every failure returns:
 | `DELETE /v1/me` | `deleteMe` | member | Deletes the account; 204. Retry after a 502 |
 | `GET /v1/me/courses` | `listMyCourses` | member | The list in personal rank order with play counts |
 | `PUT /v1/me/courses/{courseId}` | `addToList` | member | Add a catalog course; logs one round if it has none; idempotent |
-| `POST /v1/me/courses` | `addCourse` | member | Add a course by details (`source` `search` or `manual`), at `rank`, with `quantity` rounds |
+| `POST /v1/me/courses` | `addCourse` | member | Add a course by details (`source` `search` or `manual`), at `rank`, with `quantity` rounds; returns their `roundIds` |
 | `DELETE /v1/me/courses/{courseId}` | `removeCourse` | member | Remove a course and its rounds |
 | `PUT /v1/me/courses/{courseId}/rank` | `moveCourse` | member | Move to a position; renumbers the whole list |
 | `PUT /v1/me/courses/{courseId}/play-count` | `setPlayCount` | member | Set the round count; zero removes the course |
 | `GET /v1/me/courses/{courseId}/rounds` | `listMyCourseRounds` | member | Rounds at a course, newest first |
-| `POST /v1/me/courses/{courseId}/rounds` | `logRounds` | member | Log rounds at a catalog course |
+| `POST /v1/me/courses/{courseId}/rounds` | `logRounds` | member | Log rounds at a catalog course; returns their `roundIds`, so Undo is `deleteRound` for each (the last one takes the course off the list) |
 | `DELETE /v1/me/rounds/{roundId}` | `deleteRound` | member | Delete one round; the last one removes the course |
 | `GET /v1/course-search?q=` | `searchCourses` | member | Up to ten hits; catalog hits carry `courseId` |
 | `GET /v1/members?cursor=&limit=` | `listMembers` | member | The member's friends, paged by username (limit 1–200, default 50) |

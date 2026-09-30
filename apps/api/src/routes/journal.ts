@@ -44,7 +44,7 @@ export function registerJournalRoutes(app: OpenAPIHono<AppEnv>, deps: AppDepende
       quantity: body.quantity ?? 1,
       playedOn: body.playedOn ?? undefined,
     });
-    return c.json({ courseId: result.courseId, rank: result.rank, courses: result.courses.map(toMyCourse) }, 200);
+    return c.json({ courseId: result.courseId, rank: result.rank, roundIds: result.roundIds, courses: result.courses.map(toMyCourse) }, 200);
   });
 
   app.openapi(guarded(logRounds), async (c) => {
@@ -52,7 +52,7 @@ export function registerJournalRoutes(app: OpenAPIHono<AppEnv>, deps: AppDepende
     const { courseId } = c.req.valid("param");
     const body = c.req.valid("json");
     const result = await journal.logRounds(deps.db, user.id, { courseId }, body.quantity ?? 1, body.playedOn ?? undefined);
-    return c.json({ added: result.count, courses: result.courses.map(toMyCourse) }, 200);
+    return c.json({ added: result.count, roundIds: result.roundIds, courses: result.courses.map(toMyCourse) }, 200);
   });
 
   app.openapi(guarded(moveCourse), async (c) => {

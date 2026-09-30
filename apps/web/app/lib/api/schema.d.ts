@@ -502,6 +502,8 @@ export interface components {
             /** Format: uuid */
             courseId: string;
             rank: number;
+            /** @description Ids of the rounds just logged, so a client can offer Undo (`deleteRound` each one). */
+            roundIds: string[];
             /** @description The member's whole list after the change, read in the same transaction. */
             courses: components["schemas"]["MyCourse"][];
         };
@@ -536,6 +538,8 @@ export interface components {
         LoggedRounds: {
             /** @description Rounds logged. */
             added: number;
+            /** @description Ids of the rounds just logged, so a client can offer Undo (`deleteRound` each one). */
+            roundIds: string[];
             /** @description The member's whole list after the change, read in the same transaction. */
             courses: components["schemas"]["MyCourse"][];
         };
