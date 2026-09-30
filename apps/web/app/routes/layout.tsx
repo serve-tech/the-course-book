@@ -152,7 +152,7 @@ export default function Layout({ loaderData }: Route.ComponentProps) {
   };
 
   return (
-    <div className={cx("app", navStyles.withTabs)}>
+    <div className={cx("app", navStyles.shell)}>
       <TopBar member={user} incomingRequests={requests} onSignIn={openAuthDialog} onSignOut={signOut} onNavigate={navigate} />
       {problem && (
         <p className="error-text" id="authProblem" role="alert">

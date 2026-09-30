@@ -112,6 +112,20 @@
 
 .main { max-width: 1160px; margin: 0 auto; padding: 34px 24px 80px; }
 
+/* The app container. The legacy footer's Refresh App button becomes a quiet pill. */
+.shell :global(.app-refresh) {
+  width: fit-content;
+  margin: 0 auto 10px;
+  min-height: 0;
+  padding: 7px 16px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+}
+.shell :global(.app-refresh):hover { color: var(--cream); }
+
 /* Bottom tabs: phones only. */
 .tabbar { display: none; }
 
@@ -122,7 +136,7 @@
   .links, .log, .accountName { display: none; }
   .main { padding: 20px 16px 40px; }
   /* Room for the fixed tab bar below everything, the footer's links included. */
-  .withTabs { padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
+  .shell { padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
   .tabbar {
     position: fixed;
     left: 0;
@@ -169,5 +183,5 @@
   }
   .plus svg { width: 20px; height: 20px; stroke: #1a1407; stroke-width: 2.2; }
   /* Keep the toast above the tab bar. */
-  .withTabs :global(.toast) { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+  .shell :global(.toast) { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
 }

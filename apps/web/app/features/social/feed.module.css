@@ -57,10 +57,15 @@
   gap: 18px;
   padding: 56px 0 30px;
 }
+/* The background runs the full window width; legacy.css hides horizontal overflow. */
 .welcome::before {
   content: "";
   position: absolute;
-  inset: -34px -24px 0;
+  top: -34px;
+  bottom: 0;
+  left: 50%;
+  width: 100vw;
+  transform: translateX(-50%);
   background:
     radial-gradient(ellipse 55% 80% at 85% 10%, rgba(199, 170, 107, 0.12), transparent 70%),
     repeating-radial-gradient(ellipse at 95% -20%, transparent 0 38px, rgba(244, 240, 230, 0.03) 38px 39px);
@@ -93,5 +98,5 @@
   .sentence { font-size: 14px; }
   .course { font-size: 15.5px; }
   .welcome { padding-top: 36px; }
-  .welcome::before { inset: -20px -16px 0; }
+  .welcome::before { top: -20px; }
 }
