@@ -10,7 +10,7 @@ import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("../../apps/web/build/client/", import.meta.url));
-const port = Number(process.env["PORT"] ?? 3000);
+const port = Number(process.env["PORT"] ?? 3100);
 
 const types: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
