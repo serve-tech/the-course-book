@@ -10,7 +10,7 @@ import { stateName } from "../catalog/geography";
 /** One published ranking entry, as `GET /v1/rankings` returns it. */
 export interface TopListEntry {
   courseId: string;
-  /** Published list: world, usa, usa_public or state; new values may appear. */
+  /** Published list: global, world, usa, usa_public or state; new values may appear. */
   type: string;
   /** WORLD, USA, USA_PUBLIC or a two-letter state code. */
   scope: string;
@@ -25,7 +25,7 @@ export interface TopListProgress {
 }
 
 /** Display order of the national lists; state lists follow, alphabetically. */
-const NATIONAL: readonly string[] = ["usa", "world", "usa_public"];
+const NATIONAL: readonly string[] = ["global", "usa", "usa_public", "world"];
 
 /**
  * A list's display title.
@@ -36,8 +36,10 @@ const NATIONAL: readonly string[] = ["usa", "world", "usa_public"];
  */
 export function topListTitle(type: string, scope: string): string {
   switch (type) {
-    case "world":
+    case "global":
       return "World Top 100";
+    case "world":
+      return "International Top 100";
     case "usa":
       return "USA Top 100";
     case "usa_public":
@@ -59,7 +61,7 @@ export function topListTitle(type: string, scope: string): string {
  * Returns:
  *     The national lists always, then each state list the member has played
  *     at least one course from. National lists come first in a fixed order
- *     (USA, World, USA Public), then states by title.
+ *     (World, USA, USA Public, International), then states by title.
  */
 export function topListProgress(entries: readonly TopListEntry[], played: ReadonlySet<string>): TopListProgress[] {
   const lists = new Map<string, TopListProgress>();
@@ -70,12 +72,20 @@ export function topListProgress(entries: readonly TopListEntry[], played: Readon
     if (played.has(entry.courseId)) list.played++;
     lists.set(key, list);
   }
-  return [...lists.values()]
-    .filter((list) => NATIONAL.includes(list.type) || list.played > 0)
-    .sort((a, b) => order(a) - order(b) || a.title.localeCompare(b.title));
+  return [...lists.values()].filter((list) => NATIONAL.includes(list.type) || list.played > 0).sort(compareTopLists);
 }
 
-function order(list: TopListProgress): number {
-  const index = NATIONAL.indexOf(list.type);
+/** Whether a list is one of the national lists, which every member sees. */
+export function isNationalList(type: string): boolean {
+  return NATIONAL.includes(type);
+}
+
+/** Display order: the national lists in a fixed order, then the rest by title. */
+export function compareTopLists(a: { type: string; title: string }, b: { type: string; title: string }): number {
+  return order(a.type) - order(b.type) || a.title.localeCompare(b.title);
+}
+
+function order(type: string): number {
+  const index = NATIONAL.indexOf(type);
   return index === -1 ? NATIONAL.length : index;
 }

@@ -7,7 +7,10 @@ export const courseSchema = z.object({
   country: z.string().default(""),
   city: z.string().default(""),
   state: z.string().default(""),
+  /** Rank on Golf Digest's World 100, which leaves out US courses (shown as "International"). */
   world: z.number().nullable().default(null),
+  /** Rank on GOLF Magazine's Top 100 Courses in the World, every country together (shown as "World"). */
+  global: z.number().nullable().default(null),
   usa: z.number().nullable().default(null),
   michigan: z.number().nullable().default(null),
   /** Rank on the course's own Best-in-State list, whatever the state. */

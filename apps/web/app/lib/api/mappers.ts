@@ -7,6 +7,8 @@ import {
   type FeedItem,
   type Profile,
   type TimelineRound,
+  type TopListDetail,
+  type TopListStanding,
   type WantToPlayEntry,
 } from "@coursebook/domain/social/types";
 import type { ListEntry, RoundEntry } from "@coursebook/domain/journal/types";
@@ -42,6 +44,7 @@ function toCourse(id: string, details: Details, ranks: Ranks): Course {
     country: details.country,
     region: region(details.country, details.state),
     world: ranks.world,
+    global: ranks.global,
     usa: ranks.usa,
     public: ranks.usaPublic,
     michigan: details.state?.toUpperCase() === "MI" ? ranks.state : null,
@@ -158,4 +161,21 @@ export function toCourseDetailsRequest(course: Pick<Course, "name" | "location" 
 
 export function fromWantToPlay(list: ApiSchemas["WantToPlay"]): WantToPlayEntry[] {
   return list.courses.map((entry) => ({ course: fromApiCourse(entry.course), addedAt: entry.addedAt }));
+}
+
+export function fromTopListProgress(progress: ApiSchemas["TopListProgress"]): TopListStanding {
+  return { list: progress.list, mine: progress.mine, friends: progress.friends };
+}
+
+export function fromTopListDetail(detail: ApiSchemas["TopListDetail"]): TopListDetail {
+  return {
+    standing: fromTopListProgress(detail.progress),
+    entries: detail.entries.map((entry) => ({
+      course: fromApiCourse(entry.course),
+      rank: entry.rank,
+      played: entry.played,
+      wantToPlay: entry.wantToPlay,
+      friendsPlayed: entry.friendsPlayed,
+    })),
+  };
 }

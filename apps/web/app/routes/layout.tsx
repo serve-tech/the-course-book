@@ -7,7 +7,7 @@ import { api, ApiError, unwrap } from "../lib/api";
 import { useServerWaking } from "../lib/api/server-status";
 import { detectState } from "../shared/lib/geolocation";
 import { errorMessage } from "../shared/lib/errors";
-import { preferences } from "../shared/lib/storage";
+import { preferences, SELECTED_STATE_KEY } from "../shared/lib/storage";
 import { usePreference } from "../shared/lib/use-preference";
 import { TabBar, TopBar } from "../features/shell/AppNav";
 import navStyles from "../features/shell/nav.module.css";
@@ -15,7 +15,6 @@ import { cx } from "../shared/lib/cx";
 import type { Notify, Shell, ToastAction } from "../shared/ui/shell";
 import { replyMessage, useJournalFetcher } from "../features/journal/use-journal-fetcher";
 
-const SELECTED_STATE_KEY = "theCourseBookSelectedState";
 const MOBILE_BREAKPOINT = 760;
 const TOAST_MS = 1900;
 /** Long enough to read the message and reach the button. */

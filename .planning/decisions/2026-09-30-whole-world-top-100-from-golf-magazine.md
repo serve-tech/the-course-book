@@ -1,7 +1,7 @@
 # Whole-world Top 100 comes from GOLF Magazine, not a merge of Golf Digest's lists
 
 **Date:** 2026-09-30
-**Status:** Accepted (the import itself is not built yet)
+**Status:** Accepted; imported in migration 0005 (branch feat/world-top-100-and-top-list-api)
 
 ## Context
 
@@ -31,6 +31,17 @@ The maintainer also wants each course's rank on every list it appears on, like a
 Option 3, chosen by the maintainer on 2026-09-30. GOLF's list becomes a new published list, with its own `ranking_type`, alongside Golf Digest's. `world` stays Golf Digest's, because `course_rankings` allows one rank per course and type. The new list becomes the Courses page default once it lands. Until then the page opens on the USA Top 100, or on the tab last used on the device.
 
 The recruit-style ranks shipped with the Top lists redesign (commit de968f4): every course row lists each of its ranks (`rankBadges` in `apps/web/app/features/top-lists/lists.ts`).
+
+### How the import works (maintainer's answers, 2026-09-30)
+
+- **Names:**
+  - GOLF's list is "World" (ranking type `global`, scope `GLOBAL`) and is the Courses page's default tab.
+  - Golf Digest's `world` list is relabeled "International". Its type and contract field keep their names, because the contract only grows.
+- **Duplicate catalog rows:** GOLF's rank goes on the row that holds the USA rank, so World and USA line up on one row. Merging the duplicates stays a separate decision.
+- **Courses not in the catalog:** Ardfin, Childress Hall (Upper) and Nine Bridges are added. If a course with the same name key and country already exists (a member may have added one by hand), that row is ranked instead.
+- **Migration:**
+  - Postgres cannot use an enum value added in the same transaction, and drizzle applies pending migrations in one transaction. So 0005 recreates `ranking_type` with the new value instead of using `ADD VALUE`.
+  - The release before it must skip unknown list types. That's `rankSummaries`, fixed on feat/top-lists-want-to-play.
 
 ## Consequences
 

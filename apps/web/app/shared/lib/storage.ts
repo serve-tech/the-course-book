@@ -59,3 +59,9 @@ export class SafeStorage {
 export function preferences(): SafeStorage {
   return new SafeStorage(window.localStorage);
 }
+
+/** Preference: the two-letter state chosen for Best in State and My List filters. */
+export const SELECTED_STATE_KEY = "theCourseBookSelectedState";
+
+/** Preference: the Courses tab last shown on this device (a `ListTab` value). */
+export const TOP_LIST_TAB_KEY = "coursebookTopListTab";

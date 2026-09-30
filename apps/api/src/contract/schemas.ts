@@ -44,10 +44,11 @@ export const ApiErrorSchema = z.object({ error: ApiErrorBodySchema }).openapi("A
 
 export const CourseRanksSchema = z
   .object({
-    world: optionalRank,
+    world: optionalRank.openapi({ description: "Golf Digest's World 100, which leaves out US courses (shown as International)." }),
     usa: optionalRank,
     usaPublic: optionalRank,
     state: optionalRank.openapi({ description: "Rank on the Best-in-State list of the course's own state." }),
+    global: optionalRank.openapi({ description: "GOLF Magazine's Top 100 Courses in the World, every country together (shown as World)." }),
   })
   .openapi("CourseRanks");
 
@@ -101,7 +102,10 @@ export const RankingEntrySchema = z
   .object({
     course: CourseSchema,
     rank,
-    type: z.string().openapi({ description: "Published list: world, usa, usa_public or state. New lists may appear." }),
+    type: z.string().openapi({
+      description:
+        "Published list: global (GOLF Magazine, every country), world (Golf Digest, outside the US), usa, usa_public or state. New lists may appear.",
+    }),
     scope: z.string().openapi({ description: "List scope, e.g. WORLD, USA or a state code." }),
   })
   .openapi("RankingEntry");
@@ -236,6 +240,47 @@ export const WantToPlaySchema = z
   .object({ courses: z.array(WantToPlayEntrySchema).openapi({ description: "Courses the member wants to play, newest first." }) })
   .openapi("WantToPlay");
 
+export const TopListSchema = z
+  .object({
+    type: z.string().openapi({ description: "global, world, usa, usa_public or state. New lists may appear." }),
+    scope: z.string().openapi({ description: "GLOBAL, WORLD, USA, USA_PUBLIC or a two-letter state code." }),
+    title: z.string().openapi({ description: "Display title, e.g. `World Top 100` or `Best in Georgia`." }),
+    size: z.number().int().min(0),
+    source: z.string().openapi({ description: "Publisher, e.g. `GOLF Magazine`." }),
+    sourceYear: z.number().int(),
+  })
+  .openapi("TopList");
+
+export const MemberProgressSchema = z
+  .object({ member: MemberSchema, played: z.number().int().min(1) })
+  .openapi("MemberProgress");
+
+export const TopListProgressSchema = z
+  .object({
+    list: TopListSchema,
+    mine: z.number().int().min(0).openapi({ description: "Courses on the list the member has played." }),
+    friends: z.array(MemberProgressSchema).openapi({ description: "Friends who have played at least one course on it, most first." }),
+  })
+  .openapi("TopListProgress");
+
+export const TopListsSchema = z
+  .object({ lists: z.array(TopListProgressSchema).openapi({ description: "National lists first, then state lists by title." }) })
+  .openapi("TopLists");
+
+export const TopListEntrySchema = z
+  .object({
+    course: CourseSchema,
+    rank,
+    played: z.number().int().min(0).openapi({ description: "The member's rounds at this course." }),
+    wantToPlay: z.boolean(),
+    friendsPlayed: z.array(MemberSchema).openapi({ description: "Friends who have played it, by display name." }),
+  })
+  .openapi("TopListEntry");
+
+export const TopListDetailSchema = z
+  .object({ progress: TopListProgressSchema, entries: z.array(TopListEntrySchema).openapi({ description: "In rank order." }) })
+  .openapi("TopListDetail");
+
 export const FeedItemSchema = z
   .object({
     id: z.string().openapi({ description: "Stable across pages." }),
@@ -364,6 +409,11 @@ export const SetPlayCountRequestSchema = z
 
 export const RoundIdParamsSchema = z.object({
   roundId: z.uuid().openapi({ param: { name: "roundId", in: "path" } }),
+});
+
+export const TopListParamsSchema = z.object({
+  type: z.string().min(1).openapi({ param: { name: "type", in: "path" } }),
+  scope: z.string().min(1).openapi({ param: { name: "scope", in: "path" } }),
 });
 
 export const CourseIdParamsSchema = z.object({

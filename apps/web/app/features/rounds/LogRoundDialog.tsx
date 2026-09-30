@@ -207,8 +207,9 @@ export function LogRoundDialog({
                     <small>
                       {course.location}
                       {course.michigan ? " · Michigan #" + String(course.michigan) : ""}
+                      {course.global ? " · World #" + String(course.global) : ""}
                       {course.usa ? " · USA #" + String(course.usa) : ""}
-                      {course.world ? " · World #" + String(course.world) : ""}
+                      {course.world ? " · International #" + String(course.world) : ""}
                       {course.public ? " · Public #" + String(course.public) : ""}
                     </small>
                   </button>

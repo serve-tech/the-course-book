@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { SafeStorage } from "./storage";
+import { SELECTED_STATE_KEY, type SafeStorage } from "./storage";
 import { stateCode } from "@coursebook/domain/catalog/geography";
 const responseSchema = z.object({
   countryCode: z.string().optional(),
@@ -11,11 +11,11 @@ export function detectState(
 ): () => void {
   if (storage.read("theCourseBookLocationPromptVersion") !== "v2") {
     storage.write("theCourseBookLocationPromptVersion", "v2");
-    storage.remove("theCourseBookSelectedState");
+    storage.remove(SELECTED_STATE_KEY);
     onState("");
   }
   if (
-    storage.read("theCourseBookSelectedState") ||
+    storage.read(SELECTED_STATE_KEY) ||
     !("geolocation" in navigator)
   )
     return () => undefined;
@@ -44,7 +44,7 @@ export function detectState(
             parsed.countryCode === "US" &&
             code &&
             code !== "DC" &&
-            !storage.read("theCourseBookSelectedState")
+            !storage.read(SELECTED_STATE_KEY)
           )
             onState(code);
         })

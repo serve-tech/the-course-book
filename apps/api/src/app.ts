@@ -19,6 +19,7 @@ import { registerClientRoutes } from "./routes/clients";
 import { registerFeedRoutes } from "./routes/feed";
 import { registerJournalRoutes } from "./routes/journal";
 import { registerMemberRoutes } from "./routes/members";
+import { registerTopListRoutes } from "./routes/top-lists";
 import { registerWantToPlayRoutes } from "./routes/want-to-play";
 import { checkDatabase } from "./services/health";
 import type { Provisioner } from "./services/provisioning";
@@ -113,7 +114,7 @@ export function createApp(deps: AppDependencies): OpenAPIHono<AppEnv> {
     }),
   );
   app.use("/v1/*", sessionMiddleware(deps.verifySession));
-  for (const path of ["/v1/me", "/v1/me/*", "/v1/members", "/v1/members/*", "/v1/member-search", "/v1/course-search"])
+  for (const path of ["/v1/me", "/v1/me/*", "/v1/members", "/v1/members/*", "/v1/member-search", "/v1/course-search", "/v1/feed", "/v1/top-lists", "/v1/top-lists/*"])
     app.use(path, noStore);
 
   app.get("/healthz", async (c) => {
@@ -131,6 +132,7 @@ export function createApp(deps: AppDependencies): OpenAPIHono<AppEnv> {
   registerCatalogRoutes(app, deps);
   registerMemberRoutes(app, deps);
   registerWantToPlayRoutes(app, deps);
+  registerTopListRoutes(app, deps);
   registerFeedRoutes(app, deps);
   registerClientRoutes(app, deps);
 

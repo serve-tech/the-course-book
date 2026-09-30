@@ -88,10 +88,17 @@ test("anonymous navigation, dialogs and mobile layout remain usable", async ({ p
   await page.goto("/");
   await expect(welcome(page)).toBeVisible();
   await page.getByRole("link", { name: "Courses", exact: true }).click();
-  // The Courses page opens on the USA Top 100 rather than an empty state list.
-  await expect(page.getByRole("tab", { name: "USA Top 100" })).toHaveAttribute("aria-selected", "true");
+  // The Courses page opens on GOLF's World Top 100 rather than an empty state list,
+  // and every row carries each rank the course holds.
+  await expect(page.getByRole("tab", { name: "World" })).toHaveAttribute("aria-selected", "true");
   await expect(page.locator("#toplist > li")).toHaveCount(100);
-  await expect(page.locator('#toplist > li[data-course="Augusta National Golf Club"]')).toContainText("Georgia #1");
+  await expect(page.locator('#toplist > li[data-course="Augusta National Golf Club"] [aria-label="Published ranks"] li')).toHaveText([
+    /^World #\d+$/,
+    /^USA #\d+$/,
+    /^Georgia #\d+$/,
+  ]);
+  await page.getByRole("tab", { name: "International" }).click();
+  await expect(page.locator("#toplist > li")).toHaveCount(100);
   await page.getByRole("tab", { name: "Best in Michigan" }).click();
   await expect(page.locator("#topStateRankSelect")).toHaveValue("MI");
   await expect(page.locator("#toplist > li").first()).toContainText("Michigan #1");
@@ -270,6 +277,11 @@ test.describe("signed in", () => {
     await page.getByRole("button", { name: /^Only / }).click();
     await expect(list.locator(":scope > li")).toHaveCount(1);
     await expect(list.locator(":scope > li")).toHaveAttribute("data-course", "Shinnecock Hills Golf Club");
+
+    // The Courses page shows which friends played each course and how far along they are.
+    await page.goto("/courses?list=usa");
+    await expect(page.locator('#toplist > li[data-course="Shinnecock Hills Golf Club"]')).toContainText(friend.displayName + " played it");
+    await expect(page.getByRole("list", { name: "Friends' progress" })).toContainText(friend.displayName);
   });
 
   test("members befriend by username, accept, and remove a friend from their profile", async ({ page }) => {

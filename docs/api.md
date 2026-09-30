@@ -24,7 +24,7 @@ Every failure returns:
 | 400 | `bad_request` (unreadable JSON), `validation_failed` (with `fields`), `us_state_required` |
 | 401 | `unauthenticated`, `account_deleted` |
 | 403 | `username_invalid` |
-| 404 | `not_found`, `course_not_found`, `not_on_list`, `round_not_found`, `member_not_found`, `friendship_not_found` |
+| 404 | `not_found`, `course_not_found`, `not_on_list`, `round_not_found`, `member_not_found`, `friendship_not_found`, `top_list_not_found` |
 | 413 | `payload_too_large` |
 | 415 | `unsupported_media_type` |
 | 500 | `internal` |
@@ -57,6 +57,8 @@ Every failure returns:
 | `GET /v1/me/friend-requests` | `listFriendRequests` | member | Pending requests: `incoming` (they asked) and `outgoing` (the viewer asked) |
 | `PUT /v1/me/friends/{username}` | `befriendMember` | member | Send a request, or accept theirs; returns the resulting `relationship`; idempotent. 400 for the viewer's own username |
 | `DELETE /v1/me/friends/{username}` | `removeFriend` | member | End the friendship, cancel the viewer's request or decline theirs; 204, or 404 `friendship_not_found` |
+| `GET /v1/top-lists` | `listTopLists` | member | Every published list (national first) with the member's count and each friend's who has played any of it, most first |
+| `GET /v1/top-lists/{type}/{scope}` | `getTopList` | member | One list in rank order: per course the member's rounds, Want to play and the friends who played it; 404 `top_list_not_found` |
 | `GET /v1/members/{username}/want-to-play` | `listWantToPlay` | member | The member's own or a friend's Want to play list, newest first; anyone else is 404 `member_not_found` |
 | `PUT /v1/me/want-to-play/{courseId}` | `addWantToPlay` | member | Add a catalog course (played ones too); idempotent, keeps the original date; returns the list |
 | `DELETE /v1/me/want-to-play/{courseId}` | `removeWantToPlay` | member | Remove a course; idempotent (removing one that is not there changes nothing); returns the list |

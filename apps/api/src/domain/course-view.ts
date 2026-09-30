@@ -9,6 +9,7 @@ import { canonicalize } from "./identity";
 
 export interface RankSummary {
   world?: number;
+  global?: number;
   usa?: number;
   public?: number;
   /** Rank on the course's state list; a course is on at most one. */
@@ -37,6 +38,7 @@ export function courseView(row: CourseRow, ranks: RankSummary = {}): Course {
       country: row.country,
       region: region(row.country, row.state),
       world: ranks.world ?? null,
+      global: ranks.global ?? null,
       usa: ranks.usa ?? null,
       public: ranks.public ?? null,
       michigan: ranks.michigan ?? null,
@@ -57,6 +59,7 @@ export function rankSummaries(
     // Read as a string: the column may hold a list type newer than this release.
     const type: string = row.rankingType;
     if (type === "world") summary.world = row.rank;
+    else if (type === "global") summary.global = row.rank;
     else if (type === "usa") summary.usa = row.rank;
     else if (type === "usa_public") summary.public = row.rank;
     else if (type === "state") {

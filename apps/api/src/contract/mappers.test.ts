@@ -36,6 +36,7 @@ const course = (overrides: Record<string, unknown> = {}) =>
     country: "USA",
     region: "michigan",
     world: 60,
+    global: 70,
     usa: 40,
     public: 12,
     michigan: 3,
@@ -57,7 +58,7 @@ describe("contract course mapping", () => {
       country: "USA",
       logoUrl: null,
       websiteUrl: "https://arcadiabluffs.com",
-      ranks: { world: 60, usa: 40, usaPublic: 12, state: 3 },
+      ranks: { world: 60, usa: 40, usaPublic: 12, state: 3, global: 70 },
     });
     expect(CourseSchema.safeParse(mapped).success).toBe(true);
   });
@@ -87,10 +88,10 @@ describe("search hit mapping", () => {
 
   // OpenGolfAPI ids are uuids too: the id's shape must not decide membership.
   it.each(["api-123", "b25a4e85-561a-4ca4-8028-7c3480c9bbc0"])("carries no id for a course outside the catalog (id %s)", (id) => {
-    const external = course({ id, world: null, usa: null, public: null, michigan: null, stateRank: null });
+    const external = course({ id, world: null, global: null, usa: null, public: null, michigan: null, stateRank: null });
     const hit = toSearchHit({ course: external, display: external, catalogId: null });
     expect(hit.courseId).toBeNull();
-    expect(hit.ranks).toEqual({ world: null, usa: null, usaPublic: null, state: null });
+    expect(hit.ranks).toEqual({ world: null, usa: null, usaPublic: null, state: null, global: null });
     expect(SearchHitSchema.safeParse(hit).success).toBe(true);
   });
 });

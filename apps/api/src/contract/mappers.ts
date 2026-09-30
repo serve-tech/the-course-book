@@ -1,7 +1,7 @@
 import type { Course, RankedCourse } from "@coursebook/domain/catalog/course";
 import type { SearchResult } from "@coursebook/domain/catalog/search-results";
 import type { MemberList, MemberListRow } from "@coursebook/domain/friends/types";
-import type { FeedItem, Profile, TimelineRound, WantToPlayEntry } from "@coursebook/domain/social/types";
+import type { FeedItem, Profile, TimelineRound, TopListDetail, TopListStanding, WantToPlayEntry } from "@coursebook/domain/social/types";
 import type { ListEntry, RoundEntry } from "@coursebook/domain/journal/types";
 import { UNKNOWN_LOCATION } from "../domain/course-view";
 import type {
@@ -27,6 +27,7 @@ export function toCourseRanks(course: Course): CourseRanks {
     usa: course.usa,
     usaPublic: course.public,
     state: course.stateRank,
+    global: course.global,
   };
 }
 
@@ -133,4 +134,21 @@ export function toFeedItem(item: FeedItem) {
 
 export function toWantToPlay(entries: readonly WantToPlayEntry[]) {
   return { courses: entries.map((entry) => ({ course: toContractCourse(entry.course), addedAt: entry.addedAt })) };
+}
+
+export function toTopListProgress(standing: TopListStanding) {
+  return { list: standing.list, mine: standing.mine, friends: standing.friends };
+}
+
+export function toTopListDetail(detail: TopListDetail) {
+  return {
+    progress: toTopListProgress(detail.standing),
+    entries: detail.entries.map((entry) => ({
+      course: toContractCourse(entry.course),
+      rank: entry.rank,
+      played: entry.played,
+      wantToPlay: entry.wantToPlay,
+      friendsPlayed: entry.friendsPlayed,
+    })),
+  };
 }
