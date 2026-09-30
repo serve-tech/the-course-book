@@ -37,6 +37,7 @@ Sub-decisions, each by the maintainer on 2026-09-29:
 - **Finding friends.** Both an invite link and a QR code of it.
 - **Feed history.** Imported history appears in feeds.
 - **Member-made lists.** Visible to friends by default, with a per-list Only me toggle.
+- **Profile URLs.** `/u/<username>`, so usernames never collide with routes; a short reserved list still blocks impersonation for new accounts.
 - **Names.** Profiles lead with the display name, username second. Screen names:
   - "Top lists" for the published lists;
   - "Lists" for lists members make;
@@ -49,7 +50,7 @@ Sub-decisions, each by the maintainer on 2026-09-29:
 Option 2, following the review's proposal with the sub-decisions above. Rank-derived scores and sentiment buckets from the proposal are dropped in favor of star ratings.
 
 - **Navigation.** Home (friends' activity), Courses (search, Top lists, course pages), Log, Friends (people, requests, invite) and Profile. Bottom tabs on phones, a top bar on desktop.
-- **Profiles.** Every member, the viewer included, has a profile at `/<username>`: header, stats, Top Four (ranks 1–4), and tabs for Timeline, Ranking, Lists (Top list progress, Want to play, member lists) and Stats. A friend's profile adds how your ranks compare, the courses you both want to play, and Remove friend inside a ··· menu. Non-friends remain "not found".
+- **Profiles.** Every member, the viewer included, has a profile at `/u/<username>`: header, stats, Top Four (ranks 1–4), and tabs for Timeline, Ranking, Lists (Top list progress, Want to play, member lists) and Stats. A friend's profile adds how your ranks compare, the courses you both want to play, and Remove friend inside a ··· menu. Non-friends remain "not found".
 - **Top lists as checklists.** Each published list shows the viewer's and friends' progress, and a course can be ticked off with an optional date.
 - **Course pages** at `/courses/<id>` show:
   - the published ranks;
@@ -63,7 +64,7 @@ Option 2, following the review's proposal with the sub-decisions above. Rank-der
 ## Consequences
 
 - **Design.** The API and data design is in [research/2026-09-29-social-api-design.md](../research/2026-09-29-social-api-design.md). Implementation lands in slices; none merges to `main` until the launch import has run and been verified, because the importer requires the deployed migration journal to match its checkout.
-- **Contract exception.** Undated rounds make `Round.playedOn` nullable, which retypes a published field. The design argues for a one-time exception to the contract's growth-only rule, possible only because no native build has shipped yet. It needs the maintainer's approval before it merges.
+- **Contract exception.** Undated rounds make `Round.playedOn` nullable, which retypes a published field. The design argues for a one-time exception to the contract's growth-only rule, possible only because no native build has shipped yet. The maintainer approved it on 2026-09-29.
 - **Legacy behavior change.** "Add to my list" (Friends, Top 100) stops logging a round dated today. It becomes a tick-off with an optional date, or Want to play. This deliberately changes behavior carried over from the old app.
 - **Web and tests.** The redesign replaces `legacy.css` markup and element ids. The browser tests are rewritten alongside it, and AGENTS.md's "preserve the existing markup" rule is lifted for this change.
-- **Avatars.** Avatars need to know whether the member uploaded a photo. Clerk fills `image_url` with a generated placeholder even when they haven't (`hasImage` false). The design has the options: a session claim if Clerk offers one, otherwise the Backend API.
+- **Avatars.** Avatars need to know whether the member uploaded a photo. Clerk fills `image_url` with a generated placeholder even when they haven't (`hasImage` false). Avatars are required. The design has the options: a session claim if Clerk offers one, otherwise the Backend API.

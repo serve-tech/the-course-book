@@ -36,7 +36,7 @@ All are backward-compatible with the release still serving during a deploy: new 
 
 ### Changed shared schemas (additive except where marked)
 
-- `Member` + `avatarUrl: string|null`. It is non-null only when Clerk's `has_image` is true (see Avatars).
+- `Member` + `avatarUrl: string|null`. It is non-null only when the member uploaded a photo (see Avatars).
 - `Me` + `incomingRequests: int`, which drives the nav badge.
 - **`Round.playedOn` becomes nullable (exception).** It also gains `score: int|null`, `tees: string|null`, `note: string|null` and `visibility: string` (`friends`, `private`; may grow). For a friend viewing a round with `private` details, `score`, `tees` and `note` are null.
 - `MyCourse` + `rating: number|null` (0.5–5.0 in 0.5 steps).
@@ -54,7 +54,7 @@ All are backward-compatible with the release still serving during a deploy: new 
 - a sentinel date, which is a lie in the data;
 - a `/v2` just for this, which is disproportionate.
 
-Record in contract/README.md that this was the last retype before native builds ship. **Needs the maintainer's approval.**
+Record in contract/README.md that this was the last retype before native builds ship. **Approved by the maintainer on 2026-09-29.**
 
 ### Changed request schemas
 
@@ -165,7 +165,10 @@ Record in contract/README.md that this was the last retype before native builds 
   - **Milestone:** a round that is the member's first at a course on a Top list carries `milestone`.
   - **Rank moves** are not in the feed; recording them needs an event table, deferred.
 - **Member search** matches username or display name, 3+ characters. This widens discovery slightly, as the review asked ("Kowalski" finds nobody today). Results still carry only the public projection.
-- **Reserved usernames.** The web gives profiles `/<username>`, so `USERNAME_RESERVED` in `apps/api/src/domain/username.ts` blocks route words for new accounts: home, courses, friends, lists, log, invite, account, privacy, settings, feed, search, top, u, api. Before the redesign, check that no existing username is on the list.
+- **Profile URLs and reserved usernames.** Profiles live at `/u/<username>` (maintainer, 2026-09-29), so route words never collide with usernames.
+  - A short reserved list still blocks impersonation and confusion for **new** accounts: admin, administrator, support, help, coursebook, coursebookgolf, official, staff, moderator, and anything starting with `deleted_`, the tombstone prefix.
+  - The check runs only when a `users` row is created or its username changes. It never runs on the per-request refresh, so an existing member with such a name is never locked out.
+  - Clerk's sign-up form must show the same rule. Check whether Clerk can restrict usernames itself; otherwise the 403 `username_invalid` message must name the rule.
 - **Avatars.**
   - Store the image only when Clerk says the member uploaded one. The Backend API user has `hasImage`, which the dev instance confirms is false with a placeholder `imageUrl`.
   - Clerk's JWT-template docs list `{{user.image_url}}` but no `has_image` shortcode. Before building this, check the dashboard's claims editor.
@@ -183,14 +186,14 @@ Record in contract/README.md that this was the last retype before native builds 
 3. **Profiles, timelines, course pages.**
    - Operations: `getMemberProfile`, `listMemberRounds`, `getCourse`; `MemberCourse.played`, `lastPlayedOn`, `myRank`.
    - Pure functions: `compareRankings()`, the timeline cursor, visit numbering.
-   - `Member.avatarUrl` and the `has_image` claim.
+   - `Member.avatarUrl` (required by the maintainer), from a confirmed uploaded photo only.
 4. **Member lists.** Migration 0006 and the list operations.
-5. **Friends plumbing.** `Me.incomingRequests`; `FriendRequests.requests` with context; display-name search; reserved usernames; migration 0007 and invites.
+5. **Friends plumbing.** `Me.incomingRequests`; `FriendRequests.requests` with context; display-name search; reserved usernames for new accounts; migration 0007 and invites.
 6. **Feed.** `getFeed`.
 7. **Web redesign** (planned separately once 1–6 exist):
    - Navigation.
-   - Routes: `/`, `/courses`, `/courses/:id`, `/top-lists/:type/:scope`, `/friends`, `/invite/:token`, `/:username` and its tabs, `/lists/:id`, `/account`, `/privacy`.
-   - Redirects from `/top-100` and `/friends/:username`.
+   - Routes: `/`, `/courses`, `/courses/:id`, `/top-lists/:type/:scope`, `/friends`, `/invite/:token`, `/u/:username` and its tabs, `/lists/:id`, `/account`, `/privacy`.
+   - Redirects from `/top-100` and `/friends/:username` (to `/u/:username`).
    - Log a round with stars.
    - Browser tests rewritten.
    - `AGENTS.md` updated to drop "preserve legacy markup".
