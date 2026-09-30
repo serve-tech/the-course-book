@@ -32,6 +32,12 @@ export interface TripSpec {
   days: readonly (readonly string[])[];
 }
 
+/** A course added to Want to play `daysAgo` days before today. */
+export interface WantedCourse {
+  daysAgo: number;
+  course: string;
+}
+
 /** A round played `daysAgo` days before today and logged that evening. */
 export interface RecentRound {
   daysAgo: number;
@@ -49,6 +55,8 @@ export interface GolferSpec {
   trips: readonly TripSpec[];
   /** Rounds that always show on friends' feeds as fresh activity. */
   recent: readonly RecentRound[];
+  /** Want to play, oldest first. A played course may be on it, but only if its last round came before it was added. */
+  wantToPlay: readonly WantedCourse[];
   /** How far back random history dates reach, in days. */
   historyDays: number;
   /** Northern golfers play history rounds from April to October only. */
@@ -96,6 +104,12 @@ export const YOU: GolferSpec = {
     { daysAgo: 3, course: "Washtenaw Golf Club" },
     { daysAgo: 9, course: "Arcadia Bluffs Golf Club" },
   ],
+  wantToPlay: [
+    { daysAgo: 400, course: "Crystal Downs Country Club" },
+    { daysAgo: 120, course: "Sand Valley" },
+    { daysAgo: 45, course: "Kiawah Island Golf Resort: The Ocean Course" },
+    { daysAgo: 20, course: "Pacific Dunes" },
+  ],
   historyDays: 1095,
   seasonal: true,
   backfillDaysAgo: null,
@@ -126,6 +140,10 @@ export const PERSONAS: readonly PersonaSpec[] = [
       { daysAgo: 6, course: "Rackham Golf Course" },
       { daysAgo: 2, course: "Rackham Golf Course" },
     ],
+    wantToPlay: [
+      { daysAgo: 300, course: "Crystal Downs Country Club" },
+      { daysAgo: 90, course: "Sand Valley" },
+    ],
     historyDays: 1090,
     seasonal: true,
     backfillDaysAgo: null,
@@ -150,6 +168,10 @@ export const PERSONAS: readonly PersonaSpec[] = [
     filler: { states: ["CA"], minRank: 8, maxRank: 60, count: 6 },
     trips: [{ startDaysAgo: 7, days: [["Bandon Dunes"], ["Pacific Dunes", "Old Macdonald"], ["Bandon Trails"]] }],
     recent: [{ daysAgo: 1, course: "Pasatiempo Golf Club" }],
+    wantToPlay: [
+      { daysAgo: 500, course: "Cypress Point Club" },
+      { daysAgo: 60, course: "Pine Valley Golf Club" },
+    ],
     historyDays: 790,
     seasonal: false,
     backfillDaysAgo: null,
@@ -187,6 +209,11 @@ export const PERSONAS: readonly PersonaSpec[] = [
       },
     ],
     recent: [{ daysAgo: 3, course: "Bethpage Black" }],
+    wantToPlay: [
+      { daysAgo: 700, course: "Pine Valley Golf Club" },
+      { daysAgo: 250, course: "Royal County Down Golf Club (Championship)" },
+      { daysAgo: 15, course: "Royal Dornoch Golf Club (Championship)" },
+    ],
     historyDays: 1090,
     seasonal: true,
     backfillDaysAgo: null,
@@ -211,6 +238,10 @@ export const PERSONAS: readonly PersonaSpec[] = [
     filler: { states: ["WI", "IL"], minRank: 5, maxRank: 40, count: 6 },
     trips: [{ startDaysAgo: 11, days: [["Sand Valley", "Mammoth Dunes"], ["The Lido at Sand Valley"], ["Sedge Valley at Sand Valley"]] }],
     recent: [{ daysAgo: 4, course: "Blue Mound Golf & Country Club" }],
+    wantToPlay: [
+      { daysAgo: 150, course: "Pacific Dunes" },
+      { daysAgo: 40, course: "Bandon Dunes" },
+    ],
     historyDays: 490,
     seasonal: true,
     backfillDaysAgo: null,
@@ -241,6 +272,7 @@ export const PERSONAS: readonly PersonaSpec[] = [
     filler: { states: ["GA", "SC"], minRank: 10, maxRank: 50, count: 8 },
     trips: [],
     recent: [{ daysAgo: 1, course: "Sea Island: Seaside" }],
+    wantToPlay: [{ daysAgo: 1, course: "Augusta National Golf Club" }],
     historyDays: 1825,
     seasonal: false,
     backfillDaysAgo: 1,
@@ -266,6 +298,7 @@ export const PERSONAS: readonly PersonaSpec[] = [
       { daysAgo: 10, course: "TPC San Antonio: Oaks Course" },
       { daysAgo: 3, course: "PGA Frisco: Fields Ranch East" },
     ],
+    wantToPlay: [{ daysAgo: 30, course: "Kiawah Island Golf Resort: The Ocean Course" }],
     historyDays: 730,
     seasonal: false,
     backfillDaysAgo: 58,
@@ -283,6 +316,7 @@ export const PERSONAS: readonly PersonaSpec[] = [
     filler: { states: ["AZ"], minRank: 1, maxRank: 30, count: 6 },
     trips: [],
     recent: [{ daysAgo: 4, course: "Quintero Golf Club" }],
+    wantToPlay: [{ daysAgo: 100, course: "Pebble Beach Golf Links" }],
     historyDays: 290,
     seasonal: false,
     backfillDaysAgo: null,
@@ -300,6 +334,10 @@ export const PERSONAS: readonly PersonaSpec[] = [
     filler: { states: ["PA"], minRank: 1, maxRank: 45, count: 8 },
     trips: [],
     recent: [{ daysAgo: 5, course: "Nemacolin: Mystic Rock" }],
+    wantToPlay: [
+      { daysAgo: 200, course: "Merion Golf Club: East" },
+      { daysAgo: 30, course: "Oakmont Country Club" },
+    ],
     historyDays: 690,
     seasonal: true,
     backfillDaysAgo: null,

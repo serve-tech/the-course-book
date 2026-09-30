@@ -56,11 +56,18 @@ export interface SeedRound {
   createdAt: Date;
 }
 
-/** One member's list, best first (rank = index + 1), and their rounds. */
+/** A course on a Want to play list and when it was added. */
+export interface SeedWant {
+  courseId: string;
+  addedAt: Date;
+}
+
+/** One member's list, best first (rank = index + 1), their rounds and their Want to play list. */
 export interface SeedJournal {
   userId: string;
   courseIds: readonly string[];
   rounds: readonly SeedRound[];
+  wantToPlay: readonly SeedWant[];
 }
 
 /** A `friendships` row; `updatedAt` is when an accepted request was accepted. */
@@ -221,6 +228,7 @@ function namedCourses(spec: GolferSpec): string[] {
     ...spec.courses,
     ...spec.trips.flatMap((trip) => trip.days.flat()),
     ...spec.recent.map((round) => round.course),
+    ...spec.wantToPlay.map((wanted) => wanted.course),
   ];
 }
 
@@ -270,9 +278,13 @@ function specProblems(personas: readonly PersonaSpec[], golfers: readonly Golfer
     }
   }
   for (const golfer of golfers) {
-    const days = [...golfer.recent.map((round) => round.daysAgo), ...golfer.trips.map((trip) => trip.startDaysAgo - trip.days.length + 1)];
+    const days = [
+      ...golfer.recent.map((round) => round.daysAgo),
+      ...golfer.trips.map((trip) => trip.startDaysAgo - trip.days.length + 1),
+      ...golfer.wantToPlay.map((wanted) => wanted.daysAgo),
+    ];
     if (golfer.backfillDaysAgo !== null) days.push(golfer.backfillDaysAgo);
-    if (days.some((daysAgo) => daysAgo < 1)) problems.push("rounds and backfills must be at least a day ago");
+    if (days.some((daysAgo) => daysAgo < 1)) problems.push("rounds, backfills and Want to play must be at least a day ago");
   }
   return problems;
 }
@@ -313,12 +325,15 @@ function planJournal(userId: string, spec: GolferSpec, key: string, context: Jou
       names.forEach((name, order) => played.push({ course: course(name), daysAgo: trip.startDaysAgo - day, order, recent: false }));
     });
   for (const round of spec.recent) played.push({ course: course(round.course), daysAgo: round.daysAgo, order: 0, recent: true });
-  for (const pick of fillerPicks(spec, context.catalog, new Set(played.map((round) => normalizeName(round.course.name))), random)) once(pick);
+  // Filler skips wanted courses too: a filler round logged after the course was wanted would have taken it off the list.
+  const listed = new Set([...played.map((round) => round.course.name), ...spec.wantToPlay.map((wanted) => course(wanted.course).name)].map(normalizeName));
+  for (const pick of fillerPicks(spec, context.catalog, listed, random)) once(pick);
 
   return {
     userId,
     courseIds: personalOrder(played, spec.home ? course(spec.home.course).id : null, random),
     rounds: loggedRounds(played, spec.backfillDaysAgo, clock, random),
+    wantToPlay: spec.wantToPlay.map((wanted) => ({ courseId: course(wanted.course).id, addedAt: clock.at(wanted.daysAgo, 18 * 60) })),
   };
 }
 

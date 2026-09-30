@@ -1,7 +1,7 @@
 import { asc, eq, sql } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { FeedItemType } from "@coursebook/domain/social/types";
-import { friendships, rounds, userCourses, users } from "../../src/db/schema";
+import { friendships, rounds, userCourses, users, wantToPlay } from "../../src/db/schema";
 import { allCourses } from "../../src/services/catalog";
 import { friendsFeed } from "../../src/services/feed";
 import { memberProfile } from "../../src/services/profiles";
@@ -57,6 +57,7 @@ describe("writeSeed", () => {
     for (const journal of seed.journals) {
       expect(await listOf(journal.userId)).toEqual(journal.courseIds);
       expect(await roundCount(journal.userId)).toBe(journal.rounds.length);
+      expect(await db.$count(wantToPlay, eq(wantToPlay.userId, journal.userId))).toBe(journal.wantToPlay.length);
     }
     expect(await db.$count(friendships)).toBe(seed.friendships.length);
   });

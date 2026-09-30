@@ -5,13 +5,13 @@
  * Seeded members are the `users` rows whose id starts with `seed_`; deleting
  * them cascades to their lists, rounds and friendships, including yours with
  * them. Nothing else is touched except, when the plan includes it, your own
- * list and rounds. Everything happens in one transaction under your journal
+ * list, rounds and Want to play list. Everything happens in one transaction under your journal
  * lock, so a failure leaves the previous state and a running app never sees
  * half a seed.
  */
 import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import type { Database } from "../../src/db/client";
-import { friendships, rounds, userCourses, users } from "../../src/db/schema";
+import { friendships, rounds, userCourses, users, wantToPlay } from "../../src/db/schema";
 import { withJournalLock } from "../../src/services/journal";
 import { SEED_ID_PREFIX, type SeedJournal, type SeedPlan } from "./plan";
 
@@ -90,7 +90,10 @@ export async function writeSeed(db: Database, plan: SeedPlan, youId: string, you
 
     await tx.delete(users).where(isSeeded);
     // Deleting the memberships deletes their rounds (rounds_membership_fk cascades).
-    if (yourJournal) await tx.delete(userCourses).where(eq(userCourses.userId, youId));
+    if (yourJournal) {
+      await tx.delete(userCourses).where(eq(userCourses.userId, youId));
+      await tx.delete(wantToPlay).where(eq(wantToPlay.userId, youId));
+    }
 
     if (plan.members.length)
       await tx.insert(users).values(
@@ -103,6 +106,10 @@ export async function writeSeed(db: Database, plan: SeedPlan, youId: string, you
         })),
       );
     for (const journal of plan.journals) {
+      if (journal.wantToPlay.length)
+        await tx
+          .insert(wantToPlay)
+          .values(journal.wantToPlay.map((wanted) => ({ userId: journal.userId, courseId: wanted.courseId, createdAt: wanted.addedAt })));
       if (!journal.courseIds.length) continue;
       const added = firstLogged(journal);
       await tx.insert(userCourses).values(

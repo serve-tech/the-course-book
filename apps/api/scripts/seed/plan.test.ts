@@ -21,6 +21,7 @@ function catalogFor(golfers: readonly GolferSpec[]): Course[] {
       ...golfer.courses,
       ...golfer.trips.flatMap((trip) => trip.days.flat()),
       ...golfer.recent.map((round) => round.course),
+      ...golfer.wantToPlay.map((wanted) => wanted.course),
     ]),
   );
   const states = new Set(golfers.flatMap((golfer) => golfer.filler?.states ?? []));
@@ -50,6 +51,7 @@ const golfer = (fields: Partial<GolferSpec>): GolferSpec => ({
   filler: null,
   trips: [],
   recent: [],
+  wantToPlay: [],
   historyDays: 400,
   seasonal: false,
   backfillDaysAgo: null,
@@ -149,6 +151,20 @@ describe("planSeed with the committed personas", () => {
           break;
       }
     }
+  });
+
+  it("never logs a round at a wanted course after it was added, since logging takes it off", () => {
+    for (const entry of plan.journals)
+      for (const wanted of entry.wantToPlay) {
+        const later = entry.rounds.filter((round) => round.courseId === wanted.courseId && round.createdAt >= wanted.addedAt);
+        expect(later, `${entry.userId} ${wanted.courseId}`).toEqual([]);
+      }
+  });
+
+  it("gives you and at least one friend the same course to want", () => {
+    const yours = new Set(journal(YOU_ID).wantToPlay.map((wanted) => wanted.courseId));
+    const shared = plan.journals.filter((entry) => entry.userId !== YOU_ID && entry.wantToPlay.some((wanted) => yours.has(wanted.courseId)));
+    expect(shared.length).toBeGreaterThan(0);
   });
 
   it("has at most one friendship row per pair and none with oneself", () => {
