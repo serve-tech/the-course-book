@@ -64,6 +64,16 @@ describe("course view", () => {
     expect(summaries.get(ohio)).toEqual({ state: 9 });
   });
 
+  it("skips a list type it does not know rather than reading it as a state list", () => {
+    // A newer release's migration can add a list type while this one still serves.
+    const unknown = ranking({ id: "e", rankingType: "state", rank: 8, scopeCode: "GLOBAL" });
+    const summaries = rankSummaries([
+      ranking({ id: "c", rankingType: "state", rank: 1, scopeCode: "GA" }),
+      { ...unknown, rankingType: "future_list" as CourseRankingRow["rankingType"] },
+    ]);
+    expect(summaries.get(row().id)).toEqual({ state: 1 });
+  });
+
   it("carries the state rank on the course view", () => {
     expect(courseView(row({ state: "OH" }), { state: 9 })).toMatchObject({ stateRank: 9, michigan: null });
     expect(courseView(row()).stateRank).toBeNull();

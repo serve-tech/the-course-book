@@ -54,14 +54,17 @@ export function rankSummaries(
   const result = new Map<string, RankSummary>();
   for (const row of rankings) {
     const summary = result.get(row.courseId) ?? {};
-    if (row.rankingType === "world") summary.world = row.rank;
-    else if (row.rankingType === "usa") summary.usa = row.rank;
-    else if (row.rankingType === "usa_public") summary.public = row.rank;
-    else {
-      // The remaining ranking type is a Best-in-State list.
+    // Read as a string: the column may hold a list type newer than this release.
+    const type: string = row.rankingType;
+    if (type === "world") summary.world = row.rank;
+    else if (type === "usa") summary.usa = row.rank;
+    else if (type === "usa_public") summary.public = row.rank;
+    else if (type === "state") {
       summary.state = row.rank;
       if (row.scopeCode.toUpperCase() === "MI") summary.michigan = row.rank;
     }
+    // Other list types are skipped: a release must not misread a list type
+    // that a newer release's migration adds while it is still serving.
     result.set(row.courseId, summary);
   }
   return result;
