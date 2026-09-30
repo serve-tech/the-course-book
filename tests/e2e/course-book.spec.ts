@@ -88,10 +88,17 @@ test("anonymous navigation, dialogs and mobile layout remain usable", async ({ p
   await page.goto("/");
   await expect(welcome(page)).toBeVisible();
   await page.getByRole("link", { name: "Courses", exact: true }).click();
-  // The Courses page opens on the USA Top 100 rather than an empty state list.
-  await expect(page.getByRole("tab", { name: "USA Top 100" })).toHaveAttribute("aria-selected", "true");
+  // The Courses page opens on GOLF's World Top 100 rather than an empty state list,
+  // and every row carries each rank the course holds.
+  await expect(page.getByRole("tab", { name: "World" })).toHaveAttribute("aria-selected", "true");
   await expect(page.locator("#toplist > li")).toHaveCount(100);
-  await expect(page.locator('#toplist > li[data-course="Augusta National Golf Club"]')).toContainText("Georgia #1");
+  await expect(page.locator('#toplist > li[data-course="Augusta National Golf Club"] [aria-label="Published ranks"] li')).toHaveText([
+    /^World #\d+$/,
+    /^USA #\d+$/,
+    /^Georgia #\d+$/,
+  ]);
+  await page.getByRole("tab", { name: "International" }).click();
+  await expect(page.locator("#toplist > li")).toHaveCount(100);
   await page.getByRole("tab", { name: "Best in Michigan" }).click();
   await expect(page.locator("#topStateRankSelect")).toHaveValue("MI");
   await expect(page.locator("#toplist > li").first()).toContainText("Michigan #1");

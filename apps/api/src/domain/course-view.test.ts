@@ -56,11 +56,12 @@ describe("course view", () => {
     const ohio = "22222222-2222-4222-8222-222222222222";
     const summaries = rankSummaries([
       ranking({ id: "a", rankingType: "world", rank: 3, scopeCode: "WORLD" }),
+      ranking({ id: "g", rankingType: "global", rank: 4, scopeCode: "GLOBAL" }),
       ranking({ id: "b", rankingType: "usa_public", rank: 7, scopeCode: "USA_PUBLIC" }),
       ranking({ id: "c", rankingType: "state", rank: 2, scopeCode: "MI" }),
       ranking({ id: "d", courseId: ohio, rankingType: "state", rank: 9, scopeCode: "OH" }),
     ]);
-    expect(summaries.get(row().id)).toEqual({ world: 3, public: 7, state: 2, michigan: 2 });
+    expect(summaries.get(row().id)).toEqual({ world: 3, global: 4, public: 7, state: 2, michigan: 2 });
     expect(summaries.get(ohio)).toEqual({ state: 9 });
   });
 

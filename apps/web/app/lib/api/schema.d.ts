@@ -469,11 +469,14 @@ export interface components {
             ranks: components["schemas"]["CourseRanks"];
         };
         CourseRanks: {
+            /** @description Golf Digest's World 100, which leaves out US courses (shown as International). */
             world: number | null;
             usa: number | null;
             usaPublic: number | null;
             /** @description Rank on the Best-in-State list of the course's own state. */
             state: number | null;
+            /** @description GOLF Magazine's Top 100 Courses in the World, every country together (shown as World). */
+            global: number | null;
         };
         Rounds: {
             /** @description Newest first. */
@@ -586,7 +589,7 @@ export interface components {
         RankingEntry: {
             course: components["schemas"]["Course"];
             rank: number;
-            /** @description Published list: world, usa, usa_public or state. New lists may appear. */
+            /** @description Published list: global (GOLF Magazine, every country), world (Golf Digest, outside the US), usa, usa_public or state. New lists may appear. */
             type: string;
             /** @description List scope, e.g. WORLD, USA or a state code. */
             scope: string;

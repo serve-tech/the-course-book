@@ -22,13 +22,14 @@ export interface NationalProgress {
 /** National Top 100 sizes; state lists vary and come from the Lists tab. */
 const NATIONAL_SIZE = 100;
 
-/** Progress through the USA, World and USA Public Top 100s, from the courses' published ranks. */
+/** Progress through the World, USA, USA Public and International Top 100s, from the courses' published ranks. */
 export function nationalProgress(rows: readonly RankedPlay[]): NationalProgress[] {
   const count = (rank: (course: Course) => number | null) => rows.filter((row) => rank(row.course) !== null).length;
   return [
+    { title: "World Top 100", played: count((course) => course.global), size: NATIONAL_SIZE },
     { title: "USA Top 100", played: count((course) => course.usa), size: NATIONAL_SIZE },
-    { title: "World Top 100", played: count((course) => course.world), size: NATIONAL_SIZE },
     { title: "USA Public Top 100", played: count((course) => course.public), size: NATIONAL_SIZE },
+    { title: "International Top 100", played: count((course) => course.world), size: NATIONAL_SIZE },
   ];
 }
 

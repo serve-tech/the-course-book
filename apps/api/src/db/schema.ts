@@ -29,11 +29,18 @@ import {
  *   lives in the custom migration 0002_deferred_rank_unique.sql.
  */
 
+/**
+ * Published list types. `world` is Golf Digest's World 100, which leaves
+ * out the US (shown as "International"); `global` is GOLF Magazine's Top
+ * 100 Courses in the World, which ranks every country together (shown as
+ * "World"; decision 2026-09-30).
+ */
 export const rankingType = pgEnum("ranking_type", [
   "world",
   "usa",
   "usa_public",
   "state",
+  "global",
 ]);
 
 const timestamps = {

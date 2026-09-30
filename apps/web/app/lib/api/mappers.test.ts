@@ -14,7 +14,7 @@ import {
   UNKNOWN_LOCATION,
 } from "./mappers";
 
-const ranks = (state: number | null = null): ApiSchemas["CourseRanks"] => ({ world: 60, usa: 40, usaPublic: 12, state });
+const ranks = (state: number | null = null): ApiSchemas["CourseRanks"] => ({ world: 60, usa: 40, usaPublic: 12, state, global: 55 });
 
 const arcadia: ApiSchemas["Course"] = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -35,6 +35,7 @@ describe("API course to domain course", () => {
       location: "Arcadia, MI, USA",
       region: "michigan",
       world: 60,
+      global: 55,
       usa: 40,
       public: 12,
       michigan: 3,

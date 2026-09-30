@@ -44,6 +44,15 @@ describe("catalog snapshot", () => {
     expect(michigan.total).toBe(100);
   });
 
+  it("has GOLF's World Top 100: ranks 1-100 on distinct courses, American and international together", async () => {
+    const snapshot = await catalog(db);
+    const world = snapshot.rankings.filter((row) => row.type === "global");
+    expect(world.map((row) => row.rank).sort((a, b) => a - b)).toEqual(Array.from({ length: 100 }, (_, index) => index + 1));
+    expect(new Set(world.map((row) => row.course.id)).size).toBe(world.length);
+    expect(new Set(world.map((row) => (row.course.country === "USA" ? "USA" : "abroad")))).toEqual(new Set(["USA", "abroad"]));
+    expect(world.every((row) => row.course.global === row.rank)).toBe(true);
+  });
+
   it("carries rank fields on course views", async () => {
     const snapshot = await catalog(db);
     const arcadia = snapshot.byId.get((await stable("michigan11")).id);

@@ -16,18 +16,25 @@ export interface TopListRef {
   scope: string;
 }
 
-/** The tabs of the Courses page; national lists first, then the chosen state's list. */
+/**
+ * The tabs of the Courses page; national lists first, then the chosen
+ * state's list. World is GOLF Magazine's list of every country (type
+ * `global`); International is Golf Digest's World 100, which leaves out the
+ * US (type `world`; decision 2026-09-30).
+ */
 export enum ListTab {
+  World = "world",
   USA = "usa",
   Public = "usa-public",
-  World = "world",
+  International = "international",
   State = "state",
 }
 
 const NATIONAL: Readonly<Record<Exclude<ListTab, ListTab.State>, TopListRef>> = {
+  [ListTab.World]: { type: "global", scope: "GLOBAL" },
   [ListTab.USA]: { type: "usa", scope: "USA" },
   [ListTab.Public]: { type: "usa_public", scope: "USA_PUBLIC" },
-  [ListTab.World]: { type: "world", scope: "WORLD" },
+  [ListTab.International]: { type: "world", scope: "WORLD" },
 };
 
 /** Which courses to show: all, the ones played, or the ones still to play. */
@@ -49,15 +56,20 @@ export function sameList(a: TopListRef, b: TopListRef): boolean {
   return a.type === b.type && a.scope.toUpperCase() === b.scope.toUpperCase();
 }
 
+/** URL names of the national list types, as their tabs name them. */
+const SLUGS: Readonly<Record<string, string>> = { global: "world", world: "international", usa: "usa", usa_public: "usa-public" };
+
 /**
- * A list's name in URLs: `usa`, `usa-public`, `world`, `state-mi`.
+ * A list's name in URLs: `world`, `usa`, `usa-public`, `international`,
+ * `state-mi`. A list type added later gets its type with dashes.
  *
  * Example:
  *     >>> topListSlug({ type: "state", scope: "MI" })
  *     "state-mi"
  */
 export function topListSlug(list: TopListRef): string {
-  return list.type === "state" ? "state-" + list.scope.toLowerCase() : list.type.replace(/_/g, "-");
+  if (list.type === "state") return "state-" + list.scope.toLowerCase();
+  return SLUGS[list.type] ?? list.type.replace(/_/g, "-");
 }
 
 /** The published list a URL names, or null when there is none. */
@@ -73,9 +85,9 @@ export function availableLists(rows: readonly RankedCourse[]): TopListRef[] {
   return [...seen.values()];
 }
 
-/** The remembered tab, or the USA Top 100 when nothing (or something unknown) is stored. */
+/** The remembered tab, or the World Top 100 when nothing (or something unknown) is stored. */
 export function parseListTab(value: string): ListTab {
-  return (Object.values(ListTab) as string[]).includes(value) ? (value as ListTab) : ListTab.USA;
+  return (Object.values(ListTab) as string[]).includes(value) ? (value as ListTab) : ListTab.World;
 }
 
 /** The list a tab shows; the State tab needs a state and is null without one. */
@@ -126,18 +138,19 @@ export function playedCount(entries: readonly RankedCourse[], played: ReadonlySe
 }
 
 /**
- * A course's rank on every list it is on: World, USA, USA Public, then its
- * state's Best-in-State list.
+ * A course's rank on every list it is on: World, USA, USA Public,
+ * International, then its state's Best-in-State list.
  *
  * Example:
  *     >>> rankBadges(augusta).map((badge) => `${badge.label} #${badge.rank}`)
- *     ["USA #2", "Georgia #1"]
+ *     ["World #8", "USA #2", "Georgia #1"]
  */
 export function rankBadges(course: Course): RankBadge[] {
   const badges: RankBadge[] = [];
-  if (course.world !== null) badges.push({ list: NATIONAL[ListTab.World], label: "World", rank: course.world });
+  if (course.global !== null) badges.push({ list: NATIONAL[ListTab.World], label: "World", rank: course.global });
   if (course.usa !== null) badges.push({ list: NATIONAL[ListTab.USA], label: "USA", rank: course.usa });
   if (course.public !== null) badges.push({ list: NATIONAL[ListTab.Public], label: "USA Public", rank: course.public });
+  if (course.world !== null) badges.push({ list: NATIONAL[ListTab.International], label: "International", rank: course.world });
   if (course.stateRank !== null && course.state)
     badges.push({ list: { type: "state", scope: course.state.toUpperCase() }, label: stateName(course.state.toUpperCase()), rank: course.stateRank });
   return badges;

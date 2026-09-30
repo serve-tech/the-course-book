@@ -44,10 +44,11 @@ export const ApiErrorSchema = z.object({ error: ApiErrorBodySchema }).openapi("A
 
 export const CourseRanksSchema = z
   .object({
-    world: optionalRank,
+    world: optionalRank.openapi({ description: "Golf Digest's World 100, which leaves out US courses (shown as International)." }),
     usa: optionalRank,
     usaPublic: optionalRank,
     state: optionalRank.openapi({ description: "Rank on the Best-in-State list of the course's own state." }),
+    global: optionalRank.openapi({ description: "GOLF Magazine's Top 100 Courses in the World, every country together (shown as World)." }),
   })
   .openapi("CourseRanks");
 
@@ -101,7 +102,10 @@ export const RankingEntrySchema = z
   .object({
     course: CourseSchema,
     rank,
-    type: z.string().openapi({ description: "Published list: world, usa, usa_public or state. New lists may appear." }),
+    type: z.string().openapi({
+      description:
+        "Published list: global (GOLF Magazine, every country), world (Golf Digest, outside the US), usa, usa_public or state. New lists may appear.",
+    }),
     scope: z.string().openapi({ description: "List scope, e.g. WORLD, USA or a state code." }),
   })
   .openapi("RankingEntry");

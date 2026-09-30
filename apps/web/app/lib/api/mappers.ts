@@ -42,6 +42,7 @@ function toCourse(id: string, details: Details, ranks: Ranks): Course {
     country: details.country,
     region: region(details.country, details.state),
     world: ranks.world,
+    global: ranks.global,
     usa: ranks.usa,
     public: ranks.usaPublic,
     michigan: details.state?.toUpperCase() === "MI" ? ranks.state : null,

@@ -27,6 +27,7 @@ export function toCourseRanks(course: Course): CourseRanks {
     usa: course.usa,
     usaPublic: course.public,
     state: course.stateRank,
+    global: course.global,
   };
 }
 

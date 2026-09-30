@@ -17,15 +17,24 @@ import styles from "./top-lists.module.css";
 const TAB_PREFERENCE = "coursebookTopListTab";
 
 const TAB_LABELS: Readonly<Record<ListTab, string>> = {
+  [ListTab.World]: "World",
   [ListTab.USA]: "USA Top 100",
   [ListTab.Public]: "USA Public",
-  [ListTab.World]: "World",
+  [ListTab.International]: "International",
   [ListTab.State]: "Best in State",
+};
+
+/** Where a national list comes from, under its tab. */
+const CAPTIONS: Partial<Readonly<Record<ListTab, string>>> = {
+  [ListTab.World]: "GOLF Magazine's Top 100 Courses in the World: every country on one list.",
+  [ListTab.USA]: "Golf Digest's America's 100 Greatest.",
+  [ListTab.Public]: "Golf Digest's 100 Greatest Public courses.",
+  [ListTab.International]: "Golf Digest's World 100 Greatest: courses outside the United States.",
 };
 
 /**
  * The Courses page: the published Top lists as checklists. It opens on the
- * tab last used on this device (the USA Top 100 the first time). Best in
+ * tab last used on this device (the World Top 100 the first time). Best in
  * State shows the chosen state, else the state where the viewer has played
  * most. Rows carry every rank a course holds, a tick when the viewer played
  * it (which opens their rounds there, to delete a mistake), and Log a round
@@ -121,9 +130,7 @@ export function TopListsPage({
           </button>
         ))}
       </div>
-      {tab === ListTab.World && (
-        <p className={styles.caption}>Golf Digest's world list covers courses outside the United States; American courses are on the USA lists.</p>
-      )}
+      {CAPTIONS[tab] && <p className={styles.caption}>{CAPTIONS[tab]}</p>}
 
       <div className={styles.toolbar}>
         {tab === ListTab.State && (

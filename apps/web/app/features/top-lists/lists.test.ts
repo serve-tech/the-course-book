@@ -28,10 +28,12 @@ const usa100 = Array.from({ length: 100 }, (_, index) => entry("u" + String(inde
 
 describe("list names in URLs", () => {
   it.each([
+    { list: { type: "global", scope: "GLOBAL" }, slug: "world" },
     { list: { type: "usa", scope: "USA" }, slug: "usa" },
     { list: { type: "usa_public", scope: "USA_PUBLIC" }, slug: "usa-public" },
-    { list: { type: "world", scope: "WORLD" }, slug: "world" },
+    { list: { type: "world", scope: "WORLD" }, slug: "international" },
     { list: { type: "state", scope: "MI" }, slug: "state-mi" },
+    { list: { type: "future_list", scope: "EUROPE" }, slug: "future-list" },
   ])("$slug", ({ list, slug }) => {
     expect(topListSlug(list)).toBe(slug);
     expect(findList(slug.toUpperCase(), [{ type: "usa", scope: "USA" }, list])).toEqual(list);
@@ -51,10 +53,11 @@ describe("list names in URLs", () => {
 
 describe("tabs", () => {
   it.each([
-    { stored: "", tab: ListTab.USA },
-    { stored: "world", tab: ListTab.World },
+    { stored: "", tab: ListTab.World },
+    { stored: "usa", tab: ListTab.USA },
+    { stored: "international", tab: ListTab.International },
     { stored: "state", tab: ListTab.State },
-    { stored: "golf-magazine", tab: ListTab.USA },
+    { stored: "golf-magazine", tab: ListTab.World },
   ])("opens $stored as $tab", ({ stored, tab }) => {
     expect(parseListTab(stored)).toBe(tab);
   });
@@ -63,6 +66,8 @@ describe("tabs", () => {
     expect(tabList(ListTab.State, "")).toBeNull();
     expect(tabList(ListTab.State, "ga")).toEqual({ type: "state", scope: "GA" });
     expect(tabList(ListTab.Public, "")).toEqual({ type: "usa_public", scope: "USA_PUBLIC" });
+    expect(tabList(ListTab.World, "")).toEqual({ type: "global", scope: "GLOBAL" });
+    expect(tabList(ListTab.International, "")).toEqual({ type: "world", scope: "WORLD" });
   });
 });
 
@@ -107,12 +112,18 @@ describe("filterEntries", () => {
 });
 
 describe("rankBadges", () => {
-  it("lists every rank, world first and the course's state last", () => {
-    const augusta = course("augusta", { state: "GA", usa: 2, stateRank: 1 });
-    expect(rankBadges(augusta).map((badge) => `${badge.label} #${String(badge.rank)}`)).toEqual(["USA #2", "Georgia #1"]);
-    const pebble = course("pebble", { state: "CA", world: 7, usa: 9, public: 1, stateRank: 2 });
+  it("lists every rank, World first and the course's state last", () => {
+    const augusta = course("augusta", { state: "GA", global: 8, usa: 2, stateRank: 1 });
+    expect(rankBadges(augusta).map((badge) => `${badge.label} #${String(badge.rank)}`)).toEqual(["World #8", "USA #2", "Georgia #1"]);
+    const pebble = course("pebble", { state: "CA", global: 20, usa: 9, public: 1, stateRank: 2 });
     expect(rankBadges(pebble).map((badge) => badge.label)).toEqual(["World", "USA", "USA Public", "California"]);
     expect(rankBadges(pebble).at(-1)?.list).toEqual({ type: "state", scope: "CA" });
+  });
+
+  it("calls Golf Digest's list outside the US International", () => {
+    const oldCourse = course("old", { country: "Scotland", state: "Fife", global: 3, world: 3 });
+    expect(rankBadges(oldCourse).map((badge) => `${badge.label} #${String(badge.rank)}`)).toEqual(["World #3", "International #3"]);
+    expect(rankBadges(oldCourse)[0]?.list).toEqual({ type: "global", scope: "GLOBAL" });
   });
 
   it("has none for an unranked course", () => {
