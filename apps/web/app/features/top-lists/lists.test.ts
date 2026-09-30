@@ -2,9 +2,13 @@ import { describe, expect, it } from "vitest";
 import { courseSchema, type Course, type RankedCourse } from "@coursebook/domain/catalog/course";
 import {
   availableLists,
+  busiestState,
+  chooseList,
+  friendsLine,
+  isCompleteList,
+  listTab,
   filterEntries,
   findList,
-  homeState,
   listEntries,
   ListTab,
   parseListTab,
@@ -141,16 +145,51 @@ describe("rankingOwner", () => {
   });
 });
 
-describe("homeState", () => {
+describe("choosing the list", () => {
+  const lists = [
+    { type: "global", scope: "GLOBAL" },
+    { type: "usa", scope: "USA" },
+    { type: "state", scope: "MI" },
+  ];
   it.each([
-    { name: "the most played state", states: ["MI", "OR", "MI", "NC"], expected: "MI" },
-    { name: "the first state alphabetically on a tie", states: ["OR", "NC"], expected: "NC" },
-    { name: "nothing without US courses", states: [], expected: "" },
-  ])("picks $name", ({ states, expected }) => {
-    expect(homeState(states.map((state, index) => course(String(index), { state })))).toBe(expected);
+    { name: "a published list in the URL", requested: "usa", remembered: "world", state: "", tab: ListTab.USA, list: { type: "usa", scope: "USA" } },
+    { name: "a state list in the URL", requested: "state-mi", remembered: "", state: "OR", tab: ListTab.State, list: { type: "state", scope: "MI" } },
+    { name: "a bare state request", requested: "state", remembered: "", state: "MI", tab: ListTab.State, list: null },
+    { name: "an unknown list, falling back to the remembered tab", requested: "state-zz", remembered: "usa", state: "", tab: ListTab.USA, list: { type: "usa", scope: "USA" } },
+    { name: "nothing, on a first visit", requested: null, remembered: "", state: "", tab: ListTab.World, list: { type: "global", scope: "GLOBAL" } },
+    { name: "the remembered State tab with a state", requested: null, remembered: "state", state: "ga", tab: ListTab.State, list: { type: "state", scope: "GA" } },
+    { name: "the remembered State tab without one", requested: null, remembered: "state", state: "", tab: ListTab.State, list: null },
+  ])("picks $name", ({ requested, remembered, state, tab, list }) => {
+    expect(chooseList({ requested, remembered, state, lists })).toEqual({ tab, list });
   });
 
-  it("ignores courses outside the US", () => {
-    expect(homeState([course("a", { country: "Scotland", state: "Fife" }), course("b", { state: "OR" })])).toBe("OR");
+  it("maps lists to their tabs", () => {
+    expect(listTab({ type: "world", scope: "WORLD" })).toBe(ListTab.International);
+    expect(listTab({ type: "state", scope: "TX" })).toBe(ListTab.State);
+    expect(listTab({ type: "future_list", scope: "EUROPE" })).toBeNull();
+  });
+
+  it("finds the state someone has played most of", () => {
+    const standing = (scope: string, mine: number) => ({ list: { type: "state", scope }, mine });
+    expect(busiestState([standing("OR", 2), standing("MI", 5), standing("GA", 5), { list: { type: "usa", scope: "USA" }, mine: 9 }])).toBe("GA");
+    expect(busiestState([standing("MI", 0)])).toBe("");
+  });
+
+  it("knows a complete list", () => {
+    expect(isCompleteList({ type: "usa", scope: "USA" }, Array.from({ length: 100 }, (_, index) => index + 1))).toBe(true);
+    expect(isCompleteList({ type: "usa", scope: "USA" }, [1, 2])).toBe(false);
+    expect(isCompleteList({ type: "state", scope: "MI" }, [1, 1])).toBe(false);
+  });
+});
+
+describe("friendsLine", () => {
+  const member = (displayName: string) => ({ username: displayName.toLowerCase(), displayName });
+  it.each([
+    { names: [], line: "" },
+    { names: ["Priya"], line: "Priya played it" },
+    { names: ["Priya", "Dan"], line: "Priya and Dan played it" },
+    { names: ["Priya", "Dan", "Kevin"], line: "Priya and 2 other friends played it" },
+  ])("$line", ({ names, line }) => {
+    expect(friendsLine(names.map(member))).toBe(line);
   });
 });

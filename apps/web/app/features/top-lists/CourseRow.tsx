@@ -1,10 +1,12 @@
 import type { Course } from "@coursebook/domain/catalog/course";
+import type { PublicMember } from "@coursebook/domain/friends/types";
 import type { ReactNode } from "react";
+import { Avatar } from "../social/Avatar";
 import { CourseTile } from "../social/CourseTile";
-import { TileSize } from "../social/sizes";
+import { AvatarSize, TileSize } from "../social/sizes";
 import { cx } from "../../shared/lib/cx";
 import { CheckIcon } from "./icons";
-import type { TopListRef } from "./lists";
+import { friendsLine, type TopListRef } from "./lists";
 import { RankPills } from "./RankPills";
 import styles from "./top-lists.module.css";
 
@@ -28,6 +30,7 @@ export interface PlayedMark {
  * @param played - Whether the member whose list it is played it.
  * @param marks - Ticks to show, e.g. "Marcus" and "You".
  * @param note - Extra text before the marks, e.g. "3 rounds".
+ * @param friends - Friends who played it, shown under the name.
  * @param actions - Buttons at the end of the row.
  */
 export function CourseRow({
@@ -37,6 +40,7 @@ export function CourseRow({
   played,
   marks,
   note,
+  friends = [],
   actions,
 }: {
   course: Course;
@@ -45,6 +49,7 @@ export function CourseRow({
   played: boolean;
   marks: readonly PlayedMark[];
   note?: ReactNode;
+  friends?: readonly PublicMember[];
   actions: ReactNode;
 }) {
   return (
@@ -55,6 +60,16 @@ export function CourseRow({
         <div className={styles.name}>{course.name}</div>
         <div className={styles.place}>{course.location}</div>
         <RankPills course={course} current={current} />
+        {friends.length > 0 && (
+          <div className={styles.friends}>
+            <span className={styles.friendAvatars} aria-hidden="true">
+              {friends.slice(0, 3).map((friend) => (
+                <Avatar key={friend.username} member={friend} size={AvatarSize.ExtraSmall} />
+              ))}
+            </span>
+            {friendsLine(friends)}
+          </div>
+        )}
       </div>
       <div className={styles.marks}>
         {note && <span className={styles.note}>{note}</span>}
@@ -83,3 +98,4 @@ export function CourseRow({
     </li>
   );
 }
+

@@ -9,6 +9,7 @@ import {
   fromMyCourse,
   fromRound,
   fromSearchHit,
+  fromTopListDetail,
   fromWantToPlay,
   toCourseDetailsRequest,
   UNKNOWN_LOCATION,
@@ -67,6 +68,17 @@ describe("other API shapes", () => {
     expect(fromMemberList({ member: { username: "a", displayName: "A" }, courses: [row] }).rows).toMatchObject([
       { rank: 1, onMyList: true, played: 2, lastPlayedOn: "2026-09-01", myRank: 4, course: { name: "Arcadia Bluffs" } },
     ]);
+  });
+
+  it("maps a Top list with the viewer's and friends' progress", () => {
+    const priya = { username: "priya", displayName: "Priya" };
+    const list = { type: "usa", scope: "USA", title: "USA Top 100", size: 100, source: "Golf Digest", sourceYear: 2025 };
+    const detail = fromTopListDetail({
+      progress: { list, mine: 1, friends: [{ member: priya, played: 3 }] },
+      entries: [{ course: arcadia, rank: 4, played: 2, wantToPlay: true, friendsPlayed: [priya] }],
+    });
+    expect(detail.standing).toEqual({ list, mine: 1, friends: [{ member: priya, played: 3 }] });
+    expect(detail.entries).toEqual([{ course: fromApiCourse(arcadia), rank: 4, played: 2, wantToPlay: true, friendsPlayed: [priya] }]);
   });
 
   it("maps a Want to play list, newest first as the API sends it", () => {

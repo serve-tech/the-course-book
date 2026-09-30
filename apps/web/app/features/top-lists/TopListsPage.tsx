@@ -1,20 +1,22 @@
 import { useState } from "react";
-import type { Course, RankedCourse } from "@coursebook/domain/catalog/course";
+import type { Course } from "@coursebook/domain/catalog/course";
 import { stateName } from "@coursebook/domain/catalog/geography";
 import { topListTitle } from "@coursebook/domain/social/top-lists";
-import type { ViewerCourses } from "../../lib/api/viewer";
-import { usePreference } from "../../shared/lib/use-preference";
-import { StateSelect } from "../../shared/ui/StateSelect";
+import type { TopListCourse, TopListStanding } from "@coursebook/domain/social/types";
 import type { Notify } from "../../shared/ui/shell";
+import { StateSelect } from "../../shared/ui/StateSelect";
 import { LogRoundDialog } from "../rounds/LogRoundDialog";
 import { RoundHistory } from "../rounds/RoundHistory";
+import { Avatar } from "../social/Avatar";
+import { displayName } from "../social/paths";
+import { AvatarSize } from "../social/sizes";
 import { CourseActions } from "./CourseActions";
 import { CourseRow } from "./CourseRow";
-import { filterEntries, homeState, listEntries, ListTab, parseListTab, PlayedFilter, playedCount, tabList } from "./lists";
+import { isCompleteList, ListTab, type TopListRef } from "./lists";
 import styles from "./top-lists.module.css";
 
-/** Browser preference: the Courses tab last shown on this device. */
-const TAB_PREFERENCE = "coursebookTopListTab";
+/** Friends shown on the progress card before "and N more". */
+const LEADERS = 3;
 
 const TAB_LABELS: Readonly<Record<ListTab, string>> = {
   [ListTab.World]: "World",
@@ -32,56 +34,74 @@ const CAPTIONS: Partial<Readonly<Record<ListTab, string>>> = {
   [ListTab.International]: "Golf Digest's World 100 Greatest: courses outside the United States.",
 };
 
+/** Which courses to show. */
+enum Show {
+  All = "all",
+  Played = "played",
+  NotPlayed = "not-played",
+}
+
 /**
- * The Courses page: the published Top lists as checklists. It opens on the
- * tab last used on this device (the World Top 100 the first time). Best in
- * State shows the chosen state, else the state where the viewer has played
- * most. Rows carry every rank a course holds, a tick when the viewer played
- * it (which opens their rounds there, to delete a mistake), and Log a round
- * and Want to play buttons.
+ * The Courses page: one published Top list as a checklist. The route
+ * chooses the list and loads it; this renders the tabs, the viewer's and
+ * friends' progress, and the courses. Each row carries every rank the course
+ * holds, the viewer's tick (which opens their rounds there), the friends who
+ * played it, and Log a round and Want to play buttons.
  *
- * @param rows - Every published ranking entry.
- * @param viewer - The signed-in viewer's courses and Want to play list; null when signed out.
- * @param selectedState - The state chosen on this device ("" when none).
+ * @param tab - The selected tab.
+ * @param list - The list shown; null on Best in State before a state is chosen.
+ * @param state - The state the State tab shows ("" when none).
+ * @param entries - The list's courses in rank order, with the viewer's rounds and friends.
+ * @param standing - The viewer's and friends' progress; null when signed out.
+ * @param onChoose - Shows another tab (with `state` for Best in State).
+ * @param onState - Chooses the state for Best in State.
  */
 export function TopListsPage({
-  rows,
-  viewer,
-  selectedState,
+  tab,
+  list,
+  state,
+  entries,
+  standing,
+  signedIn,
+  onChoose,
   onState,
   notify,
   onSearchFocus,
   openAuth,
 }: {
-  rows: readonly RankedCourse[];
-  viewer: ViewerCourses | null;
-  selectedState: string;
+  tab: ListTab;
+  list: TopListRef | null;
+  state: string;
+  entries: readonly TopListCourse[];
+  standing: TopListStanding | null;
+  signedIn: boolean;
+  onChoose: (tab: ListTab, state: string) => void;
   onState: (code: string) => void;
   notify: Notify;
   onSearchFocus: (focused: boolean) => void;
   openAuth: () => void;
 }) {
-  const [storedTab, setStoredTab] = usePreference(TAB_PREFERENCE);
-  const [filter, setFilter] = useState(PlayedFilter.All);
+  const [show, setShow] = useState(Show.All);
   const [query, setQuery] = useState("");
   const [logging, setLogging] = useState<Course | null>(null);
   const [history, setHistory] = useState<Course | null>(null);
 
-  const tab = parseListTab(storedTab);
-  const state = selectedState || homeState(viewer?.courses ?? []);
-  const list = tabList(tab, state);
-  const played = new Set(Object.entries(viewer?.played ?? {}).flatMap(([id, rounds]) => (rounds > 0 ? [id] : [])));
-  const wanted = new Set(viewer?.wanted ?? []);
-  const { entries, complete } = list ? listEntries(rows, list) : { entries: [], complete: false };
-  const shown = filterEntries(entries, { filter, played, query });
-  const done = playedCount(entries, played);
+  const complete = list !== null && isCompleteList(list, entries.map((entry) => entry.rank));
   const title = list ? topListTitle(list.type, list.scope) : "Best in State";
-
-  const filters: readonly [PlayedFilter, string][] = [
-    [PlayedFilter.All, "All " + String(entries.length)],
-    [PlayedFilter.Played, "Played " + String(done)],
-    [PlayedFilter.NotPlayed, "Not played " + String(entries.length - done)],
+  const done = entries.filter((entry) => entry.played > 0).length;
+  const search = query.trim().toLowerCase();
+  const shown = entries.filter(
+    (entry) =>
+      (show === Show.All || (show === Show.Played) === entry.played > 0) &&
+      (!search || (entry.course.name + " " + entry.course.location).toLowerCase().includes(search)),
+  );
+  const played = Object.fromEntries(entries.map((entry) => [entry.course.id, entry.played]));
+  const filters: readonly [Show, string][] = [
+    [Show.All, "All " + String(entries.length)],
+    [Show.Played, "Played " + String(done)],
+    [Show.NotPlayed, "Not played " + String(entries.length - done)],
   ];
+  const others = standing ? standing.friends.length - LEADERS : 0;
 
   return (
     <section className={styles.page} aria-labelledby="topListsTitle">
@@ -91,22 +111,36 @@ export function TopListsPage({
           <h1 id="topListsTitle" className={styles.title}>
             Top lists
           </h1>
-          <p className={styles.lede}>Work through the published lists: tick off what you've played and save what you want to play next.</p>
+          <p className={styles.lede}>
+            Work through the published lists: tick off what you've played, save what you want to play next, and see how your friends are doing.
+          </p>
         </div>
         {list && complete && (
           <div className={styles.progress}>
             <div className={styles.progressLabel}>{title}</div>
             <div className={styles.progressLine}>
               <span>
-                <b>{viewer ? done : entries.length}</b>
-                <small>{viewer ? "/ " + String(entries.length) + " played" : "courses"}</small>
+                <b>{standing ? standing.mine : entries.length}</b>
+                <small>{standing ? "/ " + String(entries.length) + " played" : "courses"}</small>
               </span>
-              {viewer && <span>{String(entries.length - done)} to go</span>}
+              {standing && <span>{String(entries.length - standing.mine)} to go</span>}
             </div>
-            {viewer && (
-              <div className={styles.bar} role="progressbar" aria-label={title + " played"} aria-valuemin={0} aria-valuemax={entries.length} aria-valuenow={done}>
-                <span style={{ width: String(entries.length ? (100 * done) / entries.length : 0) + "%" }} />
+            {standing && (
+              <div className={styles.bar} role="progressbar" aria-label={title + " played"} aria-valuemin={0} aria-valuemax={entries.length} aria-valuenow={standing.mine}>
+                <span style={{ width: String(entries.length ? (100 * standing.mine) / entries.length : 0) + "%" }} />
               </div>
+            )}
+            {standing && standing.friends.length > 0 && (
+              <ul className={styles.leaders} aria-label="Friends' progress">
+                {standing.friends.slice(0, LEADERS).map((friend) => (
+                  <li key={friend.member.username} className={styles.leader}>
+                    <Avatar member={friend.member} size={AvatarSize.ExtraSmall} />
+                    {displayName(friend.member)}
+                    <b>{friend.played}</b>
+                  </li>
+                ))}
+                {others > 0 && <li className={styles.leader}>and {others} more {others === 1 ? "friend" : "friends"}</li>}
+              </ul>
             )}
           </div>
         )}
@@ -121,9 +155,9 @@ export function TopListsPage({
             className={styles.tab}
             aria-selected={value === tab}
             onClick={() => {
-              setStoredTab(value);
-              setFilter(PlayedFilter.All);
+              setShow(Show.All);
               setQuery("");
+              onChoose(value, state);
             }}
           >
             {value === ListTab.State && state ? "Best in " + stateName(state) : TAB_LABELS[value]}
@@ -138,16 +172,16 @@ export function TopListsPage({
             <StateSelect id="topStateRankSelect" value={state} onChange={onState} label="State for Best in State" />
           </span>
         )}
-        {viewer && (
+        {signedIn && (
           <div className={styles.filters} role="group" aria-label="Show courses">
             {filters.map(([value, label]) => (
               <button
                 key={value}
                 type="button"
                 className={styles.filter}
-                aria-pressed={filter === value}
+                aria-pressed={show === value}
                 onClick={() => {
-                  setFilter(value);
+                  setShow(value);
                 }}
               >
                 {label}
@@ -183,42 +217,40 @@ export function TopListsPage({
         <div className={styles.empty}>No courses here match.</div>
       ) : (
         <ol id="toplist" className={styles.list} aria-label={title}>
-          {shown.map((row) => {
-            const rounds = viewer?.played[row.course.id] ?? 0;
-            return (
-              <CourseRow
-                key={row.course.id}
-                course={row.course}
-                rank={row.rank}
-                current={list}
-                played={rounds > 0}
-                marks={
-                  rounds > 0
-                    ? [
-                        {
-                          label: "Played",
-                          you: false,
-                          onClick: () => {
-                            setHistory(row.course);
-                          },
+          {shown.map((entry) => (
+            <CourseRow
+              key={entry.course.id}
+              course={entry.course}
+              rank={entry.rank}
+              current={list}
+              played={entry.played > 0}
+              marks={
+                entry.played > 0
+                  ? [
+                      {
+                        label: "Played",
+                        you: false,
+                        onClick: () => {
+                          setHistory(entry.course);
                         },
-                      ]
-                    : []
-                }
-                note={rounds > 1 ? String(rounds) + " rounds" : undefined}
-                actions={
-                  <CourseActions
-                    course={row.course}
-                    wanted={wanted.has(row.course.id)}
-                    signedIn={viewer !== null}
-                    onLog={setLogging}
-                    notify={notify}
-                    openAuth={openAuth}
-                  />
-                }
-              />
-            );
-          })}
+                      },
+                    ]
+                  : []
+              }
+              note={entry.played > 1 ? String(entry.played) + " rounds" : undefined}
+              friends={entry.friendsPlayed}
+              actions={
+                <CourseActions
+                  course={entry.course}
+                  wanted={entry.wantToPlay}
+                  signedIn={signedIn}
+                  onLog={setLogging}
+                  notify={notify}
+                  openAuth={openAuth}
+                />
+              }
+            />
+          ))}
         </ol>
       )}
 
@@ -232,11 +264,11 @@ export function TopListsPage({
           }}
         />
       )}
-      {logging && viewer && (
+      {logging && signedIn && (
         <LogRoundDialog
           signedIn
           initial={logging}
-          played={viewer.played}
+          played={played}
           notify={notify}
           onSignIn={openAuth}
           onClose={() => {

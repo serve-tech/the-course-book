@@ -145,6 +145,14 @@
 }
 .badgeCurrent { border-color: rgba(199, 170, 107, 0.55); color: var(--gold); }
 
+/* Friends who played it, under the ranks. */
+.friends { display: flex; align-items: center; gap: 7px; margin-top: 6px; color: #bfc6bf; font-size: 12px; }
+.friendAvatars { display: inline-flex; }
+.friendAvatars > * + * { margin-left: -6px; }
+.leaders { display: grid; gap: 6px; margin: 4px 0 0; padding: 0; list-style: none; }
+.leader { display: flex; align-items: center; gap: 8px; color: #cfd3cb; font-size: 12.5px; }
+.leader b { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--cream); }
+
 /* Who played it. */
 .marks { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; }
 .mark {

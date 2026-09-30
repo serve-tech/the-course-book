@@ -1,4 +1,5 @@
 import { normalizeName, type Course, type RankedCourse } from "@coursebook/domain/catalog/course";
+import type { PublicMember } from "@coursebook/domain/friends/types";
 import { stateName } from "@coursebook/domain/catalog/geography";
 
 /**
@@ -96,6 +97,61 @@ export function tabList(tab: ListTab, state: string): TopListRef | null {
   return NATIONAL[tab];
 }
 
+/** The tab a list belongs to: its national tab, State for a state list, null for a list with no tab. */
+export function listTab(list: TopListRef): ListTab | null {
+  if (list.type === "state") return ListTab.State;
+  const tabs: readonly (keyof typeof NATIONAL)[] = [ListTab.World, ListTab.USA, ListTab.Public, ListTab.International];
+  return tabs.find((tab) => sameList(NATIONAL[tab], list)) ?? null;
+}
+
+/** Where the State tab points when no state is known yet. */
+export const STATE_WITHOUT_SCOPE = "state";
+
+/**
+ * Which list the Courses page shows. A list named in the URL wins when it is
+ * published (or the bare `state`, which asks for a state); otherwise the
+ * tab remembered on this device, with `state` for Best in State.
+ *
+ * Args:
+ *     options: `requested` is the URL's `list` (null when absent),
+ *         `remembered` the stored tab, `state` the state to use for Best in
+ *         State ("" when none), and `lists` every published list.
+ */
+export function chooseList(options: {
+  requested: string | null;
+  remembered: string;
+  state: string;
+  lists: readonly TopListRef[];
+}): { tab: ListTab; list: TopListRef | null } {
+  if (options.requested === STATE_WITHOUT_SCOPE) return { tab: ListTab.State, list: null };
+  const named = options.requested ? findList(options.requested, options.lists) : null;
+  const namedTab = named ? listTab(named) : null;
+  if (named && namedTab) return { tab: namedTab, list: named };
+  const tab = parseListTab(options.remembered);
+  return { tab, list: tabList(tab, options.state) };
+}
+
+/**
+ * The state whose Best-in-State list someone has played most of, for Best
+ * in State when no state is chosen; ties go to the first state
+ * alphabetically, "" when they have played none.
+ */
+export function busiestState(standings: readonly { list: TopListRef; mine: number }[]): string {
+  const states = standings.filter((standing) => standing.list.type === "state" && standing.mine > 0);
+  states.sort((a, b) => b.mine - a.mine || a.list.scope.localeCompare(b.list.scope));
+  return states[0]?.list.scope.toUpperCase() ?? "";
+}
+
+/**
+ * Whether a list's ranks make a complete list: the national lists need 100
+ * distinct ranks, a state list at least one, all distinct (docs/architecture.md,
+ * "Top lists").
+ */
+export function isCompleteList(list: TopListRef, ranks: readonly number[]): boolean {
+  const distinct = new Set(ranks).size === ranks.length;
+  return distinct && (list.type === "state" ? ranks.length > 0 : ranks.length === 100);
+}
+
 /**
  * A list's entries in rank order, and whether the list is complete: the
  * national lists need 100 distinct ranks, a state list at least one entry
@@ -105,9 +161,7 @@ export function listEntries(rows: readonly RankedCourse[], list: TopListRef): { 
   const entries = rows
     .filter((row) => sameList(row, list) && row.rank > 0 && (list.type === "state" || row.rank <= 100))
     .sort((a, b) => a.rank - b.rank);
-  const distinct = new Set(entries.map((row) => row.rank)).size === entries.length;
-  const complete = distinct && (list.type === "state" ? entries.length > 0 : entries.length === 100);
-  return { entries, complete };
+  return { entries, complete: isCompleteList(list, entries.map((row) => row.rank)) };
 }
 
 /**
@@ -171,16 +225,20 @@ export function rankingOwner(owner: string | null): string {
   return owner === null ? "Your ranking" : owner + "'s ranking";
 }
 
+
 /**
- * The US state where someone has played the most courses, for the Best in
- * State tab when no state is chosen. Ties go to the alphabetically first
- * state; "" when they have played no US course with a state.
+ * Who among the viewer's friends played a course, in words.
+ *
+ * Example:
+ *     >>> friendsLine([priya, dan, kevin])
+ *     "Priya and 2 other friends played it"
  */
-export function homeState(courses: readonly Course[]): string {
-  const counts = new Map<string, number>();
-  for (const course of courses) {
-    const state = course.state.trim().toUpperCase();
-    if (course.country === "USA" && state) counts.set(state, (counts.get(state) ?? 0) + 1);
-  }
-  return [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0] ?? "";
+export function friendsLine(friends: readonly PublicMember[]): string {
+  const [first, second] = friends;
+  if (!first) return "";
+  const name = (member: PublicMember) => member.displayName || member.username;
+  if (!second) return name(first) + " played it";
+  if (friends.length === 2) return name(first) + " and " + name(second) + " played it";
+  const others = friends.length - 1;
+  return name(first) + " and " + String(others) + " other friend" + (others === 1 ? "" : "s") + " played it";
 }

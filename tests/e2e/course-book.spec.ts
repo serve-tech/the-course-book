@@ -277,6 +277,11 @@ test.describe("signed in", () => {
     await page.getByRole("button", { name: /^Only / }).click();
     await expect(list.locator(":scope > li")).toHaveCount(1);
     await expect(list.locator(":scope > li")).toHaveAttribute("data-course", "Shinnecock Hills Golf Club");
+
+    // The Courses page shows which friends played each course and how far along they are.
+    await page.goto("/courses?list=usa");
+    await expect(page.locator('#toplist > li[data-course="Shinnecock Hills Golf Club"]')).toContainText(friend.displayName + " played it");
+    await expect(page.getByRole("list", { name: "Friends' progress" })).toContainText(friend.displayName);
   });
 
   test("members befriend by username, accept, and remove a friend from their profile", async ({ page }) => {
