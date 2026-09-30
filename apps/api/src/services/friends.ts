@@ -106,6 +106,15 @@ export async function memberPage(
   };
 }
 
+/** The viewer's accepted, active friends, with their ids for further queries (never for responses). */
+export async function friendMembers(db: Executor, viewerId: string): Promise<{ id: string; member: PublicMember }[]> {
+  const rows = await db
+    .select({ id: users.id, username: users.username, displayName: users.displayName })
+    .from(users)
+    .where(and(ne(users.id, viewerId), isNull(users.deletedAt), isFriendOf(db, viewerId)));
+  return rows.map((row) => ({ id: row.id, member: toPublicMember(row) }));
+}
+
 /** A member the viewer may see: themselves or an accepted friend. */
 export interface VisibleMember {
   id: string;

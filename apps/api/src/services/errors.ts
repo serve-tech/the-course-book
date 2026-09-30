@@ -27,6 +27,7 @@ export enum ErrorCode {
   RoundNotFound = "round_not_found",
   MemberNotFound = "member_not_found",
   FriendshipNotFound = "friendship_not_found",
+  TopListNotFound = "top_list_not_found",
   PayloadTooLarge = "payload_too_large",
   UnsupportedMediaType = "unsupported_media_type",
   AccountDeletionIncomplete = "account_deletion_incomplete",

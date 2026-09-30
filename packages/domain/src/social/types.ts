@@ -91,3 +91,44 @@ export interface WantToPlayEntry {
   /** When it was added (ISO timestamp). */
   addedAt: string;
 }
+
+/** A published list: its identity, display title, size and source. */
+export interface TopListInfo {
+  type: string;
+  scope: string;
+  title: string;
+  size: number;
+  /** Publisher, e.g. "GOLF Magazine". */
+  source: string;
+  sourceYear: number;
+}
+
+/** How many of a list's courses a member has played. */
+export interface MemberProgress {
+  member: PublicMember;
+  played: number;
+}
+
+/** A list with the viewer's progress and each friend's who has played any of it, most first. */
+export interface TopListStanding {
+  list: TopListInfo;
+  mine: number;
+  friends: MemberProgress[];
+}
+
+/** One course of a list, for the viewer. */
+export interface TopListCourse {
+  course: Course;
+  rank: number;
+  /** The viewer's rounds there. */
+  played: number;
+  wantToPlay: boolean;
+  /** Friends who played it, by display name. */
+  friendsPlayed: PublicMember[];
+}
+
+/** A list as a checklist for the viewer and their friends. */
+export interface TopListDetail {
+  standing: TopListStanding;
+  entries: TopListCourse[];
+}

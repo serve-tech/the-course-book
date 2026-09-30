@@ -72,12 +72,20 @@ export function topListProgress(entries: readonly TopListEntry[], played: Readon
     if (played.has(entry.courseId)) list.played++;
     lists.set(key, list);
   }
-  return [...lists.values()]
-    .filter((list) => NATIONAL.includes(list.type) || list.played > 0)
-    .sort((a, b) => order(a) - order(b) || a.title.localeCompare(b.title));
+  return [...lists.values()].filter((list) => NATIONAL.includes(list.type) || list.played > 0).sort(compareTopLists);
 }
 
-function order(list: TopListProgress): number {
-  const index = NATIONAL.indexOf(list.type);
+/** Whether a list is one of the national lists, which every member sees. */
+export function isNationalList(type: string): boolean {
+  return NATIONAL.includes(type);
+}
+
+/** Display order: the national lists in a fixed order, then the rest by title. */
+export function compareTopLists(a: { type: string; title: string }, b: { type: string; title: string }): number {
+  return order(a.type) - order(b.type) || a.title.localeCompare(b.title);
+}
+
+function order(type: string): number {
+  const index = NATIONAL.indexOf(type);
   return index === -1 ? NATIONAL.length : index;
 }

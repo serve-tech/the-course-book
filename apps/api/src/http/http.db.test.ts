@@ -117,9 +117,18 @@ describe("CORS", () => {
 });
 
 describe("cache headers", () => {
-  it("marks personal responses private and public settings cacheable", async () => {
+  it.each(["/v1/me", "/v1/feed", "/v1/top-lists", "/v1/top-lists/usa/USA", "/v1/members/golfer_1/want-to-play"])(
+    "marks %s private",
+    async (path) => {
+      const t = createTestApp(db);
+      const auth = t.bearer("user_1", "golfer_1");
+      expect((await t.get("/v1/me", auth)).status).toBe(200);
+      expect((await t.get(path, auth)).headers.get("cache-control")).toBe("private, no-store");
+    },
+  );
+
+  it("marks public settings cacheable", async () => {
     const t = createTestApp(db);
-    expect((await t.get("/v1/me", t.bearer("user_1", "golfer_1"))).headers.get("cache-control")).toBe("private, no-store");
     expect((await t.get("/v1/client-config")).headers.get("cache-control")).toBe("public, max-age=300");
   });
 });

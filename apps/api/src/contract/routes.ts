@@ -32,6 +32,9 @@ import {
   SearchResultsSchema,
   SetPlayCountRequestSchema,
   TimelineSchema,
+  TopListDetailSchema,
+  TopListParamsSchema,
+  TopListsSchema,
   UsernameParamsSchema,
   WantToPlaySchema,
 } from "./schemas";
@@ -200,6 +203,33 @@ export const listWantToPlay = createRoute({
   security: MEMBER,
   request: { params: UsernameParamsSchema },
   responses: { 200: json(WantToPlaySchema, "The Want to play list."), 401: unauthenticated, 403: forbidden, 404: notVisible },
+});
+
+export const listTopLists = createRoute({
+  method: "get",
+  path: "/v1/top-lists",
+  operationId: "listTopLists",
+  tags: ["Top Lists"],
+  summary: "Every published list with the member's progress and their friends'",
+  security: MEMBER,
+  responses: { 200: json(TopListsSchema, "Every list, national first."), 401: unauthenticated, 403: forbidden },
+});
+
+export const getTopList = createRoute({
+  method: "get",
+  path: "/v1/top-lists/{type}/{scope}",
+  operationId: "getTopList",
+  tags: ["Top Lists"],
+  summary: "One published list as a checklist for the member and their friends",
+  description: "Every course in rank order with the member's rounds, Want to play, and the friends who played it.",
+  security: MEMBER,
+  request: { params: TopListParamsSchema },
+  responses: {
+    200: json(TopListDetailSchema, "The list."),
+    401: unauthenticated,
+    403: forbidden,
+    404: failure("No published list with that type and scope: `top_list_not_found`."),
+  },
 });
 
 export const getFeed = createRoute({

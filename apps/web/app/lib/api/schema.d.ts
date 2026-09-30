@@ -376,6 +376,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/top-lists": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Every published list with the member's progress and their friends' */
+        get: operations["listTopLists"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/top-lists/{type}/{scope}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * One published list as a checklist for the member and their friends
+         * @description Every course in rank order with the member's rounds, Want to play, and the friends who played it.
+         */
+        get: operations["getTopList"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/feed": {
         parameters: {
             query?: never;
@@ -429,7 +466,7 @@ export interface components {
         };
         ApiErrorBody: {
             /**
-             * @description Stable machine-readable code. Current values: bad_request, validation_failed, us_state_required, unauthenticated, account_deleted, username_invalid, not_found, course_not_found, not_on_list, round_not_found, member_not_found, friendship_not_found, payload_too_large, unsupported_media_type, account_deletion_incomplete, search_unavailable, internal. New codes may appear; treat unknown codes by HTTP status.
+             * @description Stable machine-readable code. Current values: bad_request, validation_failed, us_state_required, unauthenticated, account_deleted, username_invalid, not_found, course_not_found, not_on_list, round_not_found, member_not_found, friendship_not_found, top_list_not_found, payload_too_large, unsupported_media_type, account_deletion_incomplete, search_unavailable, internal. New codes may appear; treat unknown codes by HTTP status.
              * @example not_on_list
              */
             code: string;
@@ -727,6 +764,47 @@ export interface components {
              * @description When the member added it.
              */
             addedAt: string;
+        };
+        TopLists: {
+            /** @description National lists first, then state lists by title. */
+            lists: components["schemas"]["TopListProgress"][];
+        };
+        TopListProgress: {
+            list: components["schemas"]["TopList"];
+            /** @description Courses on the list the member has played. */
+            mine: number;
+            /** @description Friends who have played at least one course on it, most first. */
+            friends: components["schemas"]["MemberProgress"][];
+        };
+        TopList: {
+            /** @description global, world, usa, usa_public or state. New lists may appear. */
+            type: string;
+            /** @description GLOBAL, WORLD, USA, USA_PUBLIC or a two-letter state code. */
+            scope: string;
+            /** @description Display title, e.g. `World Top 100` or `Best in Georgia`. */
+            title: string;
+            size: number;
+            /** @description Publisher, e.g. `GOLF Magazine`. */
+            source: string;
+            sourceYear: number;
+        };
+        MemberProgress: {
+            member: components["schemas"]["Member"];
+            played: number;
+        };
+        TopListDetail: {
+            progress: components["schemas"]["TopListProgress"];
+            /** @description In rank order. */
+            entries: components["schemas"]["TopListEntry"][];
+        };
+        TopListEntry: {
+            course: components["schemas"]["Course"];
+            rank: number;
+            /** @description The member's rounds at this course. */
+            played: number;
+            wantToPlay: boolean;
+            /** @description Friends who have played it, by display name. */
+            friendsPlayed: components["schemas"]["Member"][];
         };
         Feed: {
             /** @description Newest first. */
@@ -1994,6 +2072,94 @@ export interface operations {
             };
             /** @description The Clerk account cannot use the app: `username_invalid`. */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    listTopLists: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Every list, national first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TopLists"];
+                };
+            };
+            /** @description No valid session: `unauthenticated`, or `account_deleted` after the account was deleted. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description The Clerk account cannot use the app: `username_invalid`. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    getTopList: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                type: string;
+                scope: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The list. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TopListDetail"];
+                };
+            };
+            /** @description No valid session: `unauthenticated`, or `account_deleted` after the account was deleted. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description The Clerk account cannot use the app: `username_invalid`. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description No published list with that type and scope: `top_list_not_found`. */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
