@@ -172,7 +172,7 @@
 .month small { font: 700 10px "DM Sans", Arial, sans-serif; letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted); font-style: normal; }
 .entry {
   display: grid;
-  grid-template-columns: 38px 36px minmax(0, 1fr);
+  grid-template-columns: 38px 36px minmax(0, 1fr) auto;
   gap: 14px;
   align-items: center;
   padding: 11px 0;
@@ -193,7 +193,7 @@
 }
 .entryMeta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 4px; color: var(--muted); font-size: 12.5px; }
 /* Your own timeline: each round can be deleted. */
-.entryOwn { grid-template-columns: 38px 36px minmax(0, 1fr) auto; }
+.entryOwn { grid-template-columns: 38px 36px minmax(0, 1fr) auto auto; }
 .entryDelete {
   width: 32px;
   height: 32px;
@@ -277,8 +277,8 @@ a.progressRow:focus-visible { outline: 2px solid var(--gold); outline-offset: 2p
   .stats { width: 100%; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; padding-top: 14px; border-top: 1px solid var(--line); }
   .statValue { font-size: 22px; }
   .statLabel { font-size: 9px; letter-spacing: 1px; }
-  .entry { grid-template-columns: 30px 32px minmax(0, 1fr); gap: 10px; }
-  .entryOwn { grid-template-columns: 30px 32px minmax(0, 1fr) auto; }
+  .entry { grid-template-columns: 30px 32px minmax(0, 1fr) auto; gap: 10px; }
+  .entryOwn { grid-template-columns: 30px 32px minmax(0, 1fr) auto auto; }
   .day { font-size: 20px; }
   .tabs { gap: 20px; }
 }

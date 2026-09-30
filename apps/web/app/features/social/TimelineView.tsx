@@ -5,6 +5,7 @@ import { fromTimelineRound } from "../../lib/api/mappers";
 import { apiFailureMessage } from "../../shared/lib/errors";
 import { TrashIcon } from "../top-lists/icons";
 import { RankPills } from "../top-lists/RankPills";
+import { PersonalRank } from "./PersonalRank";
 import { CourseTile } from "./CourseTile";
 import { TileSize } from "./sizes";
 import { dayOfMonth, groupByMonth, visitLabel } from "./format";
@@ -22,7 +23,7 @@ const PAGE_SIZE = 20;
  * @param username - Whose timeline.
  * @param first - The first page from the loader.
  * @param self - Whether it is the viewer's own timeline (changes the empty state and the rank pills' "Your").
- * @param name - The member's display name, for "Dan Whitaker's ranking #3" on a friend's timeline.
+ * @param name - The member's display name, for "Dan Whitaker's ranking" on a friend's timeline.
  * @param onDelete - Deletes one of the viewer's own rounds; each entry gets a delete button when given.
  * @param deleting - The id of the round being deleted, if any.
  */
@@ -108,8 +109,9 @@ export function TimelineView({
                   <span className={[styles.tag, round.visit === 1 ? styles.tagGold : ""].join(" ")}>{visitLabel(round.visit)}</span>
                   <span>{round.course.location}</span>
                 </span>
-                <RankPills course={round.course} personal={{ owner: self ? null : name, rank: round.rank }} />
+                <RankPills course={round.course} />
               </div>
+              <PersonalRank rank={round.rank} owner={self ? null : name} />
               {onDelete && (
                 <button
                   type="button"

@@ -144,8 +144,6 @@
   font-variant-numeric: tabular-nums;
 }
 .badgeCurrent { border-color: rgba(199, 170, 107, 0.55); color: var(--gold); }
-/* A member's own Ranking, as opposed to a published list. */
-.badgePersonal { border-color: var(--gold); background: var(--gold); color: #1a1407; }
 
 /* Who played it. */
 .marks { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; }

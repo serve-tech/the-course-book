@@ -8,6 +8,7 @@ import { Avatar } from "./Avatar";
 import { ComingSoon } from "./ComingSoon";
 import { RankPills } from "../top-lists/RankPills";
 import { CourseTile } from "./CourseTile";
+import { PersonalRank } from "./PersonalRank";
 import { newFromFriends, relativeDay, shortDate, visitLabel, type FeedFirstPage } from "./format";
 import { displayName, logPath, profilePath } from "./paths";
 import { AvatarSize, TileSize } from "./sizes";
@@ -174,13 +175,11 @@ function FeedRow({ item, now }: { item: FeedItem; now: Date }) {
           <span className={[styles.tag, round.visit === 1 ? styles.tagGold : ""].join(" ")}>{visitLabel(round.visit)}</span>
           {round.playedOn && <span>{shortDate(round.playedOn, now)}</span>}
         </div>
-        <RankPills course={round.course} personal={{ owner: name, rank: round.rank }} />
+        <RankPills course={round.course} />
       </div>
       <div style={{ display: "grid", justifyItems: "end", gap: 8 }}>
         <span className={feedStyles.when}>{when}</span>
-        <div className={feedStyles.itemTile}>
-          <CourseTile course={round.course} size={TileSize.Thumb} />
-        </div>
+        <PersonalRank rank={round.rank} owner={name} />
       </div>
     </article>
   );

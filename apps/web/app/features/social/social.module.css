@@ -138,6 +138,19 @@ a.tile:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
 }
 .sectionLabel a:hover { text-decoration: underline; }
 
+/* A member's own rank for a course: the numeral, then whose ranking it is. */
+.personalRank {
+  display: grid;
+  justify-items: end;
+  gap: 3px;
+  max-width: 120px;
+  text-align: right;
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.25;
+}
+.personalRank b { font: 600 22px / 1 "Playfair Display", Georgia, serif; color: var(--gold); font-variant-numeric: lining-nums tabular-nums; }
+
 /* Tags on rows. */
 .tag {
   display: inline-flex;

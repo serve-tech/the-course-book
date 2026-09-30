@@ -144,19 +144,18 @@ export function rankBadges(course: Course): RankBadge[] {
 }
 
 /**
- * A personal ranking pill's text, in the published pills' "{whose} #{n}"
- * form, so a member's own order is never mistaken for a published rank.
+ * Whose personal ranking a rank is from, to label it: a member's own order
+ * must never read like a published rank.
  *
  * Args:
- *     owner: The member's display name, or null for the viewer ("Your").
- *     rank: The course's position on that member's Ranking.
+ *     owner: The member's display name, or null for the viewer.
  *
  * Example:
- *     >>> personalRankLabel("Dan Whitaker", 3)
- *     "Dan Whitaker's ranking #3"
+ *     >>> rankingOwner("Dan Whitaker")
+ *     "Dan Whitaker's ranking"
  */
-export function personalRankLabel(owner: string | null, rank: number): string {
-  return (owner === null ? "Your" : owner + "'s") + " ranking #" + String(rank);
+export function rankingOwner(owner: string | null): string {
+  return owner === null ? "Your ranking" : owner + "'s ranking";
 }
 
 /**

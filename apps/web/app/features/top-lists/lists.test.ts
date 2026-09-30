@@ -8,7 +8,7 @@ import {
   listEntries,
   ListTab,
   parseListTab,
-  personalRankLabel,
+  rankingOwner,
   PlayedFilter,
   playedCount,
   rankBadges,
@@ -120,13 +120,13 @@ describe("rankBadges", () => {
   });
 });
 
-describe("personalRankLabel", () => {
+describe("rankingOwner", () => {
   it.each([
-    { owner: null, rank: 3, label: "Your ranking #3" },
-    { owner: "Dan Whitaker", rank: 12, label: "Dan Whitaker's ranking #12" },
-    { owner: "James", rank: 1, label: "James's ranking #1" },
-  ])("$label", ({ owner, rank, label }) => {
-    expect(personalRankLabel(owner, rank)).toBe(label);
+    { owner: null, label: "Your ranking" },
+    { owner: "Dan Whitaker", label: "Dan Whitaker's ranking" },
+    { owner: "James", label: "James's ranking" },
+  ])("$label", ({ owner, label }) => {
+    expect(rankingOwner(owner)).toBe(label);
   });
 });
 
