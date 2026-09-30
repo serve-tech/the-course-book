@@ -3,6 +3,7 @@ import type { Course } from "@coursebook/domain/catalog/course";
 import type { SearchResult } from "@coursebook/domain/catalog/search-results";
 import { deriveState, isUSCourse, withUSState } from "@coursebook/domain/catalog/geography";
 import { Modal } from "../../shared/ui/Modal";
+import type { Notify } from "../../shared/ui/shell";
 import { StateSelect } from "../../shared/ui/StateSelect";
 import { errorMessage } from "../../shared/lib/errors";
 import { localDate } from "../../shared/lib/local-date";
@@ -14,7 +15,8 @@ const SEARCH_DEBOUNCE_MS = 180;
 
 /**
  * Log a round: search courses through the API, pick one, set the count and
- * the date played (today unless changed). A hit already in the catalog
+ * the date played (today unless changed). The toast afterwards offers Undo,
+ * which deletes exactly the rounds just logged. A hit already in the catalog
  * posts its id; anything else posts the course details for the API to find
  * or create.
  *
@@ -35,7 +37,7 @@ export function LogRoundDialog({
   onClose: () => void;
   onAdd?: () => void;
   onSignIn: () => void;
-  notify: (message: string) => void;
+  notify: Notify;
   initial?: Course | null;
 }) {
   const [query, setQuery] = useState(initial?.name ?? "");
@@ -49,7 +51,8 @@ export function LogRoundDialog({
   const [retry, setRetry] = useState(0);
   const [searchError, setSearchError] = useState("");
   const { busy, submit } = useJournalFetcher((reply) => {
-    notify(replyMessage(reply));
+    const logged = reply.roundIds ?? [];
+    notify(replyMessage(reply), logged.length ? { label: "Undo", fields: { intent: "undo-log", roundIds: logged.join(",") } } : undefined);
     if (!reply.error) onClose();
   });
 

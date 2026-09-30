@@ -14,4 +14,6 @@ export const replyMessages = {
   deletedRound: (removedCourse: boolean) =>
     removedCourse ? "Round deleted; course removed from My List" : "Round deleted",
   deletedCourse: () => "Course deleted from My List",
+  undone: (count: number, removedCourse: boolean) =>
+    (count === 1 ? "Round removed" : rounds(count) + " removed") + (removedCourse ? "; course taken off your list" : ""),
 };

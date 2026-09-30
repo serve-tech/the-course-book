@@ -14,7 +14,9 @@ import styles from "../features/social/social.module.css";
 import { nationalProgress } from "../features/social/stats";
 import { api, unwrap } from "../lib/api";
 import { fromTimelineRound } from "../lib/api/mappers";
+import { replyMessage, useJournalFetcher } from "../features/journal/use-journal-fetcher";
 import { RouteError } from "../shared/ui/RouteError";
+import { useShell } from "../shared/ui/shell";
 
 const FIRST_PAGE = 20;
 
@@ -31,10 +33,21 @@ export async function clientLoader({ params }: Route.ClientLoaderArgs) {
   }
 }
 
-/** The profile's main tab: Top Four and the timeline, with comparisons and Top list progress alongside. */
+/**
+ * The profile's main tab: Top Four and the timeline, with comparisons and
+ * Top list progress alongside. On your own timeline each round can be
+ * deleted; the route owns that fetcher because the timeline remounts when
+ * its first page reloads.
+ */
 export default function ProfileTimeline({ loaderData, params }: Route.ComponentProps) {
+  const shell = useShell();
   const { profile, list } = useProfileData();
   const self = profile.relationship === ProfileRelationship.Self;
+  const removal = useJournalFetcher((reply) => {
+    shell.notify(replyMessage(reply));
+  });
+  const pendingRound = removal.fetcher.formData?.get("roundId");
+  const deleting = removal.busy && typeof pendingRound === "string" ? pendingRound : null;
   const name = displayName(profile.member);
   return (
     <div className={profileStyles.columns}>
@@ -44,7 +57,21 @@ export default function ProfileTimeline({ loaderData, params }: Route.ComponentP
           <h2 id="timeline" className={styles.sectionLabel}>
             Timeline
           </h2>
-          <TimelineView key={timelineKey(params.username, loaderData)} username={params.username} first={loaderData} self={self} />
+          <TimelineView
+            key={timelineKey(params.username, loaderData)}
+            username={params.username}
+            first={loaderData}
+            self={self}
+            deleting={deleting}
+            onDelete={
+              self
+                ? (round) => {
+                    if (window.confirm("Delete your round at " + round.course.name + "?"))
+                      removal.submit({ intent: "delete-round", roundId: round.id });
+                  }
+                : undefined
+            }
+          />
         </section>
       </div>
       <aside className={profileStyles.aside}>

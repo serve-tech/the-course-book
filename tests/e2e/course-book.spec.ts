@@ -223,6 +223,37 @@ test.describe("signed in", () => {
     await expect.poll(() => wantedIds(db, owner.id)).toEqual([]);
   });
 
+  test("a mistaken round can be undone, or deleted from a list row or the timeline", async ({ page }) => {
+    const { owner } = members();
+    const augusta = await catalogCourse(db, "usa2");
+    const augustaRow = page.locator('#toplist > li[data-course="Augusta National Golf Club"]');
+    const logAugusta = async () => {
+      await page.getByRole("button", { name: "Log a round at Augusta National Golf Club" }).click();
+      await page.locator("#confirmLog").click();
+      await expect(augustaRow).toHaveAttribute("data-played", "true");
+    };
+    await signInAs(page, owner);
+    await page.goto("/courses");
+
+    await logAugusta();
+    await page.locator("#toast").getByRole("button", { name: "Undo" }).click();
+    await expect(augustaRow).toHaveAttribute("data-played", "false");
+    expect(await roundDates(db, owner.id, augusta)).toEqual([]);
+
+    await logAugusta();
+    await augustaRow.getByRole("button", { name: "Your rounds at Augusta National Golf Club" }).click();
+    page.once("dialog", (dialog) => void dialog.accept());
+    await page.locator("#roundmodal .delete-round").click();
+    await expect(page.locator("#roundmodal")).toHaveCount(0);
+    await expect(augustaRow).toHaveAttribute("data-played", "false");
+
+    await page.goto(`/u/${owner.username}`);
+    page.once("dialog", (dialog) => void dialog.accept());
+    await page.getByRole("button", { name: "Delete your round at Test Beta Links on 2026-02-01" }).click();
+    await expect(page.locator('[data-round="Test Beta Links"]')).toHaveCount(0);
+    expect(await listOrder(db, owner.id)).toEqual([fixtureCourses.alpha.id]);
+  });
+
   test("a friend's Top list shows which courses they played and you haven't", async ({ page }) => {
     const { owner, friend } = members();
     await addPlayed(db, friend, await catalogCourse(db, "usa4"));

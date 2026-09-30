@@ -10,6 +10,8 @@ export interface JournalReply {
   removed?: boolean;
   removedCourse?: boolean;
   courseId?: string;
+  /** Rounds a log created, for Undo. */
+  roundIds?: string[];
 }
 
 /**

@@ -4,7 +4,7 @@ import { z } from "zod";
 import type { Route } from "./+types/journal";
 import { replyMessages } from "../features/journal/reply-message";
 import type { JournalReply } from "../features/journal/use-journal-fetcher";
-import { api, unwrap } from "../lib/api";
+import { api, ApiError, unwrap } from "../lib/api";
 import { apiFailureMessage } from "../shared/lib/errors";
 import { localDate } from "../shared/lib/local-date";
 import { fromRound, toCourseDetailsRequest } from "../lib/api/mappers";
@@ -44,6 +44,10 @@ const intentSchema = z.discriminatedUnion("intent", [
   z.object({ intent: z.literal("move"), courseId: uuid, rank: z.coerce.number() }),
   z.object({ intent: z.literal("set-count"), courseId: uuid, count: z.coerce.number().int().min(0) }),
   z.object({ intent: z.literal("delete-round"), roundId: uuid }),
+  z.object({
+    intent: z.literal("undo-log"),
+    roundIds: z.string().transform((value) => value.split(",")).pipe(z.array(uuid).min(1).max(100)),
+  }),
   z.object({ intent: z.literal("delete-course"), courseId: uuid }),
 ]);
 
@@ -80,7 +84,7 @@ async function perform(form: JournalIntent): Promise<JournalReply> {
             body: { quantity: form.quantity, playedOn },
           }),
         );
-        return { ok: true, message: replyMessages.logged(result.added), count: result.added, courseId: form.courseId };
+        return { ok: true, message: replyMessages.logged(result.added), count: result.added, courseId: form.courseId, roundIds: result.roundIds };
       }
       if (!form.course) return failure("Choose a course first.");
       let raw: unknown;
@@ -98,7 +102,7 @@ async function perform(form: JournalIntent): Promise<JournalReply> {
           body: { source: "search", course: toCourseDetailsRequest(posted.data), quantity: form.quantity, playedOn },
         }),
       );
-      return { ok: true, message: replyMessages.logged(form.quantity), count: form.quantity, courseId: result.courseId };
+      return { ok: true, message: replyMessages.logged(form.quantity), count: form.quantity, courseId: result.courseId, roundIds: result.roundIds };
     }
     case "want":
       unwrap(await api.PUT("/v1/me/want-to-play/{courseId}", { params: { path: { courseId: form.courseId } } }));
@@ -147,6 +151,18 @@ async function perform(form: JournalIntent): Promise<JournalReply> {
         removedCourse: result.removedCourse,
         courseId: result.courseId,
       };
+    }
+    case "undo-log": {
+      let removedCourse = false;
+      for (const roundId of form.roundIds) {
+        try {
+          removedCourse = unwrap(await api.DELETE("/v1/me/rounds/{roundId}", { params: { path: { roundId } } })).removedCourse;
+        } catch (error) {
+          // Already deleted (a second tap, or from the round history): the undo still holds.
+          if (!(error instanceof ApiError && error.code === "round_not_found")) throw error;
+        }
+      }
+      return { ok: true, message: replyMessages.undone(form.roundIds.length, removedCourse), removedCourse };
     }
     case "delete-course":
       unwrap(await api.DELETE("/v1/me/courses/{courseId}", { params: { path: { courseId: form.courseId } } }));

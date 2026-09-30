@@ -12,6 +12,8 @@ export interface PlayedMark {
   label: string;
   /** The viewer's own mark, in the viewer's color, next to a friend's. */
   you: boolean;
+  /** Opens the viewer's rounds at the course (to delete one); only on the viewer's own tick. */
+  onClick?: () => void;
 }
 
 /**
@@ -67,12 +69,26 @@ export function CourseRow({
       </div>
       <div className={styles.marks}>
         {note && <span className={styles.note}>{note}</span>}
-        {marks.map((mark) => (
-          <span key={mark.label} className={cx(styles.mark, mark.you && styles.markYou)}>
-            <CheckIcon />
-            {mark.label}
-          </span>
-        ))}
+        {marks.map((mark) =>
+          mark.onClick ? (
+            <button
+              key={mark.label}
+              type="button"
+              className={cx(styles.mark, styles.markButton, mark.you && styles.markYou)}
+              aria-label={"Your rounds at " + course.name}
+              title="See or delete your rounds"
+              onClick={mark.onClick}
+            >
+              <CheckIcon />
+              {mark.label}
+            </button>
+          ) : (
+            <span key={mark.label} className={cx(styles.mark, mark.you && styles.markYou)}>
+              <CheckIcon />
+              {mark.label}
+            </span>
+          ),
+        )}
       </div>
       {actions}
     </li>

@@ -4,7 +4,9 @@ import type { Course, RankedCourse } from "@coursebook/domain/catalog/course";
 import { topListTitle } from "@coursebook/domain/social/top-lists";
 import type { ViewerCourses } from "../../lib/api/viewer";
 import { cx } from "../../shared/lib/cx";
+import type { Notify } from "../../shared/ui/shell";
 import { LogRoundDialog } from "../rounds/LogRoundDialog";
+import { RoundHistory } from "../rounds/RoundHistory";
 import { CourseActions } from "./CourseActions";
 import { CourseRow, type PlayedMark } from "./CourseRow";
 import { filterEntries, PlayedFilter, playedCount, type TopListRef } from "./lists";
@@ -50,11 +52,12 @@ export function MemberTopList({
   memberPlayed: ReadonlySet<string>;
   viewer: ViewerCourses;
   backTo: string;
-  notify: (message: string) => void;
+  notify: Notify;
   openAuth: () => void;
 }) {
   const [filter, setFilter] = useState(MemberFilter.All);
   const [logging, setLogging] = useState<Course | null>(null);
+  const [history, setHistory] = useState<Course | null>(null);
   const youPlayed = new Set(Object.entries(viewer.played).flatMap(([id, rounds]) => (rounds > 0 ? [id] : [])));
   const onlyThem = new Set([...memberPlayed].filter((id) => !youPlayed.has(id)));
   const wanted = new Set(viewer.wanted);
@@ -77,11 +80,14 @@ export function MemberTopList({
   if (!self) filters.push([MemberFilter.OnlyThem, "Only " + name + " " + String(playedCount(entries, onlyThem))]);
   filters.push([MemberFilter.NotPlayed, "Not played " + String(entries.length - theirs)]);
 
-  const marks = (courseId: string): PlayedMark[] => {
-    if (self) return memberPlayed.has(courseId) ? [{ label: "Played", you: false }] : [];
+  const marks = (course: Course): PlayedMark[] => {
+    const openRounds = () => {
+      setHistory(course);
+    };
+    if (self) return memberPlayed.has(course.id) ? [{ label: "Played", you: false, onClick: openRounds }] : [];
     return [
-      ...(memberPlayed.has(courseId) ? [{ label: name, you: false }] : []),
-      ...(youPlayed.has(courseId) ? [{ label: "You", you: true }] : []),
+      ...(memberPlayed.has(course.id) ? [{ label: name, you: false }] : []),
+      ...(youPlayed.has(course.id) ? [{ label: "You", you: true, onClick: openRounds }] : []),
     ];
   };
 
@@ -153,7 +159,7 @@ export function MemberTopList({
               rank={row.rank}
               current={list}
               played={memberPlayed.has(row.course.id)}
-              marks={marks(row.course.id)}
+              marks={marks(row.course)}
               actions={
                 <CourseActions
                   course={row.course}
@@ -169,6 +175,16 @@ export function MemberTopList({
         </ol>
       )}
 
+      {history && (
+        <RoundHistory
+          key={history.id}
+          course={history}
+          notify={notify}
+          onClose={() => {
+            setHistory(null);
+          }}
+        />
+      )}
       {logging && (
         <LogRoundDialog
           signedIn

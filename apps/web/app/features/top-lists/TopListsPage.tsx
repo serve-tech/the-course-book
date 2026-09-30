@@ -5,7 +5,9 @@ import { topListTitle } from "@coursebook/domain/social/top-lists";
 import type { ViewerCourses } from "../../lib/api/viewer";
 import { usePreference } from "../../shared/lib/use-preference";
 import { StateSelect } from "../../shared/ui/StateSelect";
+import type { Notify } from "../../shared/ui/shell";
 import { LogRoundDialog } from "../rounds/LogRoundDialog";
+import { RoundHistory } from "../rounds/RoundHistory";
 import { CourseActions } from "./CourseActions";
 import { CourseRow } from "./CourseRow";
 import { filterEntries, homeState, listEntries, ListTab, parseListTab, PlayedFilter, playedCount, tabList } from "./lists";
@@ -26,7 +28,8 @@ const TAB_LABELS: Readonly<Record<ListTab, string>> = {
  * tab last used on this device (the USA Top 100 the first time). Best in
  * State shows the chosen state, else the state where the viewer has played
  * most. Rows carry every rank a course holds, a tick when the viewer played
- * it, and Log a round and Want to play buttons.
+ * it (which opens their rounds there, to delete a mistake), and Log a round
+ * and Want to play buttons.
  *
  * @param rows - Every published ranking entry.
  * @param viewer - The signed-in viewer's courses and Want to play list; null when signed out.
@@ -45,7 +48,7 @@ export function TopListsPage({
   viewer: ViewerCourses | null;
   selectedState: string;
   onState: (code: string) => void;
-  notify: (message: string) => void;
+  notify: Notify;
   onSearchFocus: (focused: boolean) => void;
   openAuth: () => void;
 }) {
@@ -53,6 +56,7 @@ export function TopListsPage({
   const [filter, setFilter] = useState(PlayedFilter.All);
   const [query, setQuery] = useState("");
   const [logging, setLogging] = useState<Course | null>(null);
+  const [history, setHistory] = useState<Course | null>(null);
 
   const tab = parseListTab(storedTab);
   const state = selectedState || homeState(viewer?.courses ?? []);
@@ -181,7 +185,19 @@ export function TopListsPage({
                 rank={row.rank}
                 current={list}
                 played={rounds > 0}
-                marks={rounds > 0 ? [{ label: "Played", you: false }] : []}
+                marks={
+                  rounds > 0
+                    ? [
+                        {
+                          label: "Played",
+                          you: false,
+                          onClick: () => {
+                            setHistory(row.course);
+                          },
+                        },
+                      ]
+                    : []
+                }
                 note={rounds > 1 ? String(rounds) + " rounds" : undefined}
                 actions={
                   <CourseActions
@@ -199,6 +215,16 @@ export function TopListsPage({
         </ol>
       )}
 
+      {history && (
+        <RoundHistory
+          key={history.id}
+          course={history}
+          notify={notify}
+          onClose={() => {
+            setHistory(null);
+          }}
+        />
+      )}
       {logging && viewer && (
         <LogRoundDialog
           signedIn

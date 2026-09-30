@@ -14,6 +14,8 @@ describe("journal reply messages", () => {
     [replyMessages.deletedRound(false), "Round deleted"],
     [replyMessages.deletedRound(true), "Round deleted; course removed from My List"],
     [replyMessages.deletedCourse(), "Course deleted from My List"],
+    [replyMessages.undone(1, true), "Round removed; course taken off your list"],
+    [replyMessages.undone(2, false), "2 rounds removed"],
   ])("%s", (actual, expected) => {
     expect(actual).toBe(expected);
   });

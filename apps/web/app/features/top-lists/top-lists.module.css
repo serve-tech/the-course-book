@@ -160,6 +160,10 @@
 }
 .mark svg { width: 12px; height: 12px; }
 .markYou { background: rgba(143, 179, 156, 0.15); color: #9fc2aa; }
+/* The viewer's own tick opens their rounds there. */
+.markButton { border: 1px solid transparent; cursor: pointer; }
+.markButton:hover { border-color: currentColor; }
+.markButton:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 .note { color: var(--muted); font-size: 12px; white-space: nowrap; }
 
 /* Letterboxd-style icon buttons. */

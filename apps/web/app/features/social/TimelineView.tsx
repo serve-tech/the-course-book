@@ -3,6 +3,7 @@ import type { TimelineRound } from "@coursebook/domain/social/types";
 import { api, unwrap } from "../../lib/api";
 import { fromTimelineRound } from "../../lib/api/mappers";
 import { apiFailureMessage } from "../../shared/lib/errors";
+import { TrashIcon } from "../top-lists/icons";
 import { CourseTile } from "./CourseTile";
 import { TileSize } from "./sizes";
 import { dayOfMonth, groupByMonth, visitLabel } from "./format";
@@ -20,15 +21,21 @@ const PAGE_SIZE = 20;
  * @param username - Whose timeline.
  * @param first - The first page from the loader.
  * @param self - Whether it is the viewer's own timeline (changes the empty state).
+ * @param onDelete - Deletes one of the viewer's own rounds; each entry gets a delete button when given.
+ * @param deleting - The id of the round being deleted, if any.
  */
 export function TimelineView({
   username,
   first,
   self,
+  onDelete,
+  deleting = null,
 }: {
   username: string;
   first: { rounds: readonly TimelineRound[]; nextCursor: string | null };
   self: boolean;
+  onDelete?: ((round: TimelineRound) => void) | undefined;
+  deleting?: string | null;
 }) {
   const [more, setMore] = useState<{ rounds: TimelineRound[]; cursor: string | null } | null>(null);
   const [loading, setLoading] = useState(false);
@@ -88,7 +95,7 @@ export function TimelineView({
             </small>
           </h3>
           {month.rounds.map((round) => (
-            <div key={round.id} className={profileStyles.entry}>
+            <div key={round.id} className={[profileStyles.entry, onDelete ? profileStyles.entryOwn : ""].join(" ")} data-round={round.course.name}>
               <span className={profileStyles.day}>{dayOfMonth(round.playedOn)}</span>
               <CourseTile course={round.course} number={round.rank} size={TileSize.Thumb} />
               <div>
@@ -102,6 +109,20 @@ export function TimelineView({
                 <b>#{round.rank}</b>
                 ranked
               </span>
+              {onDelete && (
+                <button
+                  type="button"
+                  className={profileStyles.entryDelete}
+                  aria-label={"Delete your round at " + round.course.name + (round.playedOn ? " on " + round.playedOn : "")}
+                  title="Delete this round"
+                  disabled={deleting !== null}
+                  onClick={() => {
+                    onDelete(round);
+                  }}
+                >
+                  <TrashIcon />
+                </button>
+              )}
             </div>
           ))}
         </div>

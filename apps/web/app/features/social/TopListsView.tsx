@@ -5,7 +5,9 @@ import type { TopListProgress } from "@coursebook/domain/social/top-lists";
 import type { WantToPlayEntry } from "@coursebook/domain/social/types";
 import type { ViewerCourses } from "../../lib/api/viewer";
 import { localDate } from "../../shared/lib/local-date";
+import type { Notify } from "../../shared/ui/shell";
 import { LogRoundDialog } from "../rounds/LogRoundDialog";
+import { RoundHistory } from "../rounds/RoundHistory";
 import { CourseActions } from "../top-lists/CourseActions";
 import { CourseRow, type PlayedMark } from "../top-lists/CourseRow";
 import { topListSlug } from "../top-lists/lists";
@@ -47,17 +49,24 @@ export function TopListsView({
   wantToPlay: readonly WantToPlayEntry[];
   memberPlayed: ReadonlySet<string>;
   viewer: ViewerCourses;
-  notify: (message: string) => void;
+  notify: Notify;
   openAuth: () => void;
 }) {
   const [logging, setLogging] = useState<Course | null>(null);
+  const [history, setHistory] = useState<Course | null>(null);
   const [now] = useState(() => new Date());
   const wanted = new Set(viewer.wanted);
 
-  const marks = (courseId: string): PlayedMark[] => {
-    const theyPlayed = memberPlayed.has(courseId);
-    if (self) return theyPlayed ? [{ label: "Played", you: false }] : [];
-    return [...(theyPlayed ? [{ label: name, you: false }] : []), ...((viewer.played[courseId] ?? 0) > 0 ? [{ label: "You", you: true }] : [])];
+  const marks = (course: Course): PlayedMark[] => {
+    const theyPlayed = memberPlayed.has(course.id);
+    const openRounds = () => {
+      setHistory(course);
+    };
+    if (self) return theyPlayed ? [{ label: "Played", you: false, onClick: openRounds }] : [];
+    return [
+      ...(theyPlayed ? [{ label: name, you: false }] : []),
+      ...((viewer.played[course.id] ?? 0) > 0 ? [{ label: "You", you: true, onClick: openRounds }] : []),
+    ];
   };
 
   return (
@@ -109,7 +118,7 @@ export function TopListsView({
                   rank={null}
                   current={null}
                   played={false}
-                  marks={marks(entry.course.id)}
+                  marks={marks(entry.course)}
                   note={"Added " + shortDate(localDate(new Date(entry.addedAt)), now)}
                   actions={
                     <CourseActions
@@ -132,6 +141,16 @@ export function TopListsView({
           {self ? "Make your own lists, ranked or not, like a Bandon trip or the best munis in Michigan." : "Lists " + name + " makes will appear here."}
         </ComingSoon>
       </aside>
+      {history && (
+        <RoundHistory
+          key={history.id}
+          course={history}
+          notify={notify}
+          onClose={() => {
+            setHistory(null);
+          }}
+        />
+      )}
       {logging && (
         <LogRoundDialog
           signedIn
