@@ -21,6 +21,7 @@ cp .env.example .env   # then add your Clerk development keys (CLERK_* and VITE_
 docker compose up -d db
 pnpm db:migrate
 pnpm dev
+pnpm seed:dev --me <username>   # optional, after signing in once: sample friends, rounds and feed activity
 ```
 
 `pnpm dev` runs the API on http://localhost:3001 and the web app on http://localhost:5173/.
