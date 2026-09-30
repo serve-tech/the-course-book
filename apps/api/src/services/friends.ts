@@ -1,12 +1,14 @@
-import { and, asc, desc, eq, exists, gt, isNull, ne, or, sql, type AnyColumn, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, exists, gt, isNull, max, ne, or, sql, type AnyColumn, type SQL } from "drizzle-orm";
+import type { Course } from "@coursebook/domain/catalog/course";
 import type { Database, Executor, Transaction } from "../db/client";
-import { courses, friendships, userCourses, users } from "../db/schema";
+import { courses, friendships, rounds, userCourses, users } from "../db/schema";
 import { courseView } from "../domain/course-view";
 import { BefriendChange, FriendshipStatus, befriend, relationshipFor } from "../domain/friendship";
 import { equivalentCourses } from "../domain/identity";
 import type {
   FriendRequests,
   MemberList,
+  MemberListRow,
   MemberRelationship,
   PublicMember,
 } from "@coursebook/domain/friends/types";
@@ -104,11 +106,93 @@ export async function memberPage(
   };
 }
 
+/** A member the viewer may see: themselves or an accepted friend. */
+export interface VisibleMember {
+  id: string;
+  username: string;
+  displayName: string;
+}
+
 /**
- * A member's list for a viewer: the viewer's own, or an accepted friend's.
- * The username matches case-insensitively, like the unique index.
- * `onMyList` uses the same identity rule as the catalog so a duplicate row
- * for the same course still reads as already listed.
+ * The member behind `username` if the viewer may see them: the viewer
+ * themselves or an accepted friend. The username matches case-insensitively,
+ * like the unique index.
+ *
+ * Returns:
+ *     The member, or null when no such member exists or they are not the
+ *     viewer's friend. The two are indistinguishable on purpose, so every
+ *     read of another member goes through here.
+ */
+export async function visibleMember(db: Executor, viewerId: string, username: string): Promise<VisibleMember | null> {
+  const member = await findMember(db, username);
+  if (!member) return null;
+  if (member.id === viewerId) return member;
+  const [friendship] = await db
+    .select({ id: friendships.id })
+    .from(friendships)
+    .where(and(eq(friendships.status, FriendshipStatus.Accepted), pair(viewerId, member.id)));
+  return friendship ? member : null;
+}
+
+/** One course on a member's ranking with their play history there. */
+export interface MemberRankingRow {
+  course: Course;
+  rank: number;
+  played: number;
+  lastPlayedOn: string | null;
+}
+
+/** A member's ranking in rank order, with play counts and latest dated round per course. */
+export async function memberRanking(db: Executor, userId: string): Promise<MemberRankingRow[]> {
+  const playedRows = db
+    .select({
+      courseId: rounds.courseId,
+      played: count().as("played"),
+      lastPlayedOn: max(rounds.playedAt).as("last_played_on"),
+    })
+    .from(rounds)
+    .where(eq(rounds.userId, userId))
+    .groupBy(rounds.courseId)
+    .as("played_rows");
+  const rows = await db
+    .select({
+      course: courses,
+      rank: userCourses.personalRank,
+      // bigint comes back as a string from pg.
+      played: sql<string>`coalesce(${playedRows.played}, 0)`,
+      lastPlayedOn: playedRows.lastPlayedOn,
+    })
+    .from(userCourses)
+    .innerJoin(courses, eq(courses.id, userCourses.courseId))
+    .leftJoin(playedRows, eq(playedRows.courseId, userCourses.courseId))
+    .where(eq(userCourses.userId, userId))
+    .orderBy(userCourses.personalRank);
+  const views = await rankedViews(db, rows.map((row) => row.course));
+  return rows.map((row) => ({
+    course: views.get(row.course.id) ?? courseView(row.course),
+    rank: row.rank,
+    played: Number(row.played),
+    lastPlayedOn: row.lastPlayedOn ?? null,
+  }));
+}
+
+/**
+ * Rows of another member's ranking as the viewer sees them: whether each
+ * course is on the viewer's list and at what rank. Matching uses the same
+ * identity rule as the catalog, so a duplicate row for the same course still
+ * reads as already listed.
+ */
+export function relativeRows(theirs: readonly MemberRankingRow[], mine: readonly { course: Course; rank: number }[]): MemberListRow[] {
+  const byId = new Map(mine.map((entry) => [entry.course.id, entry.rank]));
+  return theirs.map((row) => {
+    const myRank = byId.get(row.course.id) ?? mine.find((entry) => equivalentCourses(entry.course, row.course))?.rank ?? null;
+    return { ...row, onMyList: myRank !== null, myRank };
+  });
+}
+
+/**
+ * A member's list for a viewer: the viewer's own, or an accepted friend's,
+ * with the member's play counts and the viewer's own rank per course.
  *
  * Returns:
  *     The list, or null when no such member exists or they are not the
@@ -119,38 +203,10 @@ export async function memberList(
   viewerId: string,
   username: string,
 ): Promise<MemberList | null> {
-  const member = await findMember(db, username);
+  const member = await visibleMember(db, viewerId, username);
   if (!member) return null;
-  if (member.id !== viewerId) {
-    const [friendship] = await db
-      .select({ id: friendships.id })
-      .from(friendships)
-      .where(and(eq(friendships.status, FriendshipStatus.Accepted), pair(viewerId, member.id)));
-    if (!friendship) return null;
-  }
-  const [list, own] = await Promise.all([
-    db
-      .select({ course: courses, rank: userCourses.personalRank })
-      .from(userCourses)
-      .innerJoin(courses, eq(courses.id, userCourses.courseId))
-      .where(eq(userCourses.userId, member.id))
-      .orderBy(userCourses.personalRank),
-    personalList(db, viewerId),
-  ]);
-  const views = await rankedViews(db, list.map((row) => row.course));
-  const ownCourses = own.map((entry) => entry.course);
-  const ownIds = new Set(ownCourses.map((course) => course.id));
-  return {
-    member: toPublicMember(member),
-    rows: list.map((row) => {
-      const course = views.get(row.course.id) ?? courseView(row.course);
-      return {
-        course,
-        rank: row.rank,
-        onMyList: ownIds.has(course.id) || ownCourses.some((mine) => equivalentCourses(mine, course)),
-      };
-    }),
-  };
+  const [theirs, mine] = await Promise.all([memberRanking(db, member.id), personalList(db, viewerId)]);
+  return { member: toPublicMember(member), rows: relativeRows(theirs, mine) };
 }
 
 const MEMBER_SEARCH_LIMIT = 20;

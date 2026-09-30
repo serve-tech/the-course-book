@@ -8,6 +8,7 @@ import {
   ClientConfigSchema,
   CourseIdParamsSchema,
   DeletedRoundSchema,
+  FeedSchema,
   FriendRequestsSchema,
   LoggedRoundsSchema,
   LogRoundsRequestSchema,
@@ -21,13 +22,16 @@ import {
   MovedCourseSchema,
   MoveCourseRequestSchema,
   MyCoursesSchema,
+  PageQuerySchema,
   PlayCountSchema,
+  ProfileSchema,
   RankingsSchema,
   RoundIdParamsSchema,
   RoundsSchema,
   SearchQuerySchema,
   SearchResultsSchema,
   SetPlayCountRequestSchema,
+  TimelineSchema,
   UsernameParamsSchema,
 } from "./schemas";
 
@@ -154,6 +158,47 @@ export const getMemberList = createRoute({
     403: forbidden,
     404: failure("No such member, or not a friend: `member_not_found`."),
   },
+});
+
+const invalidCursor = failure("Invalid parameters or an unusable `cursor`: `validation_failed`.");
+const notVisible = failure("No such member, or not a friend: `member_not_found`.");
+
+export const getMemberProfile = createRoute({
+  method: "get",
+  path: "/v1/members/{username}/profile",
+  operationId: "getMemberProfile",
+  tags: ["Members"],
+  summary: "A friend's profile (or the member's own)",
+  description:
+    "Header, stats, Top Four and, for a friend, how their ranking compares with the viewer's. " +
+    "A member who is not a friend is indistinguishable from no member.",
+  security: MEMBER,
+  request: { params: UsernameParamsSchema },
+  responses: { 200: json(ProfileSchema, "The profile."), 401: unauthenticated, 403: forbidden, 404: notVisible },
+});
+
+export const listMemberRounds = createRoute({
+  method: "get",
+  path: "/v1/members/{username}/rounds",
+  operationId: "listMemberRounds",
+  tags: ["Members"],
+  summary: "A friend's timeline of rounds (or the member's own), a page at a time",
+  description: "Newest played first; undated rounds last. Dates and courses only.",
+  security: MEMBER,
+  request: { params: UsernameParamsSchema, query: PageQuerySchema },
+  responses: { 200: json(TimelineSchema, "One page of rounds."), 400: invalidCursor, 401: unauthenticated, 403: forbidden, 404: notVisible },
+});
+
+export const getFeed = createRoute({
+  method: "get",
+  path: "/v1/feed",
+  operationId: "getFeed",
+  tags: ["Feed"],
+  summary: "What the member's friends did, newest first, a page at a time",
+  description: "Rounds logged long after they were played are collapsed into one backfill item per friend and day.",
+  security: MEMBER,
+  request: { query: PageQuerySchema },
+  responses: { 200: json(FeedSchema, "One page of the feed."), 400: invalidCursor, 401: unauthenticated, 403: forbidden },
 });
 
 export const searchMembers = createRoute({

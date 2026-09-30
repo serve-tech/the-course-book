@@ -1,21 +1,39 @@
 import type { OpenAPIHono } from "@hono/zod-openapi";
+import type { ZodType } from "zod";
 import type { AppDependencies } from "../app";
 import { requireUser } from "../auth/middleware";
-import { toMemberList } from "../contract/mappers";
+import { toMemberList, toProfile, toTimelineRound } from "../contract/mappers";
 import {
   befriendMember,
   getMemberList,
+  getMemberProfile,
   listFriendRequests,
+  listMemberRounds,
   listMembers,
   removeFriend,
   searchMembers,
 } from "../contract/routes";
 import type { AppEnv } from "../http/env";
 import { guarded } from "./guard";
+import { decodeCursor, encodeCursor } from "../domain/cursor";
 import { AppError, ErrorCode } from "../services/errors";
 import * as friends from "../services/friends";
+import { memberProfile } from "../services/profiles";
+import { memberTimeline, timelineCursorSchema } from "../services/timeline";
 
 const DEFAULT_PAGE_SIZE = 50;
+/** Default page size for timelines and the feed. */
+export const DEFAULT_TIMELINE_PAGE = 30;
+
+const notVisible = () => new AppError(404, ErrorCode.MemberNotFound, "No member with that username among your friends.");
+
+/** A cursor from the query, validated; 400 when a client sends one the server did not issue. */
+export function pageCursor<T>(text: string | null | undefined, schema: ZodType<T>): T | null {
+  if (!text) return null;
+  const cursor = decodeCursor(text, schema);
+  if (!cursor) throw new AppError(400, ErrorCode.ValidationFailed, "That page link is out of date. Start again from the first page.");
+  return cursor;
+}
 
 /**
  * Friends, their lists, member search and friend requests. Every operation
@@ -37,8 +55,28 @@ export function registerMemberRoutes(app: OpenAPIHono<AppEnv>, deps: AppDependen
     const user = await requireUser(c, deps.provisioner);
     const { username } = c.req.valid("param");
     const list = await friends.memberList(deps.db, user.id, username);
-    if (!list) throw new AppError(404, ErrorCode.MemberNotFound, "No member with that username among your friends.");
+    if (!list) throw notVisible();
     return c.json(toMemberList(list), 200);
+  });
+
+  app.openapi(guarded(getMemberProfile), async (c) => {
+    const user = await requireUser(c, deps.provisioner);
+    const { username } = c.req.valid("param");
+    const profile = await memberProfile(deps.db, user.id, username);
+    if (!profile) throw notVisible();
+    return c.json(toProfile(profile), 200);
+  });
+
+  app.openapi(guarded(listMemberRounds), async (c) => {
+    const user = await requireUser(c, deps.provisioner);
+    const { username } = c.req.valid("param");
+    const { cursor, limit } = c.req.valid("query");
+    const page = await memberTimeline(deps.db, user.id, username, {
+      after: pageCursor(cursor, timelineCursorSchema),
+      limit: limit ?? DEFAULT_TIMELINE_PAGE,
+    });
+    if (!page) throw notVisible();
+    return c.json({ rounds: page.rounds.map(toTimelineRound), nextCursor: page.next ? encodeCursor(page.next) : null }, 200);
   });
 
   app.openapi(guarded(searchMembers), async (c) => {

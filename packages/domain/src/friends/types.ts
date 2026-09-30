@@ -46,6 +46,12 @@ export interface MemberListRow {
   rank: number;
   /** Whether the viewer already has this course (by id or equivalent identity). */
   onMyList: boolean;
+  /** The member's rounds at this course. */
+  played: number;
+  /** ISO date of the member's latest dated round here; null when none is dated. */
+  lastPlayedOn: string | null;
+  /** The viewer's own rank for this course (by id or equivalent identity); null when not on their list. */
+  myRank: number | null;
 }
 
 /** Another member's list as the viewer sees it. */

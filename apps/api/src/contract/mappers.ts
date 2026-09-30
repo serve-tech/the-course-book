@@ -1,6 +1,7 @@
 import type { Course, RankedCourse } from "@coursebook/domain/catalog/course";
 import type { SearchResult } from "@coursebook/domain/catalog/search-results";
-import type { MemberList } from "@coursebook/domain/friends/types";
+import type { MemberList, MemberListRow } from "@coursebook/domain/friends/types";
+import type { FeedItem, Profile, TimelineRound } from "@coursebook/domain/social/types";
 import type { ListEntry, RoundEntry } from "@coursebook/domain/journal/types";
 import { UNKNOWN_LOCATION } from "../domain/course-view";
 import type {
@@ -76,13 +77,56 @@ export function toSearchHit(result: SearchResult) {
   };
 }
 
-export function toMemberList(list: MemberList) {
+/** A row of another member's ranking, relative to the viewer. */
+export function toMemberCourse(row: MemberListRow) {
   return {
-    member: list.member,
-    courses: list.rows.map((row) => ({
-      course: toContractCourse(row.course),
-      rank: row.rank,
-      onMyList: row.onMyList,
-    })),
+    course: toContractCourse(row.course),
+    rank: row.rank,
+    onMyList: row.onMyList,
+    played: row.played,
+    lastPlayedOn: row.lastPlayedOn,
+    myRank: row.myRank,
+  };
+}
+
+export function toMemberList(list: MemberList) {
+  return { member: list.member, courses: list.rows.map(toMemberCourse) };
+}
+
+export function toTimelineRound(round: TimelineRound) {
+  return {
+    id: round.id,
+    course: toContractCourse(round.course),
+    playedOn: round.playedOn,
+    visit: round.visit,
+    rank: round.rank,
+  };
+}
+
+export function toProfile(profile: Profile) {
+  const comparison = profile.comparison;
+  const split = comparison?.biggestSplit ?? null;
+  return {
+    member: profile.member,
+    relationship: profile.relationship,
+    friendsSince: profile.friendsSince,
+    stats: profile.stats,
+    topFour: profile.topFour.map(toMemberCourse),
+    comparison: {
+      inCommon: comparison?.inCommon ?? null,
+      agreement: comparison?.agreement ?? null,
+      biggestSplits: split ? [{ course: toContractCourse(split.course), myRank: split.myRank, theirRank: split.theirRank }] : [],
+    },
+  };
+}
+
+export function toFeedItem(item: FeedItem) {
+  return {
+    id: item.id,
+    type: item.type,
+    at: item.at,
+    member: item.member,
+    rounds: item.rounds.map(toTimelineRound),
+    count: item.count,
   };
 }

@@ -1,6 +1,7 @@
 import { courseSchema, type Course, type RankedCourse } from "@coursebook/domain/catalog/course";
 import type { SearchResult } from "@coursebook/domain/catalog/search-results";
-import type { MemberList } from "@coursebook/domain/friends/types";
+import type { MemberList, MemberListRow } from "@coursebook/domain/friends/types";
+import { FeedItemType, ProfileRelationship, type FeedItem, type Profile, type TimelineRound } from "@coursebook/domain/social/types";
 import type { ListEntry, RoundEntry } from "@coursebook/domain/journal/types";
 import type { ApiSchemas } from "./client";
 
@@ -70,10 +71,67 @@ export function fromSearchHit(hit: ApiSchemas["SearchHit"], index: number): Sear
   return { course, display: course, catalogId: hit.courseId };
 }
 
-export function fromMemberList(list: ApiSchemas["MemberList"]): MemberList {
+export function fromMemberCourse(row: ApiSchemas["MemberCourse"]): MemberListRow {
   return {
-    member: list.member,
-    rows: list.courses.map((row) => ({ course: fromApiCourse(row.course), rank: row.rank, onMyList: row.onMyList })),
+    course: fromApiCourse(row.course),
+    rank: row.rank,
+    onMyList: row.onMyList,
+    played: row.played,
+    lastPlayedOn: row.lastPlayedOn,
+    myRank: row.myRank,
+  };
+}
+
+export function fromMemberList(list: ApiSchemas["MemberList"]): MemberList {
+  return { member: list.member, rows: list.courses.map(fromMemberCourse) };
+}
+
+export function fromTimelineRound(round: ApiSchemas["TimelineRound"]): TimelineRound {
+  return { id: round.id, course: fromApiCourse(round.course), playedOn: round.playedOn, visit: round.visit, rank: round.rank };
+}
+
+/** Relationship values this client knows; anything newer reads as a friend's profile. */
+function toProfileRelationship(value: string): ProfileRelationship {
+  return (Object.values(ProfileRelationship) as string[]).includes(value) ? (value as ProfileRelationship) : ProfileRelationship.Friends;
+}
+
+/**
+ * A profile. The API always sends a comparison object; this client models
+ * "no comparison" (the viewer's own profile) as null.
+ */
+export function fromProfile(profile: ApiSchemas["Profile"]): Profile {
+  const relationship = toProfileRelationship(profile.relationship);
+  const { inCommon, agreement, biggestSplits } = profile.comparison;
+  const split = biggestSplits[0];
+  return {
+    member: profile.member,
+    relationship,
+    friendsSince: profile.friendsSince,
+    stats: profile.stats,
+    topFour: profile.topFour.map(fromMemberCourse),
+    comparison:
+      relationship === ProfileRelationship.Self || inCommon === null
+        ? null
+        : {
+            inCommon,
+            agreement,
+            biggestSplit: split ? { course: fromApiCourse(split.course), myRank: split.myRank, theirRank: split.theirRank } : null,
+          },
+  };
+}
+
+const FEED_ITEM_TYPES: ReadonlySet<string> = new Set(Object.values(FeedItemType));
+
+/** A feed item, or null for a type this client does not know yet (the contract lets types grow). */
+export function fromFeedItem(item: ApiSchemas["FeedItem"]): FeedItem | null {
+  if (!FEED_ITEM_TYPES.has(item.type)) return null;
+  return {
+    id: item.id,
+    type: item.type as FeedItemType,
+    at: item.at,
+    member: item.member,
+    rounds: item.rounds.map(fromTimelineRound),
+    count: item.count,
   };
 }
 

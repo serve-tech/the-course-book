@@ -90,6 +90,16 @@ The seed migration (`0001_seed_catalog.sql`) carries the retired project's publi
 - **Rankings page:** progress uses the full list before search and "Show mine". World, USA and public lists render only with 100 unique ranks; state lists need a selected state and at least one row.
 - **My List:** geographic filters are read-only (no drag or count editing); text search keeps editing.
 - **Friends** ([decision](../.planning/decisions/2026-09-29-friends-only-visibility-with-mutual-friend-requests.md)): a member sees their own list and their friends' lists read-only, and no one else's; another member's list is 404 whether or not they exist. Friendships are mutual (request, then accept; either side can end it). Members find each other by username search (3+ characters, username and display name only). The imported members start as friends with each other; new sign-ups start with none. Usernames match case-insensitively. Responses never include email addresses or user ids.
+- **Profiles, timelines and the feed** ([decision](../.planning/decisions/2026-09-29-social-redesign-top-lists-profiles-timelines-and-star-ratings.md)):
+  - All three are read-only and follow the Friends rule: the viewer or an accepted friend, anyone else 404. The shared check is `visibleMember` in `services/friends.ts`.
+  - **Profile** (`getMemberProfile`):
+    - stats: courses on the list, rounds, rounds dated in the current UTC year, friends;
+    - Top Four: personal ranks 1–4;
+    - for a friend, a comparison over shared courses (matched like `onMyList`): the share of concordant pairs from three shared courses, and the largest split by percentile position (`compareRankings` in `packages/domain`).
+  - **Timeline** (`listMemberRounds`): dates and courses only. Order is `played_at DESC NULLS LAST, created_at DESC, id DESC`. `visit` counts the member's rounds at a course in played order, undated first.
+  - **Feed** (`getFeed`): friends' rounds by when they were logged. Rounds logged more than 14 days after they were played (or undated) collapse into one `backfill` item per friend and UTC day. It is derived on read; there is no event table.
+  - **Paging:** cursors are opaque keyset keys (`domain/cursor.ts`) that carry timestamps as Postgres text with microseconds, never member ids.
+  - **`MemberCourse`** carries the member's `played`, `lastPlayedOn` and the viewer's `myRank`.
 - **Account deletion** (`DELETE /v1/me`): data first, then the Clerk user; a retry after a Clerk failure finishes the job. Details under [Authentication and authorization](#authentication-and-authorization).
 - **Preferences:** manual state selection and optional geolocation stay in browser storage.
 - **Known data quirk:** the Pinehurst No. 4 alias resolves to the legacy `usa80` record; fixing it is a data change, not a code change.

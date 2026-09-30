@@ -16,6 +16,7 @@ import { errorHandler, notFoundHandler, validationHook } from "./http/errors";
 import { registerAccountRoutes } from "./routes/account";
 import { registerCatalogRoutes } from "./routes/catalog";
 import { registerClientRoutes } from "./routes/clients";
+import { registerFeedRoutes } from "./routes/feed";
 import { registerJournalRoutes } from "./routes/journal";
 import { registerMemberRoutes } from "./routes/members";
 import { checkDatabase } from "./services/health";
@@ -128,6 +129,7 @@ export function createApp(deps: AppDependencies): OpenAPIHono<AppEnv> {
   registerJournalRoutes(app, deps);
   registerCatalogRoutes(app, deps);
   registerMemberRoutes(app, deps);
+  registerFeedRoutes(app, deps);
   registerClientRoutes(app, deps);
 
   app.openAPIRegistry.registerComponent("securitySchemes", SECURITY_SCHEME, {

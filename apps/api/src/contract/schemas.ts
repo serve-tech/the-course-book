@@ -156,12 +156,95 @@ export const FriendRequestsSchema = z
   .openapi("FriendRequests");
 
 export const MemberCourseSchema = z
-  .object({ course: CourseSchema, rank, onMyList: z.boolean() })
+  .object({
+    course: CourseSchema,
+    rank,
+    onMyList: z.boolean(),
+    played: z.number().int().min(0).openapi({ description: "The member's rounds at this course." }),
+    lastPlayedOn: z.iso.date().nullable().openapi({ description: "The member's latest dated round here; null when none is dated." }),
+    myRank: optionalRank.openapi({ description: "The viewer's own rank for this course; null when it is not on the viewer's list." }),
+  })
   .openapi("MemberCourse");
 
 export const MemberListSchema = z
   .object({ member: MemberSchema, courses: z.array(MemberCourseSchema) })
   .openapi("MemberList");
+
+const nextCursor = z.string().nullable().openapi({ description: "Pass as `cursor` for the next page; null on the last page." });
+
+export const TimelineRoundSchema = z
+  .object({
+    id: z.uuid(),
+    course: CourseSchema,
+    playedOn: z.iso.date().nullable().openapi({ description: "Date played; null when the member did not record one." }),
+    visit: z.number().int().min(1).openapi({ description: "1 for the member's first round at this course, 2 for the second; undated rounds count as earliest." }),
+    rank: rank.openapi({ description: "The member's current personal rank for this course." }),
+  })
+  .openapi("TimelineRound");
+
+export const TimelineSchema = z
+  .object({
+    rounds: z.array(TimelineRoundSchema).openapi({ description: "Newest played first; undated rounds last." }),
+    nextCursor,
+  })
+  .openapi("Timeline");
+
+export const ProfileStatsSchema = z
+  .object({
+    courses: z.number().int().min(0),
+    rounds: z.number().int().min(0),
+    roundsThisYear: z.number().int().min(0).openapi({ description: "Rounds dated in the current calendar year (UTC)." }),
+    friends: z.number().int().min(0),
+  })
+  .openapi("ProfileStats");
+
+export const RankSplitSchema = z
+  .object({ course: CourseSchema, myRank: rank, theirRank: rank })
+  .openapi("RankSplit", { description: "The shared course whose positions differ most, relative to each list's length." });
+
+export const RankComparisonSchema = z
+  .object({
+    inCommon: z.number().int().min(0).nullable().openapi({ description: "Courses both members have ranked; null on the viewer's own profile." }),
+    agreement: z.number().min(0).max(1).nullable().openapi({
+      description: "Share of shared-course pairs both members order the same way; null below three shared courses or on the viewer's own profile.",
+    }),
+    biggestSplits: z.array(RankSplitSchema).openapi({
+      description: "Courses whose positions differ most, largest first; at most one today, empty when there is nothing to compare.",
+    }),
+  })
+  .openapi("RankComparison", { description: "How a member's ranking compares with the viewer's. Always present, so clients never decode a null object." });
+
+export const ProfileSchema = z
+  .object({
+    member: MemberSchema,
+    relationship: z.string().openapi({ description: "self or friends. New values may appear." }),
+    friendsSince: z.iso.date().nullable().openapi({ description: "When the friendship was accepted; null on the viewer's own profile." }),
+    stats: ProfileStatsSchema,
+    topFour: z.array(MemberCourseSchema).openapi({ description: "The member's personal ranks 1-4 (fewer for a shorter list)." }),
+    comparison: RankComparisonSchema,
+  })
+  .openapi("Profile");
+
+export const FeedItemSchema = z
+  .object({
+    id: z.string().openapi({ description: "Stable across pages." }),
+    type: z.string().openapi({
+      description:
+        "round (a friend logged a round) or backfill (rounds logged long after they were played, one item per member and day). " +
+        "New types may appear; skip ones you do not know.",
+    }),
+    at: z.iso.datetime().openapi({ description: "When it happened: when the round was logged." }),
+    member: MemberSchema,
+    rounds: z.array(TimelineRoundSchema).openapi({
+      description: "The round for a round item; up to four examples, one per course, for a backfill item.",
+    }),
+    count: z.number().int().min(1).openapi({ description: "Rounds the item stands for: 1 for a round item, all of them for a backfill item." }),
+  })
+  .openapi("FeedItem");
+
+export const FeedSchema = z
+  .object({ items: z.array(FeedItemSchema).openapi({ description: "Newest first." }), nextCursor })
+  .openapi("Feed");
 
 export const MinimumVersionsSchema = z
   .object({ ios: z.string(), android: z.string() })
@@ -291,6 +374,11 @@ export const MemberSearchQuerySchema = z.object({
     .min(3, "Enter at least three characters.")
     .max(64)
     .openapi({ param: { name: "q", in: "query" }, description: "Text in the username, at least three characters." }),
+});
+
+export const PageQuerySchema = z.object({
+  cursor: z.string().max(512).nullish().openapi({ param: { name: "cursor", in: "query" }, description: "`nextCursor` from the previous page." }),
+  limit: z.coerce.number().int().min(1).max(100).nullish().openapi({ param: { name: "limit", in: "query" }, description: "Defaults to 30." }),
 });
 
 export const MembersQuerySchema = z.object({

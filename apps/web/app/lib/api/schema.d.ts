@@ -234,6 +234,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/members/{username}/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A friend's profile (or the member's own)
+         * @description Header, stats, Top Four and, for a friend, how their ranking compares with the viewer's. A member who is not a friend is indistinguishable from no member.
+         */
+        get: operations["getMemberProfile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/members/{username}/rounds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A friend's timeline of rounds (or the member's own), a page at a time
+         * @description Newest played first; undated rounds last. Dates and courses only.
+         */
+        get: operations["listMemberRounds"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/member-search": {
         parameters: {
             query?: never;
@@ -287,6 +327,26 @@ export interface paths {
         post?: never;
         /** Remove a friend, cancel a request, or decline one */
         delete: operations["removeFriend"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/feed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What the member's friends did, newest first, a page at a time
+         * @description Rounds logged long after they were played are collapsed into one backfill item per friend and day.
+         */
+        get: operations["getFeed"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -524,6 +584,71 @@ export interface components {
             course: components["schemas"]["Course"];
             rank: number;
             onMyList: boolean;
+            /** @description The member's rounds at this course. */
+            played: number;
+            /**
+             * Format: date
+             * @description The member's latest dated round here; null when none is dated.
+             */
+            lastPlayedOn: string | null;
+            /** @description The viewer's own rank for this course; null when it is not on the viewer's list. */
+            myRank: number | null;
+        };
+        Profile: {
+            member: components["schemas"]["Member"];
+            /** @description self or friends. New values may appear. */
+            relationship: string;
+            /**
+             * Format: date
+             * @description When the friendship was accepted; null on the viewer's own profile.
+             */
+            friendsSince: string | null;
+            stats: components["schemas"]["ProfileStats"];
+            /** @description The member's personal ranks 1-4 (fewer for a shorter list). */
+            topFour: components["schemas"]["MemberCourse"][];
+            comparison: components["schemas"]["RankComparison"];
+        };
+        ProfileStats: {
+            courses: number;
+            rounds: number;
+            /** @description Rounds dated in the current calendar year (UTC). */
+            roundsThisYear: number;
+            friends: number;
+        };
+        /** @description How a member's ranking compares with the viewer's. Always present, so clients never decode a null object. */
+        RankComparison: {
+            /** @description Courses both members have ranked; null on the viewer's own profile. */
+            inCommon: number | null;
+            /** @description Share of shared-course pairs both members order the same way; null below three shared courses or on the viewer's own profile. */
+            agreement: number | null;
+            /** @description Courses whose positions differ most, largest first; at most one today, empty when there is nothing to compare. */
+            biggestSplits: components["schemas"]["RankSplit"][];
+        };
+        /** @description The shared course whose positions differ most, relative to each list's length. */
+        RankSplit: {
+            course: components["schemas"]["Course"];
+            myRank: number;
+            theirRank: number;
+        };
+        Timeline: {
+            /** @description Newest played first; undated rounds last. */
+            rounds: components["schemas"]["TimelineRound"][];
+            /** @description Pass as `cursor` for the next page; null on the last page. */
+            nextCursor: string | null;
+        };
+        TimelineRound: {
+            /** Format: uuid */
+            id: string;
+            course: components["schemas"]["Course"];
+            /**
+             * Format: date
+             * @description Date played; null when the member did not record one.
+             */
+            playedOn: string | null;
+            /** @description 1 for the member's first round at this course, 2 for the second; undated rounds count as earliest. */
+            visit: number;
+            /** @description The member's current personal rank for this course. */
+            rank: number;
         };
         MemberSearchResults: {
             /** @description At most 20, usernames starting with the query first. */
@@ -539,6 +664,28 @@ export interface components {
             incoming: components["schemas"]["Member"][];
             /** @description Members the viewer asked, by username. */
             outgoing: components["schemas"]["Member"][];
+        };
+        Feed: {
+            /** @description Newest first. */
+            items: components["schemas"]["FeedItem"][];
+            /** @description Pass as `cursor` for the next page; null on the last page. */
+            nextCursor: string | null;
+        };
+        FeedItem: {
+            /** @description Stable across pages. */
+            id: string;
+            /** @description round (a friend logged a round) or backfill (rounds logged long after they were played, one item per member and day). New types may appear; skip ones you do not know. */
+            type: string;
+            /**
+             * Format: date-time
+             * @description When it happened: when the round was logged.
+             */
+            at: string;
+            member: components["schemas"]["Member"];
+            /** @description The round for a round item; up to four examples, one per course, for a backfill item. */
+            rounds: components["schemas"]["TimelineRound"][];
+            /** @description Rounds the item stands for: 1 for a round item, all of them for a backfill item. */
+            count: number;
         };
         ClientConfig: {
             minimumVersions: components["schemas"]["MinimumVersions"];
@@ -1332,6 +1479,118 @@ export interface operations {
             };
         };
     };
+    getMemberProfile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                username: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The profile. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Profile"];
+                };
+            };
+            /** @description No valid session: `unauthenticated`, or `account_deleted` after the account was deleted. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description The Clerk account cannot use the app: `username_invalid`. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description No such member, or not a friend: `member_not_found`. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    listMemberRounds: {
+        parameters: {
+            query?: {
+                /** @description `nextCursor` from the previous page. */
+                cursor?: string | null;
+                /** @description Defaults to 30. */
+                limit?: number | null;
+            };
+            header?: never;
+            path: {
+                username: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description One page of rounds. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Timeline"];
+                };
+            };
+            /** @description Invalid parameters or an unusable `cursor`: `validation_failed`. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description No valid session: `unauthenticated`, or `account_deleted` after the account was deleted. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description The Clerk account cannot use the app: `username_invalid`. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description No such member, or not a friend: `member_not_found`. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
     searchMembers: {
         parameters: {
             query: {
@@ -1516,6 +1775,58 @@ export interface operations {
             };
             /** @description No such member: `member_not_found`; nothing between the two: `friendship_not_found`. */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    getFeed: {
+        parameters: {
+            query?: {
+                /** @description `nextCursor` from the previous page. */
+                cursor?: string | null;
+                /** @description Defaults to 30. */
+                limit?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description One page of the feed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Feed"];
+                };
+            };
+            /** @description Invalid parameters or an unusable `cursor`: `validation_failed`. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description No valid session: `unauthenticated`, or `account_deleted` after the account was deleted. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description The Clerk account cannot use the app: `username_invalid`. */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
