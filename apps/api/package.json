@@ -20,6 +20,7 @@
     "db:migrate": "node --env-file-if-exists=../../.env src/db/migrate-cli.ts",
     "seed:build": "tsx scripts/build-seed.ts",
     "import:supabase": "tsx scripts/import-supabase.ts",
+    "seed:dev": "tsx scripts/seed-dev.ts",
     "contract:emit": "tsx scripts/emit-openapi.ts"
   },
   "dependencies": {
