@@ -1,6 +1,6 @@
 import { and, count, desc, eq, inArray, sql } from "drizzle-orm";
 import type { Database, Executor, Transaction } from "../db/client";
-import { courses, rounds, userCourses } from "../db/schema";
+import { courses, rounds, userCourses, wantToPlay } from "../db/schema";
 import { courseView } from "../domain/course-view";
 import { insertAt, reorder } from "@coursebook/domain/journal/reorder";
 import type { ListEntry, RoundEntry } from "@coursebook/domain/journal/types";
@@ -113,7 +113,10 @@ async function renumber(tx: Transaction, userId: string, order: readonly string[
   `);
 }
 
-/** Insert `quantity` rounds sharing one played date; returns their ids. */
+/**
+ * Insert `quantity` rounds sharing one played date; returns their ids.
+ * Playing a course takes it off the member's Want to play list.
+ */
 export async function insertRounds(
   tx: Transaction,
   userId: string,
@@ -132,6 +135,7 @@ export async function insertRounds(
       })),
     )
     .returning({ id: rounds.id });
+  await tx.delete(wantToPlay).where(and(eq(wantToPlay.userId, userId), eq(wantToPlay.courseId, courseId)));
   return inserted.map((row) => row.id);
 }
 
@@ -199,17 +203,17 @@ export async function logRounds(
   input: CourseInput,
   quantity: number,
   playedAt?: string,
-): Promise<{ courseId: string; count: number; courses: ListEntry[] }> {
+): Promise<{ courseId: string; count: number; roundIds: string[]; courses: ListEntry[] }> {
   const count = Math.max(1, quantity);
   if (!("courseId" in input)) {
     const added = await addCourseByDetails(db, userId, input, { rank: null, quantity: count, playedOn: playedAt });
-    return { courseId: added.courseId, count, courses: added.courses };
+    return { courseId: added.courseId, count, roundIds: added.roundIds, courses: added.courses };
   }
   return withJournalLock(db, userId, async (tx) => {
     const courseId = await requireCourse(tx, input.courseId);
     await ensureMembership(tx, userId, courseId);
-    const inserted = await insertRounds(tx, userId, courseId, count, playedAt);
-    return { courseId, count: inserted.length, courses: await personalList(tx, userId) };
+    const roundIds = await insertRounds(tx, userId, courseId, count, playedAt);
+    return { courseId, count: roundIds.length, roundIds, courses: await personalList(tx, userId) };
   });
 }
 
@@ -230,14 +234,15 @@ export async function logRounds(
  *         optional ISO `playedOn` date (database date when absent).
  *
  * Returns:
- *     The course id, its rank on the list and the whole updated list.
+ *     The course id, its rank on the list, the ids of the rounds logged
+ *     (for undo) and the whole updated list.
  */
 export async function addCourseByDetails(
   db: Database,
   userId: string,
   input: Exclude<CourseInput, { courseId: string }>,
   options: { rank: number | null; quantity: number; playedOn?: string | undefined },
-): Promise<{ courseId: string; rank: number; courses: ListEntry[] }> {
+): Promise<{ courseId: string; rank: number; roundIds: string[]; courses: ListEntry[] }> {
   const result = await withJournalLock(db, userId, async (tx) => {
     const course = await findOrCreateCourse(tx, input, userId);
     let rank = await membershipRank(tx, userId, course.id);
@@ -247,11 +252,11 @@ export async function addCourseByDetails(
       await renumber(tx, userId, order);
       rank = order.indexOf(course.id) + 1;
     }
-    await insertRounds(tx, userId, course.id, Math.max(1, options.quantity), options.playedOn);
-    return { courseId: course.id, rank, created: course.created, courses: await personalList(tx, userId) };
+    const roundIds = await insertRounds(tx, userId, course.id, Math.max(1, options.quantity), options.playedOn);
+    return { courseId: course.id, rank, roundIds, created: course.created, courses: await personalList(tx, userId) };
   });
   if (result.created) invalidateCatalog();
-  return { courseId: result.courseId, rank: result.rank, courses: result.courses };
+  return { courseId: result.courseId, rank: result.rank, roundIds: result.roundIds, courses: result.courses };
 }
 
 /**

@@ -1,0 +1,208 @@
+/*
+ * Top lists: the Courses page and a member's list page share one course
+ * row. Colors and fonts come from the :root tokens in legacy.css (--panel,
+ * --cream, --muted, --gold, --line, --green; Playfair Display, DM Sans).
+ */
+
+.page { display: grid; gap: 0; }
+
+/* Header: title and copy on the left, progress through the chosen list on the right. */
+.head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 340px);
+  gap: 20px 28px;
+  align-items: end;
+  margin-bottom: 26px;
+}
+.eyebrow { color: var(--gold); font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 8px; }
+.title { margin: 0; font: 600 clamp(34px, 5vw, 52px) / 1 "Playfair Display", Georgia, serif; letter-spacing: -1px; color: var(--cream); }
+.lede { margin: 12px 0 0; max-width: 58ch; color: var(--muted); line-height: 1.6; }
+.back { display: inline-flex; gap: 6px; margin-bottom: 10px; color: var(--gold); font-size: 13px; font-weight: 700; text-decoration: none; }
+.back:hover { text-decoration: underline; }
+
+.progress {
+  display: grid;
+  gap: 10px;
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
+}
+.progressLabel { color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; }
+.progressLine { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; color: #cfd3cb; font-size: 13px; }
+.progressLine b { font: 600 30px / 1 "Playfair Display", Georgia, serif; color: var(--cream); font-variant-numeric: lining-nums tabular-nums; }
+.progressLine small { color: var(--muted); font-size: 12px; margin-left: 4px; }
+.bar { height: 6px; border-radius: 99px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
+.bar span { display: block; height: 100%; border-radius: 99px; background: var(--gold); }
+.barYou span { background: #8fb39c; }
+
+/* List tabs: a segmented control that scrolls sideways on phones. */
+.tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.03);
+  scrollbar-width: none;
+}
+.tab {
+  flex: 1 0 auto;
+  padding: 9px 14px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font: 700 13px "DM Sans", Arial, sans-serif;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.tab:hover { color: var(--cream); }
+.tab[aria-selected="true"] { background: var(--cream); color: #0f2419; }
+.tab:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.caption { margin: 10px 2px 0; color: var(--muted); font-size: 13px; }
+
+/* Filters, state picker and search. */
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 18px 0 8px; }
+.filters { display: flex; flex-wrap: wrap; gap: 6px; }
+.filter {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: #bfc6bf;
+  font: 600 12.5px "DM Sans", Arial, sans-serif;
+  cursor: pointer;
+}
+.filter[aria-pressed="true"] { background: var(--cream); border-color: var(--cream); color: #0f2419; }
+.filter:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.stateSelect select {
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 9px;
+  border: 1px solid rgba(199, 170, 107, 0.45);
+  background: var(--panel);
+  color: var(--cream);
+  font: 600 13px "DM Sans", Arial, sans-serif;
+}
+.search { flex: 1 1 200px; min-width: 0; margin-left: auto; max-width: 320px; }
+.search input {
+  width: 100%;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--cream);
+  font: 500 14px "DM Sans", Arial, sans-serif;
+  outline: 0;
+}
+.search input:focus { border-color: rgba(199, 170, 107, 0.5); }
+
+/* Course rows. */
+.list { margin: 0; padding: 0; list-style: none; }
+.row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 40px 26px minmax(0, 1fr) auto auto;
+  gap: 12px;
+  align-items: center;
+  padding: 11px 10px 11px 8px;
+  border-top: 1px solid var(--line);
+}
+.row:first-child { border-top: 0; }
+/* Played by the member whose list it is: a gold edge and a warmer ground. */
+.row[data-played="true"] { background: linear-gradient(90deg, rgba(199, 170, 107, 0.1), rgba(199, 170, 107, 0.02) 60%, transparent); }
+.row[data-played="true"]::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 3px;
+  background: var(--gold);
+}
+.rank {
+  font: 600 20px / 1 "Playfair Display", Georgia, serif;
+  color: var(--gold);
+  text-align: center;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+.main { min-width: 0; }
+.name { font: 600 16px / 1.25 "Playfair Display", Georgia, serif; color: var(--cream); overflow-wrap: anywhere; }
+.place { margin-top: 2px; color: var(--muted); font-size: 12.5px; }
+.badges { display: flex; flex-wrap: wrap; gap: 4px 6px; margin: 6px 0 0; padding: 0; list-style: none; }
+.badge {
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: #aeb7ae;
+  font: 600 11px / 1.6 "DM Sans", Arial, sans-serif;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.badgeCurrent { border-color: rgba(199, 170, 107, 0.55); color: var(--gold); }
+
+/* Who played it. */
+.marks { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; }
+.mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(199, 170, 107, 0.16);
+  color: var(--gold);
+  font: 700 11px / 1.5 "DM Sans", Arial, sans-serif;
+  white-space: nowrap;
+}
+.mark svg { width: 12px; height: 12px; }
+.markYou { background: rgba(143, 179, 156, 0.15); color: #9fc2aa; }
+/* The viewer's own tick opens their rounds there. */
+.markButton { border: 1px solid transparent; cursor: pointer; }
+.markButton:hover { border-color: currentColor; }
+.markButton:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.note { color: var(--muted); font-size: 12px; white-space: nowrap; }
+
+/* Letterboxd-style icon buttons. */
+.actions { display: flex; gap: 6px; }
+.iconButton {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid rgba(199, 170, 107, 0.4);
+  background: rgba(199, 170, 107, 0.06);
+  color: var(--gold);
+  cursor: pointer;
+}
+.iconButton svg { width: 17px; height: 17px; }
+.iconButton:hover { background: rgba(199, 170, 107, 0.16); }
+.iconButton:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.iconButton[aria-pressed="true"] { background: var(--gold); border-color: var(--gold); color: #1a1407; }
+.iconButton:disabled { opacity: 0.55; cursor: default; }
+
+.empty {
+  margin-top: 8px;
+  padding: 22px;
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  color: var(--muted);
+  text-align: center;
+  font-size: 14px;
+}
+
+@media (max-width: 760px) {
+  .head { grid-template-columns: minmax(0, 1fr); }
+  .search { max-width: none; margin-left: 0; flex-basis: 100%; }
+  /* Marks and buttons move under the name on phones. */
+  .row { grid-template-columns: 32px minmax(0, 1fr) auto; gap: 4px 10px; padding-right: 4px; }
+  .row > :nth-child(2) { display: none; }
+  .rank { font-size: 18px; grid-row: span 2; align-self: start; padding-top: 2px; }
+  .main { grid-column: 2 / 4; }
+  .marks { grid-column: 2; justify-content: flex-start; }
+  .actions { grid-column: 3; }
+}

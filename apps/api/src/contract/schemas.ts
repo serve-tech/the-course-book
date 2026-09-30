@@ -225,6 +225,17 @@ export const ProfileSchema = z
   })
   .openapi("Profile");
 
+export const WantToPlayEntrySchema = z
+  .object({
+    course: CourseSchema,
+    addedAt: z.iso.datetime().openapi({ description: "When the member added it." }),
+  })
+  .openapi("WantToPlayEntry");
+
+export const WantToPlaySchema = z
+  .object({ courses: z.array(WantToPlayEntrySchema).openapi({ description: "Courses the member wants to play, newest first." }) })
+  .openapi("WantToPlay");
+
 export const FeedItemSchema = z
   .object({
     id: z.string().openapi({ description: "Stable across pages." }),
@@ -268,12 +279,16 @@ export const AddedToListSchema = z
   .object({ added: z.boolean().openapi({ description: "False when the course was already on the list." }), courses: listAfterChange })
   .openapi("AddedToList");
 
+const loggedRoundIds = z
+  .array(z.uuid())
+  .openapi({ description: "Ids of the rounds just logged, so a client can offer Undo (`deleteRound` each one)." });
+
 export const AddedCourseSchema = z
-  .object({ courseId: z.uuid(), rank, courses: listAfterChange })
+  .object({ courseId: z.uuid(), rank, roundIds: loggedRoundIds, courses: listAfterChange })
   .openapi("AddedCourse");
 
 export const LoggedRoundsSchema = z
-  .object({ added: z.number().int().min(1).openapi({ description: "Rounds logged." }), courses: listAfterChange })
+  .object({ added: z.number().int().min(1).openapi({ description: "Rounds logged." }), roundIds: loggedRoundIds, courses: listAfterChange })
   .openapi("LoggedRounds");
 
 export const MovedCourseSchema = z

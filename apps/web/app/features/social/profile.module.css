@@ -192,8 +192,23 @@
   overflow-wrap: anywhere;
 }
 .entryMeta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 4px; color: var(--muted); font-size: 12.5px; }
-.entryRank { text-align: right; font-size: 12px; color: var(--muted); white-space: nowrap; }
-.entryRank b { display: block; font: 600 18px / 1 "Playfair Display", Georgia, serif; color: var(--gold); }
+/* Your own timeline: each round can be deleted. */
+.entryOwn { grid-template-columns: 38px 36px minmax(0, 1fr) auto auto; }
+.entryDelete {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.entryDelete svg { width: 16px; height: 16px; }
+.entryDelete:hover { color: #f0b3a1; border-color: rgba(224, 145, 122, 0.5); }
+.entryDelete:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.entryDelete:disabled { opacity: 0.5; cursor: default; }
 .more { display: flex; justify-content: center; margin-top: 18px; }
 
 /* A friend's ranking. */
@@ -242,6 +257,11 @@
 /* Top list progress. */
 .progressList { display: grid; gap: 16px; }
 .progressRow { display: grid; gap: 7px; }
+/* Each list opens with the member's ticks. */
+a.progressRow { margin: -8px -10px; padding: 8px 10px; border-radius: 10px; color: inherit; text-decoration: none; }
+a.progressRow:hover { background: rgba(255, 255, 255, 0.04); }
+a.progressRow:hover .progressTitle { color: var(--gold); }
+a.progressRow:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 .progressHead { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
 .progressTitle { font: 600 16px "Playfair Display", Georgia, serif; color: var(--cream); }
 .progressCount { font: 600 18px "Playfair Display", Georgia, serif; color: var(--cream); font-variant-numeric: lining-nums tabular-nums; }
@@ -258,6 +278,7 @@
   .statValue { font-size: 22px; }
   .statLabel { font-size: 9px; letter-spacing: 1px; }
   .entry { grid-template-columns: 30px 32px minmax(0, 1fr) auto; gap: 10px; }
+  .entryOwn { grid-template-columns: 30px 32px minmax(0, 1fr) auto auto; }
   .day { font-size: 20px; }
   .tabs { gap: 20px; }
 }

@@ -9,8 +9,11 @@ const TEST_DATABASE_URL =
   process.env["DATABASE_URL_TEST"] ??
   "postgres://coursebook:coursebook@localhost:5433/coursebook_test";
 const STUB = "http://127.0.0.1:3999";
-const APP = "http://127.0.0.1:3000";
-const API = "http://127.0.0.1:3001";
+// Not the development ports (3001, 5173): outside CI Playwright reuses a
+// server already listening on its port, and `pnpm dev` serves the
+// development database, not the test database.
+const APP = "http://127.0.0.1:3100";
+const API = "http://127.0.0.1:3101";
 
 /** A configured value, or undefined when it is the .env.example placeholder. */
 const real = (value: string | undefined) =>
@@ -63,7 +66,7 @@ export default defineConfig({
       reuseExistingServer: !process.env["CI"],
       timeout: 120_000,
       env: {
-        PORT: "3001",
+        PORT: "3101",
         NODE_ENV: "production",
         DATABASE_URL: TEST_DATABASE_URL,
         WEB_ORIGINS: APP,
@@ -79,7 +82,7 @@ export default defineConfig({
       reuseExistingServer: !process.env["CI"],
       timeout: 120_000,
       env: {
-        PORT: "3000",
+        PORT: "3100",
         VITE_API_URL: API,
         VITE_CLERK_PUBLISHABLE_KEY: clerkKeys.CLERK_PUBLISHABLE_KEY,
       },

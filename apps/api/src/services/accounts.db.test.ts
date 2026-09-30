@@ -1,12 +1,13 @@
 import { eq } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { courses, friendships, rounds, userCourses, users } from "../db/schema";
+import { courses, friendships, rounds, userCourses, users, wantToPlay } from "../db/schema";
 import { FriendshipStatus } from "../domain/friendship";
 import { resetMemberData, testDatabase } from "../test/db";
 import { deleteAccountData } from "./accounts";
 import { ErrorCode } from "./errors";
 import { memberPage } from "./friends";
 import { addCourseByDetails, logRounds, moveCourse } from "./journal";
+import { addWantToPlay } from "./want-to-play";
 
 const { db, pool } = testDatabase();
 const USER = "user_del";
@@ -38,6 +39,7 @@ describe("account deletion", () => {
     await logRounds(db, "user_other", { courseId: customId }, 1);
 
     await db.insert(friendships).values({ requesterId: "user_other", addresseeId: USER, status: FriendshipStatus.Accepted });
+    await addWantToPlay(db, USER, await seeded("usa2"));
     await deleteAccountData(db, USER);
 
     expect(await db.select().from(userCourses).where(eq(userCourses.userId, USER))).toHaveLength(0);
@@ -51,6 +53,7 @@ describe("account deletion", () => {
     expect(row?.deletedAt).not.toBeNull();
     expect((await memberPage(db, "user_other", { after: null, limit: 50 })).members).toEqual([]);
     expect(await db.select().from(friendships)).toEqual([]);
+    expect(await db.select().from(wantToPlay).where(eq(wantToPlay.userId, USER))).toEqual([]);
   });
 
   it("rejects list changes for a deleted account", async () => {

@@ -287,6 +287,14 @@
             "type": "integer",
             "minimum": 1
           },
+          "roundIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Ids of the rounds just logged, so a client can offer Undo (`deleteRound` each one)."
+          },
           "courses": {
             "type": "array",
             "items": {
@@ -298,6 +306,7 @@
         "required": [
           "courseId",
           "rank",
+          "roundIds",
           "courses"
         ]
       },
@@ -389,6 +398,14 @@
             "minimum": 1,
             "description": "Rounds logged."
           },
+          "roundIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Ids of the rounds just logged, so a client can offer Undo (`deleteRound` each one)."
+          },
           "courses": {
             "type": "array",
             "items": {
@@ -399,6 +416,7 @@
         },
         "required": [
           "added",
+          "roundIds",
           "courses"
         ]
       },
@@ -957,6 +975,38 @@
         "required": [
           "incoming",
           "outgoing"
+        ]
+      },
+      "WantToPlay": {
+        "type": "object",
+        "properties": {
+          "courses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WantToPlayEntry"
+            },
+            "description": "Courses the member wants to play, newest first."
+          }
+        },
+        "required": [
+          "courses"
+        ]
+      },
+      "WantToPlayEntry": {
+        "type": "object",
+        "properties": {
+          "course": {
+            "$ref": "#/components/schemas/Course"
+          },
+          "addedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the member added it."
+          }
+        },
+        "required": [
+          "course",
+          "addedAt"
         ]
       },
       "Feed": {
@@ -2507,6 +2557,218 @@
           },
           "404": {
             "description": "No such member: `member_not_found`; nothing between the two: `friendship_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/members/{username}/want-to-play": {
+      "get": {
+        "operationId": "listWantToPlay",
+        "tags": [
+          "Members"
+        ],
+        "summary": "A friend's Want to play list (or the member's own)",
+        "description": "Newest first. A member who is not a friend is indistinguishable from no member.",
+        "security": [
+          {
+            "ClerkSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "username",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The Want to play list.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WantToPlay"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session: `unauthenticated`, or `account_deleted` after the account was deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The Clerk account cannot use the app: `username_invalid`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such member, or not a friend: `member_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/want-to-play/{courseId}": {
+      "put": {
+        "operationId": "addWantToPlay",
+        "tags": [
+          "Want to Play"
+        ],
+        "summary": "Put a catalog course on the Want to play list",
+        "description": "Played courses are allowed (\"play it again\"). Adding it again keeps the original date, so retrying is safe. Logging a round at the course takes it off the list.",
+        "security": [
+          {
+            "ClerkSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "courseId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The member's Want to play list afterwards.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WantToPlay"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters: `validation_failed`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session: `unauthenticated`, or `account_deleted` after the account was deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The Clerk account cannot use the app: `username_invalid`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such catalog course: `course_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "removeWantToPlay",
+        "tags": [
+          "Want to Play"
+        ],
+        "summary": "Take a course off the Want to play list",
+        "description": "Removing a course that is not on the list changes nothing, so retrying is safe.",
+        "security": [
+          {
+            "ClerkSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "courseId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The member's Want to play list afterwards.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WantToPlay"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters: `validation_failed`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session: `unauthenticated`, or `account_deleted` after the account was deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The Clerk account cannot use the app: `username_invalid`.",
             "content": {
               "application/json": {
                 "schema": {

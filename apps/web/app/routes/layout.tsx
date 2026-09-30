@@ -12,10 +12,15 @@ import { usePreference } from "../shared/lib/use-preference";
 import { TabBar, TopBar } from "../features/shell/AppNav";
 import navStyles from "../features/shell/nav.module.css";
 import { cx } from "../shared/lib/cx";
-import type { Shell } from "../shared/ui/shell";
+import type { Notify, Shell, ToastAction } from "../shared/ui/shell";
+import { replyMessage, useJournalFetcher } from "../features/journal/use-journal-fetcher";
 
 const SELECTED_STATE_KEY = "theCourseBookSelectedState";
 const MOBILE_BREAKPOINT = 760;
+const TOAST_MS = 1900;
+/** Long enough to read the message and reach the button. */
+const FOLLOW_UP_TOAST_MS = 7000;
+const NO_TOAST = { message: "", followUp: null };
 
 /**
  * Pending friend requests to the member, for the Friends badge. A failure
@@ -88,19 +93,26 @@ export default function Layout({ loaderData }: Route.ComponentProps) {
   };
   const [storedState, setStoredState] = usePreference(SELECTED_STATE_KEY);
   const selectedState = storedState.toUpperCase();
-  const [toast, setToast] = useState("");
+  const [toast, setToast] = useState<{ message: string; followUp: ToastAction | null }>(NO_TOAST);
   const [refreshing, setRefreshing] = useState(false);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
     undefined,
   );
 
-  const notify = useCallback((message: string) => {
+  const notify = useCallback<Notify>((message, followUp) => {
     clearTimeout(toastTimer.current);
-    setToast(message);
-    toastTimer.current = setTimeout(() => {
-      setToast("");
-    }, 1900);
+    setToast({ message, followUp: followUp ?? null });
+    toastTimer.current = setTimeout(
+      () => {
+        setToast(NO_TOAST);
+      },
+      followUp ? FOLLOW_UP_TOAST_MS : TOAST_MS,
+    );
   }, []);
+  // The layout outlives the dialogs and pages that offer a follow-up, so it posts it.
+  const followUp = useJournalFetcher((reply) => {
+    notify(replyMessage(reply));
+  });
 
   const onState = useCallback(
     (code: string) => {
@@ -174,11 +186,25 @@ export default function Layout({ loaderData }: Route.ComponentProps) {
         />
       )}
 
-      <div className={"toast" + (toast ? " show" : "")} id="toast" role="status">
-        {toast}
+      <div className={"toast" + (toast.message ? " show" : "") + (toast.followUp ? " has-action" : "")} id="toast" role="status">
+        {toast.message}
+        {toast.followUp && (
+          <button
+            type="button"
+            className="toast-action"
+            onClick={() => {
+              if (!toast.followUp) return;
+              followUp.submit(toast.followUp.fields);
+              clearTimeout(toastTimer.current);
+              setToast(NO_TOAST);
+            }}
+          >
+            {toast.followUp.label}
+          </button>
+        )}
       </div>
 
-      {waking && !toast && (
+      {waking && !toast.message && (
         <div className="toast show" id="wakingNotice" role="status">
           Waking the server… this can take up to a minute.
         </div>

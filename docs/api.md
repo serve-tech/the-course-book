@@ -43,12 +43,12 @@ Every failure returns:
 | `DELETE /v1/me` | `deleteMe` | member | Deletes the account; 204. Retry after a 502 |
 | `GET /v1/me/courses` | `listMyCourses` | member | The list in personal rank order with play counts |
 | `PUT /v1/me/courses/{courseId}` | `addToList` | member | Add a catalog course; logs one round if it has none; idempotent |
-| `POST /v1/me/courses` | `addCourse` | member | Add a course by details (`source` `search` or `manual`), at `rank`, with `quantity` rounds |
+| `POST /v1/me/courses` | `addCourse` | member | Add a course by details (`source` `search` or `manual`), at `rank`, with `quantity` rounds; returns their `roundIds` |
 | `DELETE /v1/me/courses/{courseId}` | `removeCourse` | member | Remove a course and its rounds |
 | `PUT /v1/me/courses/{courseId}/rank` | `moveCourse` | member | Move to a position; renumbers the whole list |
 | `PUT /v1/me/courses/{courseId}/play-count` | `setPlayCount` | member | Set the round count; zero removes the course |
 | `GET /v1/me/courses/{courseId}/rounds` | `listMyCourseRounds` | member | Rounds at a course, newest first |
-| `POST /v1/me/courses/{courseId}/rounds` | `logRounds` | member | Log rounds at a catalog course |
+| `POST /v1/me/courses/{courseId}/rounds` | `logRounds` | member | Log rounds at a catalog course; returns their `roundIds`, so Undo is `deleteRound` for each (the last one takes the course off the list) |
 | `DELETE /v1/me/rounds/{roundId}` | `deleteRound` | member | Delete one round; the last one removes the course |
 | `GET /v1/course-search?q=` | `searchCourses` | member | Up to ten hits; catalog hits carry `courseId` |
 | `GET /v1/members?cursor=&limit=` | `listMembers` | member | The member's friends, paged by username (limit 1–200, default 50) |
@@ -57,9 +57,12 @@ Every failure returns:
 | `GET /v1/me/friend-requests` | `listFriendRequests` | member | Pending requests: `incoming` (they asked) and `outgoing` (the viewer asked) |
 | `PUT /v1/me/friends/{username}` | `befriendMember` | member | Send a request, or accept theirs; returns the resulting `relationship`; idempotent. 400 for the viewer's own username |
 | `DELETE /v1/me/friends/{username}` | `removeFriend` | member | End the friendship, cancel the viewer's request or decline theirs; 204, or 404 `friendship_not_found` |
+| `GET /v1/members/{username}/want-to-play` | `listWantToPlay` | member | The member's own or a friend's Want to play list, newest first; anyone else is 404 `member_not_found` |
+| `PUT /v1/me/want-to-play/{courseId}` | `addWantToPlay` | member | Add a catalog course (played ones too); idempotent, keeps the original date; returns the list |
+| `DELETE /v1/me/want-to-play/{courseId}` | `removeWantToPlay` | member | Remove a course; idempotent (removing one that is not there changes nothing); returns the list |
 
 `relationship` is one of `none`, `friends`, `requested` (the viewer asked) and `incoming` (they asked); treat an unknown value as `none`. Friendships are mutual: one member asks, the other accepts, and either can end it. When both ask each other, they are friends ([decision](../.planning/decisions/2026-09-29-friends-only-visibility-with-mutual-friend-requests.md)).
 
-`POST` operations are not idempotent: a retry after a lost response logs the rounds again. `PUT` and `DELETE` operations are safe to retry; a `DELETE` retried after success answers 404.
+`POST` operations are not idempotent: a retry after a lost response logs the rounds again. `PUT` and `DELETE` operations are safe to retry; a `DELETE` retried after success answers 404, except `removeWantToPlay`, which answers 200 with the list.
 
 `GET /healthz` (outside `/v1`, not in the contract) answers `{ "ok": true }` after a database round-trip, for Render's health checks.

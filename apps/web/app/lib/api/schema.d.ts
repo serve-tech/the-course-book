@@ -332,6 +332,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/members/{username}/want-to-play": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A friend's Want to play list (or the member's own)
+         * @description Newest first. A member who is not a friend is indistinguishable from no member.
+         */
+        get: operations["listWantToPlay"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/want-to-play/{courseId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Put a catalog course on the Want to play list
+         * @description Played courses are allowed ("play it again"). Adding it again keeps the original date, so retrying is safe. Logging a round at the course takes it off the list.
+         */
+        put: operations["addWantToPlay"];
+        post?: never;
+        /**
+         * Take a course off the Want to play list
+         * @description Removing a course that is not on the list changes nothing, so retrying is safe.
+         */
+        delete: operations["removeWantToPlay"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/feed": {
         parameters: {
             query?: never;
@@ -458,6 +502,8 @@ export interface components {
             /** Format: uuid */
             courseId: string;
             rank: number;
+            /** @description Ids of the rounds just logged, so a client can offer Undo (`deleteRound` each one). */
+            roundIds: string[];
             /** @description The member's whole list after the change, read in the same transaction. */
             courses: components["schemas"]["MyCourse"][];
         };
@@ -492,6 +538,8 @@ export interface components {
         LoggedRounds: {
             /** @description Rounds logged. */
             added: number;
+            /** @description Ids of the rounds just logged, so a client can offer Undo (`deleteRound` each one). */
+            roundIds: string[];
             /** @description The member's whole list after the change, read in the same transaction. */
             courses: components["schemas"]["MyCourse"][];
         };
@@ -664,6 +712,18 @@ export interface components {
             incoming: components["schemas"]["Member"][];
             /** @description Members the viewer asked, by username. */
             outgoing: components["schemas"]["Member"][];
+        };
+        WantToPlay: {
+            /** @description Courses the member wants to play, newest first. */
+            courses: components["schemas"]["WantToPlayEntry"][];
+        };
+        WantToPlayEntry: {
+            course: components["schemas"]["Course"];
+            /**
+             * Format: date-time
+             * @description When the member added it.
+             */
+            addedAt: string;
         };
         Feed: {
             /** @description Newest first. */
@@ -1775,6 +1835,162 @@ export interface operations {
             };
             /** @description No such member: `member_not_found`; nothing between the two: `friendship_not_found`. */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    listWantToPlay: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                username: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The Want to play list. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WantToPlay"];
+                };
+            };
+            /** @description No valid session: `unauthenticated`, or `account_deleted` after the account was deleted. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description The Clerk account cannot use the app: `username_invalid`. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description No such member, or not a friend: `member_not_found`. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    addWantToPlay: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                courseId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The member's Want to play list afterwards. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WantToPlay"];
+                };
+            };
+            /** @description Invalid parameters: `validation_failed`. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description No valid session: `unauthenticated`, or `account_deleted` after the account was deleted. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description The Clerk account cannot use the app: `username_invalid`. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description No such catalog course: `course_not_found`. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    removeWantToPlay: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                courseId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The member's Want to play list afterwards. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WantToPlay"];
+                };
+            };
+            /** @description Invalid parameters: `validation_failed`. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description No valid session: `unauthenticated`, or `account_deleted` after the account was deleted. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description The Clerk account cannot use the app: `username_invalid`. */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

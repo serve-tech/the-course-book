@@ -4,7 +4,7 @@
  */
 import { and, eq, inArray, or, sql } from "drizzle-orm";
 import { createDatabase } from "@coursebook/api/db/client";
-import { courses, friendships, rounds, userCourses, users } from "@coursebook/api/db/schema";
+import { courses, friendships, rounds, userCourses, users, wantToPlay } from "@coursebook/api/db/schema";
 import { FriendshipStatus } from "@coursebook/api/domain/friendship";
 import { normalizeName } from "@coursebook/domain/catalog/course";
 
@@ -82,7 +82,7 @@ export async function ensureMembers(
 /**
  * Reset both members to the baseline scenario: they are friends; the owner
  * has Beta at rank 1 and Alpha at rank 2 with one round each; the friend has
- * Alpha then Gamma.
+ * Alpha then Gamma. Neither wants to play anything.
  */
 export async function resetScenario(
   db: ReturnType<typeof connect>["db"],
@@ -90,6 +90,7 @@ export async function resetScenario(
   friend: TestMember,
 ): Promise<void> {
   const ids = [owner.id, friend.id];
+  await db.delete(wantToPlay).where(inArray(wantToPlay.userId, ids));
   await db.delete(friendships).where(or(inArray(friendships.requesterId, ids), inArray(friendships.addresseeId, ids)));
   await db.insert(friendships).values({ requesterId: owner.id, addresseeId: friend.id, status: FriendshipStatus.Accepted });
   await db.delete(rounds).where(inArray(rounds.userId, ids));
@@ -160,4 +161,33 @@ export async function addHiddenCourse(db: ReturnType<typeof connect>["db"], owne
     })
     .onConflictDoNothing();
   await db.insert(userCourses).values({ userId: owner.id, courseId: "aaaaaaaa-0000-4000-8000-000000000004", personalRank: 3 });
+}
+
+/** A seeded catalog course's id by its stable id (e.g. `usa4`, Shinnecock Hills). */
+export async function catalogCourse(db: ReturnType<typeof connect>["db"], stableId: string): Promise<string> {
+  const [row] = await db.select({ id: courses.id }).from(courses).where(eq(courses.stableId, stableId));
+  if (!row) throw new Error("missing seeded course " + stableId);
+  return row.id;
+}
+
+/** Put a course at the bottom of a member's list with one round. */
+export async function addPlayed(db: ReturnType<typeof connect>["db"], member: TestMember, courseId: string): Promise<void> {
+  const ranks = await db.select({ rank: userCourses.personalRank }).from(userCourses).where(eq(userCourses.userId, member.id));
+  await db.insert(userCourses).values({ userId: member.id, courseId, personalRank: ranks.length + 1 });
+  await db.insert(rounds).values({ userId: member.id, courseId, playedAt: "2026-06-01" });
+}
+
+/** Course ids on a member's Want to play list. */
+export async function wantedIds(db: ReturnType<typeof connect>["db"], userId: string): Promise<string[]> {
+  const rows = await db.select({ courseId: wantToPlay.courseId }).from(wantToPlay).where(eq(wantToPlay.userId, userId));
+  return rows.map((row) => row.courseId);
+}
+
+/** Dates of a member's rounds at a course. */
+export async function roundDates(db: ReturnType<typeof connect>["db"], userId: string, courseId: string): Promise<string[]> {
+  const rows = await db
+    .select({ playedAt: rounds.playedAt })
+    .from(rounds)
+    .where(and(eq(rounds.userId, userId), eq(rounds.courseId, courseId)));
+  return rows.map((row) => row.playedAt).sort();
 }

@@ -33,6 +33,7 @@ import {
   SetPlayCountRequestSchema,
   TimelineSchema,
   UsernameParamsSchema,
+  WantToPlaySchema,
 } from "./schemas";
 
 /**
@@ -187,6 +188,18 @@ export const listMemberRounds = createRoute({
   security: MEMBER,
   request: { params: UsernameParamsSchema, query: PageQuerySchema },
   responses: { 200: json(TimelineSchema, "One page of rounds."), 400: invalidCursor, 401: unauthenticated, 403: forbidden, 404: notVisible },
+});
+
+export const listWantToPlay = createRoute({
+  method: "get",
+  path: "/v1/members/{username}/want-to-play",
+  operationId: "listWantToPlay",
+  tags: ["Members"],
+  summary: "A friend's Want to play list (or the member's own)",
+  description: "Newest first. A member who is not a friend is indistinguishable from no member.",
+  security: MEMBER,
+  request: { params: UsernameParamsSchema },
+  responses: { 200: json(WantToPlaySchema, "The Want to play list."), 401: unauthenticated, 403: forbidden, 404: notVisible },
 });
 
 export const getFeed = createRoute({
@@ -396,6 +409,43 @@ export const deleteRound = createRoute({
     401: unauthenticated,
     403: forbidden,
     404: failure("No such round: `round_not_found`."),
+  },
+});
+
+export const addWantToPlay = createRoute({
+  method: "put",
+  path: "/v1/me/want-to-play/{courseId}",
+  operationId: "addWantToPlay",
+  tags: ["Want to Play"],
+  summary: "Put a catalog course on the Want to play list",
+  description:
+    "Played courses are allowed (\"play it again\"). Adding it again keeps the original date, so retrying is safe. " +
+    "Logging a round at the course takes it off the list.",
+  security: MEMBER,
+  request: { params: CourseIdParamsSchema },
+  responses: {
+    200: json(WantToPlaySchema, "The member's Want to play list afterwards."),
+    400: invalid,
+    401: unauthenticated,
+    403: forbidden,
+    404: failure("No such catalog course: `course_not_found`."),
+  },
+});
+
+export const removeWantToPlay = createRoute({
+  method: "delete",
+  path: "/v1/me/want-to-play/{courseId}",
+  operationId: "removeWantToPlay",
+  tags: ["Want to Play"],
+  summary: "Take a course off the Want to play list",
+  description: "Removing a course that is not on the list changes nothing, so retrying is safe.",
+  security: MEMBER,
+  request: { params: CourseIdParamsSchema },
+  responses: {
+    200: json(WantToPlaySchema, "The member's Want to play list afterwards."),
+    400: invalid,
+    401: unauthenticated,
+    403: forbidden,
   },
 });
 

@@ -9,6 +9,7 @@ import {
   fromMyCourse,
   fromRound,
   fromSearchHit,
+  fromWantToPlay,
   toCourseDetailsRequest,
   UNKNOWN_LOCATION,
 } from "./mappers";
@@ -64,6 +65,12 @@ describe("other API shapes", () => {
     const row = { course: arcadia, rank: 1, onMyList: true, played: 2, lastPlayedOn: "2026-09-01", myRank: 4 };
     expect(fromMemberList({ member: { username: "a", displayName: "A" }, courses: [row] }).rows).toMatchObject([
       { rank: 1, onMyList: true, played: 2, lastPlayedOn: "2026-09-01", myRank: 4, course: { name: "Arcadia Bluffs" } },
+    ]);
+  });
+
+  it("maps a Want to play list, newest first as the API sends it", () => {
+    expect(fromWantToPlay({ courses: [{ course: arcadia, addedAt: "2026-09-01T12:00:00.000Z" }] })).toEqual([
+      { course: fromApiCourse(arcadia), addedAt: "2026-09-01T12:00:00.000Z" },
     ]);
   });
 

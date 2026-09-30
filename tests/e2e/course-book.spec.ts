@@ -8,14 +8,18 @@ import { clerk } from "@clerk/testing/playwright";
 import { authAvailable, clerkAvailable, signInAs } from "./auth";
 import {
   addHiddenCourse,
+  addPlayed,
+  catalogCourse,
   connect,
   courseByName,
   fixtureCourses,
   friendshipStatus,
   listOrder,
   resetScenario,
+  roundDates,
   type TestMember,
   unfriend,
+  wantedIds,
 } from "./db";
 
 /**
@@ -84,8 +88,13 @@ test("anonymous navigation, dialogs and mobile layout remain usable", async ({ p
   await page.goto("/");
   await expect(welcome(page)).toBeVisible();
   await page.getByRole("link", { name: "Courses", exact: true }).click();
-  await expect(page.locator("#toplist .row")).toHaveCount(100);
+  // The Courses page opens on the USA Top 100 rather than an empty state list.
+  await expect(page.getByRole("tab", { name: "USA Top 100" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator("#toplist > li")).toHaveCount(100);
+  await expect(page.locator('#toplist > li[data-course="Augusta National Golf Club"]')).toContainText("Georgia #1");
+  await page.getByRole("tab", { name: "Best in Michigan" }).click();
   await expect(page.locator("#topStateRankSelect")).toHaveValue("MI");
+  await expect(page.locator("#toplist > li").first()).toContainText("Michigan #1");
   await page.goto("/top-100");
   await expect(page).toHaveURL(/\/courses$/);
   await page.locator("#authOpen").click();
@@ -188,6 +197,79 @@ test.describe("signed in", () => {
     await page.getByRole("button", { name: "Both played" }).click();
     await expect(ranking.locator("[data-course]")).toHaveCount(1);
     await expect(ranking.locator('[data-course="Test Alpha Links"]')).toContainText("You #2");
+  });
+
+  test("course rows save Want to play and log a dated round", async ({ page }) => {
+    const { owner } = members();
+    const [pineValley, augusta] = [await catalogCourse(db, "usa1"), await catalogCourse(db, "usa2")];
+    await signInAs(page, owner);
+    await page.goto("/courses");
+    const want = page.getByRole("button", { name: "Want to play Pine Valley Golf Club" });
+    await want.click();
+    await expect(want).toHaveAttribute("aria-pressed", "true");
+    await expect.poll(() => wantedIds(db, owner.id)).toEqual([pineValley]);
+
+    await page.getByRole("button", { name: "Log a round at Augusta National Golf Club" }).click();
+    await expect(page.locator("#selectedCourseCard")).toContainText("Augusta National Golf Club");
+    await page.locator("#playedOn").fill("2026-05-01");
+    await page.locator("#confirmLog").click();
+    await expect(page.locator("#modal")).toHaveCount(0);
+    await expect(page.locator('#toplist > li[data-course="Augusta National Golf Club"]')).toHaveAttribute("data-played", "true");
+    expect(await roundDates(db, owner.id, augusta)).toEqual(["2026-05-01"]);
+
+    await page.goto(`/u/${owner.username}/lists`);
+    await expect(page.locator("#wantToPlay")).toContainText("Pine Valley Golf Club");
+    await page.getByRole("button", { name: "Want to play Pine Valley Golf Club" }).click();
+    await expect.poll(() => wantedIds(db, owner.id)).toEqual([]);
+  });
+
+  test("a mistaken round can be undone, or deleted from a list row or the timeline", async ({ page }) => {
+    const { owner } = members();
+    const augusta = await catalogCourse(db, "usa2");
+    const augustaRow = page.locator('#toplist > li[data-course="Augusta National Golf Club"]');
+    const logAugusta = async () => {
+      await page.getByRole("button", { name: "Log a round at Augusta National Golf Club" }).click();
+      await page.locator("#confirmLog").click();
+      await expect(augustaRow).toHaveAttribute("data-played", "true");
+    };
+    await signInAs(page, owner);
+    await page.goto("/courses");
+
+    await logAugusta();
+    await page.locator("#toast").getByRole("button", { name: "Undo" }).click();
+    await expect(augustaRow).toHaveAttribute("data-played", "false");
+    expect(await roundDates(db, owner.id, augusta)).toEqual([]);
+
+    await logAugusta();
+    await augustaRow.getByRole("button", { name: "Your rounds at Augusta National Golf Club" }).click();
+    page.once("dialog", (dialog) => void dialog.accept());
+    await page.locator("#roundmodal .delete-round").click();
+    await expect(page.locator("#roundmodal")).toHaveCount(0);
+    await expect(augustaRow).toHaveAttribute("data-played", "false");
+
+    await page.goto(`/u/${owner.username}`);
+    // A personal rank always says whose ranking it is.
+    await expect(page.locator('[data-round="Test Beta Links"] [data-personal-rank="1"]')).toHaveText("#1Your ranking");
+    page.once("dialog", (dialog) => void dialog.accept());
+    await page.getByRole("button", { name: "Delete your round at Test Beta Links on 2026-02-01" }).click();
+    await expect(page.locator('[data-round="Test Beta Links"]')).toHaveCount(0);
+    expect(await listOrder(db, owner.id)).toEqual([fixtureCourses.alpha.id]);
+  });
+
+  test("a friend's Top list shows which courses they played and you haven't", async ({ page }) => {
+    const { owner, friend } = members();
+    await addPlayed(db, friend, await catalogCourse(db, "usa4"));
+    await addPlayed(db, owner, await catalogCourse(db, "usa1"));
+    await signInAs(page, owner);
+    await page.goto(`/u/${friend.username}/lists`);
+    await page.getByRole("link", { name: /USA Top 100/ }).click();
+    await expect(page).toHaveURL(new RegExp(`/u/${friend.username}/lists/usa$`));
+    const list = page.locator("#memberTopList");
+    await expect(list.locator('[data-course="Shinnecock Hills Golf Club"]')).toHaveAttribute("data-played", "true");
+    await expect(list.locator('[data-course="Pine Valley Golf Club"]')).toContainText("You");
+    await page.getByRole("button", { name: /^Only / }).click();
+    await expect(list.locator(":scope > li")).toHaveCount(1);
+    await expect(list.locator(":scope > li")).toHaveAttribute("data-course", "Shinnecock Hills Golf Club");
   });
 
   test("members befriend by username, accept, and remove a friend from their profile", async ({ page }) => {

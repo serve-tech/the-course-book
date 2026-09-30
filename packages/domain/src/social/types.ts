@@ -84,3 +84,10 @@ export interface FeedItem {
   /** Rounds the item stands for: 1 for a `round` item, all of them for a `backfill` item. */
   count: number;
 }
+
+/** A course on a member's Want to play list. */
+export interface WantToPlayEntry {
+  course: Course;
+  /** When it was added (ISO timestamp). */
+  addedAt: string;
+}

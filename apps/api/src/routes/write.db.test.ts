@@ -90,7 +90,9 @@ describe("adding a course by details", () => {
     const hit = { name: "Mystery Meadows", location: "Nowhere, KS, USA", city: "Nowhere", state: "KS", country: "USA" };
     const result = await t.send("POST", "/v1/me/courses", { source: "search", course: hit, quantity: 2 }, auth);
     expect(result.status).toBe(200);
-    expect(AddedCourseSchema.parse(result.body)).toMatchObject({ rank: 1, courses: [{ played: 2, course: { name: "Mystery Meadows" } }] });
+    const added = AddedCourseSchema.parse(result.body);
+    expect(added).toMatchObject({ rank: 1, courses: [{ played: 2, course: { name: "Mystery Meadows" } }] });
+    expect(added.roundIds).toHaveLength(2);
     const stateless = await t.send("POST", "/v1/me/courses", { source: "search", course: { name: "Nowhere Nine", location: "USA", country: "USA" } }, auth);
     expect(errorOf(stateless.body).code).toBe("us_state_required");
   });
@@ -132,6 +134,20 @@ describe("logging rounds at a catalog course", () => {
     const result = await t.send("POST", `/v1/me/courses/${await seeded("usa1")}/rounds`, body, auth);
     expect(result.status).toBe(400);
     if (message) expect(errorOf(result.body).message).toBe(message);
+  });
+
+  it("returns the new rounds' ids, so deleting them undoes the log and a first visit leaves the list", async () => {
+    const { t, auth } = await signedIn();
+    const [kept, mistake] = [await seeded("usa1"), await seeded("usa2")];
+    await logRounds(db, "user_1", { courseId: kept }, 1);
+    const again = LoggedRoundsSchema.parse((await t.send("POST", `/v1/me/courses/${kept}/rounds`, { quantity: 2 }, auth)).body);
+    const first = LoggedRoundsSchema.parse((await t.send("POST", `/v1/me/courses/${mistake}/rounds`, {}, auth)).body);
+    expect(again.roundIds).toHaveLength(2);
+    expect(first.roundIds).toHaveLength(1);
+
+    for (const id of [...again.roundIds, ...first.roundIds]) expect((await t.send("DELETE", `/v1/me/rounds/${id}`, undefined, auth)).status).toBe(200);
+    const list = MyCoursesSchema.parse((await t.get("/v1/me/courses", auth)).body);
+    expect(list.courses).toMatchObject([{ course: { id: kept }, played: 1 }]);
   });
 });
 

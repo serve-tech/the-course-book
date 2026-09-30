@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { eq, sql } from "drizzle-orm";
 import type { Database } from "../db/client";
-import { courses, userCourses, users } from "../db/schema";
+import { courses, userCourses, users, wantToPlay } from "../db/schema";
 import { removeAllFriendships } from "./friends";
 import { withJournalLock } from "./journal";
 
@@ -11,6 +11,7 @@ import { withJournalLock } from "./journal";
  *
  * In one transaction under the member's journal lock:
  * - memberships are deleted and their rounds cascade;
+ * - Want to play entries are deleted;
  * - friendships and pending friend requests, in both directions, are deleted;
  * - courses the member created stay in the shared catalog with `created_by`
  *   cleared;
@@ -29,6 +30,7 @@ import { withJournalLock } from "./journal";
 export async function deleteAccountData(db: Database, userId: string): Promise<void> {
   await withJournalLock(db, userId, async (tx) => {
     await tx.delete(userCourses).where(eq(userCourses.userId, userId));
+    await tx.delete(wantToPlay).where(eq(wantToPlay.userId, userId));
     await removeAllFriendships(tx, userId);
     await tx.update(courses).set({ createdBy: null }).where(eq(courses.createdBy, userId));
     await tx
