@@ -701,12 +701,208 @@
           },
           "onMyList": {
             "type": "boolean"
+          },
+          "played": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The member's rounds at this course."
+          },
+          "lastPlayedOn": {
+            "type": "string",
+            "nullable": true,
+            "format": "date",
+            "description": "The member's latest dated round here; null when none is dated."
+          },
+          "myRank": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 1,
+            "description": "The viewer's own rank for this course; null when it is not on the viewer's list."
           }
         },
         "required": [
           "course",
           "rank",
-          "onMyList"
+          "onMyList",
+          "played",
+          "lastPlayedOn",
+          "myRank"
+        ]
+      },
+      "Profile": {
+        "type": "object",
+        "properties": {
+          "member": {
+            "$ref": "#/components/schemas/Member"
+          },
+          "relationship": {
+            "type": "string",
+            "description": "self or friends. New values may appear."
+          },
+          "friendsSince": {
+            "type": "string",
+            "nullable": true,
+            "format": "date",
+            "description": "When the friendship was accepted; null on the viewer's own profile."
+          },
+          "stats": {
+            "$ref": "#/components/schemas/ProfileStats"
+          },
+          "topFour": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MemberCourse"
+            },
+            "description": "The member's personal ranks 1-4 (fewer for a shorter list)."
+          },
+          "comparison": {
+            "$ref": "#/components/schemas/RankComparison"
+          }
+        },
+        "required": [
+          "member",
+          "relationship",
+          "friendsSince",
+          "stats",
+          "topFour",
+          "comparison"
+        ]
+      },
+      "ProfileStats": {
+        "type": "object",
+        "properties": {
+          "courses": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "rounds": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "roundsThisYear": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Rounds dated in the current calendar year (UTC)."
+          },
+          "friends": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "courses",
+          "rounds",
+          "roundsThisYear",
+          "friends"
+        ]
+      },
+      "RankComparison": {
+        "type": "object",
+        "properties": {
+          "inCommon": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 0,
+            "description": "Courses both members have ranked; null on the viewer's own profile."
+          },
+          "agreement": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Share of shared-course pairs both members order the same way; null below three shared courses or on the viewer's own profile."
+          },
+          "biggestSplits": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RankSplit"
+            },
+            "description": "Courses whose positions differ most, largest first; at most one today, empty when there is nothing to compare."
+          }
+        },
+        "required": [
+          "inCommon",
+          "agreement",
+          "biggestSplits"
+        ],
+        "description": "How a member's ranking compares with the viewer's. Always present, so clients never decode a null object."
+      },
+      "RankSplit": {
+        "type": "object",
+        "properties": {
+          "course": {
+            "$ref": "#/components/schemas/Course"
+          },
+          "myRank": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "theirRank": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "course",
+          "myRank",
+          "theirRank"
+        ],
+        "description": "The shared course whose positions differ most, relative to each list's length."
+      },
+      "Timeline": {
+        "type": "object",
+        "properties": {
+          "rounds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TimelineRound"
+            },
+            "description": "Newest played first; undated rounds last."
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true,
+            "description": "Pass as `cursor` for the next page; null on the last page."
+          }
+        },
+        "required": [
+          "rounds",
+          "nextCursor"
+        ]
+      },
+      "TimelineRound": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "course": {
+            "$ref": "#/components/schemas/Course"
+          },
+          "playedOn": {
+            "type": "string",
+            "nullable": true,
+            "format": "date",
+            "description": "Date played; null when the member did not record one."
+          },
+          "visit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "1 for the member's first round at this course, 2 for the second; undated rounds count as earliest."
+          },
+          "rank": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The member's current personal rank for this course."
+          }
+        },
+        "required": [
+          "id",
+          "course",
+          "playedOn",
+          "visit",
+          "rank"
         ]
       },
       "MemberSearchResults": {
@@ -761,6 +957,68 @@
         "required": [
           "incoming",
           "outgoing"
+        ]
+      },
+      "Feed": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FeedItem"
+            },
+            "description": "Newest first."
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true,
+            "description": "Pass as `cursor` for the next page; null on the last page."
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ]
+      },
+      "FeedItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Stable across pages."
+          },
+          "type": {
+            "type": "string",
+            "description": "round (a friend logged a round) or backfill (rounds logged long after they were played, one item per member and day). New types may appear; skip ones you do not know."
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it happened: when the round was logged."
+          },
+          "member": {
+            "$ref": "#/components/schemas/Member"
+          },
+          "rounds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TimelineRound"
+            },
+            "description": "The round for a round item; up to four examples, one per course, for a backfill item."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Rounds the item stands for: 1 for a round item, all of them for a backfill item."
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "at",
+          "member",
+          "rounds",
+          "count"
         ]
       },
       "ClientConfig": {
@@ -1836,6 +2094,177 @@
         }
       }
     },
+    "/v1/members/{username}/profile": {
+      "get": {
+        "operationId": "getMemberProfile",
+        "tags": [
+          "Members"
+        ],
+        "summary": "A friend's profile (or the member's own)",
+        "description": "Header, stats, Top Four and, for a friend, how their ranking compares with the viewer's. A member who is not a friend is indistinguishable from no member.",
+        "security": [
+          {
+            "ClerkSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "username",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The profile.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Profile"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session: `unauthenticated`, or `account_deleted` after the account was deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The Clerk account cannot use the app: `username_invalid`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such member, or not a friend: `member_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/members/{username}/rounds": {
+      "get": {
+        "operationId": "listMemberRounds",
+        "tags": [
+          "Members"
+        ],
+        "summary": "A friend's timeline of rounds (or the member's own), a page at a time",
+        "description": "Newest played first; undated rounds last. Dates and courses only.",
+        "security": [
+          {
+            "ClerkSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "username",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "nullable": true,
+              "maxLength": 512,
+              "description": "`nextCursor` from the previous page."
+            },
+            "required": false,
+            "description": "`nextCursor` from the previous page.",
+            "name": "cursor",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "nullable": true,
+              "minimum": 1,
+              "maximum": 100,
+              "description": "Defaults to 30."
+            },
+            "required": false,
+            "description": "Defaults to 30.",
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of rounds.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Timeline"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters or an unusable `cursor`: `validation_failed`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session: `unauthenticated`, or `account_deleted` after the account was deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The Clerk account cannot use the app: `username_invalid`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such member, or not a friend: `member_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/member-search": {
       "get": {
         "operationId": "searchMembers",
@@ -2078,6 +2507,90 @@
           },
           "404": {
             "description": "No such member: `member_not_found`; nothing between the two: `friendship_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/feed": {
+      "get": {
+        "operationId": "getFeed",
+        "tags": [
+          "Feed"
+        ],
+        "summary": "What the member's friends did, newest first, a page at a time",
+        "description": "Rounds logged long after they were played are collapsed into one backfill item per friend and day.",
+        "security": [
+          {
+            "ClerkSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "nullable": true,
+              "maxLength": 512,
+              "description": "`nextCursor` from the previous page."
+            },
+            "required": false,
+            "description": "`nextCursor` from the previous page.",
+            "name": "cursor",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "nullable": true,
+              "minimum": 1,
+              "maximum": 100,
+              "description": "Defaults to 30."
+            },
+            "required": false,
+            "description": "Defaults to 30.",
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of the feed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Feed"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters or an unusable `cursor`: `validation_failed`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session: `unauthenticated`, or `account_deleted` after the account was deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The Clerk account cannot use the app: `username_invalid`.",
             "content": {
               "application/json": {
                 "schema": {

@@ -16,6 +16,7 @@ Installed app builds cannot be forced to update, so the contract only grows.
 - Add operations, fields and error codes; never rename, retype or remove them. A breaking change needs a new version path (`/v2/...`).
 - Every object schema has a name; no `oneOf`, `anyOf` or `allOf`.
 - Response fields are always present and use `null` for "none"; they are never optional.
+- Object-typed fields are never nullable. OpenAPI 3.0 can only express a nullable reference with `allOf`, and a reference without it would tell generated clients the field is never null. Use an always-present object whose own fields are nullable (`Profile.comparison`) or an array of zero or more (`RankComparison.biggestSplits`, `FeedItem.rounds`).
 - Optional request fields accept both a missing key and `null` (Swift omits nil values; Kotlin sends `null`).
 - Values that may gain members, such as error `code` and ranking list `type`, are documented strings, not enums: Swift cannot decode an enum value it does not know.
 - `operationId`s become method names in the generated clients; never rename one.

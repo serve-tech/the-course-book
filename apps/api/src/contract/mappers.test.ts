@@ -1,20 +1,27 @@
 import { courseSchema } from "@coursebook/domain/catalog/course";
+import { FeedItemType, ProfileRelationship } from "@coursebook/domain/social/types";
 import { describe, expect, it } from "vitest";
 import { UNKNOWN_LOCATION } from "../domain/course-view";
 import {
   toContractCourse,
   toCourseDetails,
+  toFeedItem,
   toMemberList,
+  toProfile,
   toRankingEntry,
   toRound,
   toSearchHit,
+  toTimelineRound,
 } from "./mappers";
 import {
   CourseSchema,
+  FeedItemSchema,
   MemberListSchema,
+  ProfileSchema,
   RankingEntrySchema,
   RoundSchema,
   SearchHitSchema,
+  TimelineRoundSchema,
 } from "./schemas";
 
 const CATALOG_ID = "11111111-1111-4111-8111-111111111111";
@@ -100,9 +107,34 @@ describe("other mappings", () => {
     expect(RankingEntrySchema.safeParse(entry).success).toBe(true);
     const list = toMemberList({
       member: { username: "friend", displayName: "Friend" },
-      rows: [{ course: course(), rank: 1, onMyList: true }],
+      rows: [{ course: course(), rank: 1, onMyList: true, played: 3, lastPlayedOn: "2026-09-27", myRank: 2 }],
     });
-    expect(list.courses[0]).toMatchObject({ rank: 1, onMyList: true });
+    expect(list.courses[0]).toMatchObject({ rank: 1, onMyList: true, played: 3, lastPlayedOn: "2026-09-27", myRank: 2 });
     expect(MemberListSchema.safeParse(list).success).toBe(true);
+  });
+
+  it("maps profiles, timeline rounds and feed items to valid contract shapes", () => {
+    const row = { course: course(), rank: 1, onMyList: false, played: 1, lastPlayedOn: null, myRank: null };
+    const round = { id: "aaaaaaaa-0000-4000-8000-000000000009", course: course(), playedOn: null, visit: 1, rank: 1 };
+    const profile = toProfile({
+      member: { username: "friend", displayName: "Friend" },
+      relationship: ProfileRelationship.Friends,
+      friendsSince: "2025-06-01",
+      stats: { courses: 1, rounds: 1, roundsThisYear: 0, friends: 3 },
+      topFour: [row],
+      comparison: { inCommon: 1, agreement: null, biggestSplit: { course: course(), myRank: 9, theirRank: 1 } },
+    });
+    expect(ProfileSchema.safeParse(profile).success).toBe(true);
+    expect(profile.comparison.biggestSplits).toHaveLength(1);
+    expect(TimelineRoundSchema.safeParse(toTimelineRound(round)).success).toBe(true);
+    const item = toFeedItem({
+      id: "backfill:" + round.id,
+      type: FeedItemType.Backfill,
+      at: "2026-09-29T18:04:05.123456Z",
+      member: { username: "friend", displayName: "Friend" },
+      rounds: [round],
+      count: 12,
+    });
+    expect(FeedItemSchema.safeParse(item).success).toBe(true);
   });
 });

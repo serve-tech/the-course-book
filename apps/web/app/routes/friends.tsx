@@ -1,6 +1,5 @@
 import { getToken } from "@clerk/react-router";
 import type { FriendRequests, PublicMember } from "@coursebook/domain/friends/types";
-import { data } from "react-router";
 import { z } from "zod";
 import type { Route } from "./+types/friends";
 import {
@@ -11,8 +10,7 @@ import {
   unfriendMessage,
 } from "../features/friends/friend-actions";
 import { FriendsPage } from "../features/friends/FriendsPage";
-import { api, ApiError, expectOk, unwrap, type ApiSchemas } from "../lib/api";
-import { fromMemberList } from "../lib/api/mappers";
+import { api, expectOk, unwrap, type ApiSchemas } from "../lib/api";
 import { apiFailureMessage } from "../shared/lib/errors";
 import { RouteError } from "../shared/ui/RouteError";
 import { useShell } from "../shared/ui/shell";
@@ -35,25 +33,11 @@ async function allFriends(): Promise<PublicMember[]> {
   return members;
 }
 
-async function friendList(username: string) {
-  try {
-    return fromMemberList(unwrap(await api.GET("/v1/members/{username}", { params: { path: { username } } })));
-  } catch (error) {
-    if (error instanceof ApiError && error.code === "member_not_found")
-      throw data({ error: "None of your friends has that username." }, { status: 404 });
-    throw error;
-  }
-}
-
 /** Anonymous visitors see the page with a sign-in prompt; member data needs a session. */
-export async function clientLoader({ params }: Route.ClientLoaderArgs) {
-  if (!(await getToken())) return { signedIn: false as const, members: [], requests: NO_REQUESTS, selected: null };
-  const [members, requests, selected] = await Promise.all([
-    allFriends(),
-    api.GET("/v1/me/friend-requests").then(unwrap),
-    params.username ? friendList(params.username) : Promise.resolve(null),
-  ]);
-  return { signedIn: true as const, members, requests, selected };
+export async function clientLoader() {
+  if (!(await getToken())) return { signedIn: false as const, members: [], requests: NO_REQUESTS };
+  const [members, requests] = await Promise.all([allFriends(), api.GET("/v1/me/friend-requests").then(unwrap)]);
+  return { signedIn: true as const, members, requests };
 }
 
 /** Reply of the Friends action, reported once per submission. */
@@ -104,7 +88,6 @@ export default function Friends({ loaderData }: Route.ComponentProps) {
       signedIn={loaderData.signedIn}
       members={loaderData.members}
       requests={loaderData.requests}
-      selected={loaderData.selected}
       notify={shell.notify}
     />
   );

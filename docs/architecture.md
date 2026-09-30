@@ -32,7 +32,7 @@ On `main` (PR #4, merged 2026-09-29): the API with its read and write operations
 | `packages/domain/src/` | Pure rules both sides run: course model, geography, ranking selectors, list reorder, shared types | [course.ts](../packages/domain/src/catalog/course.ts), [reorder.ts](../packages/domain/src/journal/reorder.ts) |
 | `apps/web/app/lib/api/` | The typed API client (generated `schema.d.ts`, bearer tokens, `ApiError`), contract-to-domain mappers, the slow-server notice | [client.ts](../apps/web/app/lib/api/client.ts), [mappers.ts](../apps/web/app/lib/api/mappers.ts) |
 | `apps/web/app/root.tsx`, `routes.ts`, `routes/` | Document shell with `ClerkProvider`, route configuration, per-route `clientLoader`/`clientAction` and pages | [root.tsx](../apps/web/app/root.tsx), [journal.ts](../apps/web/app/routes/journal.ts) |
-| `apps/web/app/features/<feature>/` | Pages, dialogs and hooks for catalog (Rankings), journal (My List), rounds, friends and auth | [JournalPage.tsx](../apps/web/app/features/journal/JournalPage.tsx), [LogRoundDialog.tsx](../apps/web/app/features/rounds/LogRoundDialog.tsx) |
+| `apps/web/app/features/<feature>/` | Pages, dialogs and hooks for catalog (Courses), journal (the Ranking tab's editor), rounds, friends, social (Home feed, profiles, timelines), the navigation shell and auth | [JournalPage.tsx](../apps/web/app/features/journal/JournalPage.tsx), [LogRoundDialog.tsx](../apps/web/app/features/rounds/LogRoundDialog.tsx) |
 | `apps/web/app/shared/` | Modal, StateSelect, RouteError, SafeStorage, geolocation, error formatting, `useActionFetcher`, country data, `legacy.css` | [Modal.tsx](../apps/web/app/shared/ui/Modal.tsx), [storage.ts](../apps/web/app/shared/lib/storage.ts) |
 | `tests/e2e/` | Playwright user flows against the built API and web app | [course-book.spec.ts](../tests/e2e/course-book.spec.ts) |
 
@@ -90,6 +90,16 @@ The seed migration (`0001_seed_catalog.sql`) carries the retired project's publi
 - **Rankings page:** progress uses the full list before search and "Show mine". World, USA and public lists render only with 100 unique ranks; state lists need a selected state and at least one row.
 - **My List:** geographic filters are read-only (no drag or count editing); text search keeps editing.
 - **Friends** ([decision](../.planning/decisions/2026-09-29-friends-only-visibility-with-mutual-friend-requests.md)): a member sees their own list and their friends' lists read-only, and no one else's; another member's list is 404 whether or not they exist. Friendships are mutual (request, then accept; either side can end it). Members find each other by username search (3+ characters, username and display name only). The imported members start as friends with each other; new sign-ups start with none. Usernames match case-insensitively. Responses never include email addresses or user ids.
+- **Profiles, timelines and the feed** ([decision](../.planning/decisions/2026-09-29-social-redesign-top-lists-profiles-timelines-and-star-ratings.md)):
+  - All three are read-only and follow the Friends rule: the viewer or an accepted friend, anyone else 404. The shared check is `visibleMember` in `services/friends.ts`.
+  - **Profile** (`getMemberProfile`):
+    - stats: courses on the list, rounds, rounds dated in the current UTC year, friends;
+    - Top Four: personal ranks 1–4;
+    - for a friend, a comparison over shared courses (matched like `onMyList`): the share of concordant pairs from three shared courses, and the largest split by percentile position (`compareRankings` in `packages/domain`).
+  - **Timeline** (`listMemberRounds`): dates and courses only. Order is `played_at DESC NULLS LAST, created_at DESC, id DESC`. `visit` counts the member's rounds at a course in played order, undated first.
+  - **Feed** (`getFeed`): friends' rounds by when they were logged. Rounds logged more than 14 days after they were played (or undated) collapse into one `backfill` item per friend and UTC day. It is derived on read; there is no event table.
+  - **Paging:** cursors are opaque keyset keys (`domain/cursor.ts`) that carry timestamps as Postgres text with microseconds, never member ids.
+  - **`MemberCourse`** carries the member's `played`, `lastPlayedOn` and the viewer's `myRank`.
 - **Account deletion** (`DELETE /v1/me`): data first, then the Clerk user; a retry after a Clerk failure finishes the job. Details under [Authentication and authorization](#authentication-and-authorization).
 - **Preferences:** manual state selection and optional geolocation stay in browser storage.
 - **Known data quirk:** the Pinehurst No. 4 alias resolves to the legacy `usa80` record; fixing it is a data change, not a code change.
@@ -132,11 +142,20 @@ Validate untrusted input at boundaries: request parameters and bodies (contract 
 - **Logs:** one JSON line per API request with its request id, which also appears in every error envelope and the `X-Request-Id` header. Server-side failures (unexpected errors and 5xx `AppError`s) are also logged with the request id and their cause; 4xx errors are not.
 - **Account lifecycle:** delete members only through the API (`DELETE /v1/me`: the Account page, or an admin acting as the member), never in Clerk's dashboard. Deleting only the Clerk user leaves a member row that no one can sign in to or remove, and provisioning has no reconciliation for it. Keep Clerk's self-service account deletion off for the same reason.
 - **Known data issue, kept as-is:** the canonical-location table in `apps/api/src/domain/identity.ts` matches on normalized names, so "The Glen Club" in Glenview, IL (Illinois list #32) shows as North Berwick, Scotland. The old app had the same table. It is left unchanged until the maintainer decides; see the [import decision](../.planning/decisions/2026-09-28-import-supabase-member-data-1-for-1.md) for this and the duplicate catalog rows members carry over.
-- **Friends picker:** the Friends page loads every page of `GET /v1/members` (the member's friends, 200 each) on each visit. Fine at today's size; page the picker if members gather hundreds of friends.
+- **Friends list:** the Friends page loads every page of `GET /v1/members` (the member's friends, 200 each) on each visit. Fine at today's size; page it if members gather hundreds of friends.
 
 ## Appearance
 
-Reuse the existing markup, element ids, shared primitives and `legacy.css`. The stylesheet preserves what Chromium parsed from the original page, including rules the browser ignored; broad cleanup changes appearance. New screens (Account, Privacy) append their few rules at the end of the file. The root route renders once at build time into `index.html`, so anything that depends on `window`, `document`, `localStorage` or the viewport runs in an effect.
+The web app is mid-redesign ([decision](../.planning/decisions/2026-09-29-social-redesign-top-lists-profiles-timelines-and-star-ratings.md)).
+
+- **Redesigned screens** style themselves with colocated CSS modules. These are the navigation (`features/shell`), Home, profiles and Friends (`features/social`, `features/friends`). They use the `legacy.css` `:root` tokens (`--bg`, `--panel`, `--cream`, `--gold`, …) and its Playfair Display and DM Sans fonts. Modules keep their class names local, because `legacy.css` styles bare `header`, `nav`, `main` and generic classes such as `.card`, `.avatar` and `.stat`. Join module classes with `cx()` (`shared/lib/cx.ts`): lookups are `string | undefined` under `noUncheckedIndexedAccess`.
+- **Screens not yet redesigned** keep their markup, element ids and `legacy.css`: Courses, Account, Privacy, and the Ranking tab's editor and dialogs. The stylesheet preserves what Chromium parsed from the original page, including rules the browser ignored, so broad cleanup changes appearance.
+- **Routes:**
+  - `/` is Home (the friends feed, or a welcome when signed out).
+  - `/courses` is the published rankings; `/top-100` redirects there.
+  - `/u/:username` is a profile, with tabs for Timeline (index), Ranking, Lists and Stats. The member's own Ranking tab is the list editor, and `?log=1` opens the Log dialog.
+  - `/friends` is requests, search and friends; `/friends/:username` redirects to the profile.
+  - Phones get a bottom tab bar, and the app container reserves room for it. The root route renders once at build time into `index.html`, so anything that depends on `window`, `document`, `localStorage` or the viewport runs in an effect.
 
 ## Cutover
 

@@ -46,6 +46,21 @@ test.beforeEach(async ({ page }) => {
 const row = (page: Page, name: string) =>
   page.locator("#mylist .rankrow").filter({ has: page.getByText(name, { exact: true }) });
 
+/** The member's own Ranking tab (My List) on their profile. */
+async function openRanking(page: Page, member: TestMember): Promise<void> {
+  await page.goto(`/u/${member.username}/ranking`);
+  await expect(page.locator("#mine")).toBeVisible();
+}
+
+/** Open the Log dialog with the profile's Log a round button. */
+const openLog = (page: Page) => page.getByRole("main").getByRole("link", { name: "+ Log a round" }).click();
+
+/** The Friends destination; its name gains the request count when there are requests. */
+const friendsLink = (page: Page) => page.getByRole("link", { name: /^Friends\b/ });
+
+/** The signed-out Home page. */
+const welcome = (page: Page) => page.getByRole("heading", { name: /Every course you.ve played/ });
+
 /**
  * How far Clerk's card sits inside the auth dialog's content box on each side,
  * in whole pixels; `{ left: 0, right: 0 }` when it fills it exactly. The right
@@ -67,15 +82,13 @@ const authCardInset = (page: Page) =>
 test("anonymous navigation, dialogs and mobile layout remain usable", async ({ page }) => {
   test.skip(!clerkAvailable, "Clerk development instance keys are not configured");
   await page.goto("/");
-  await expect(page.locator("#mine")).toBeVisible();
-  await expect(page.locator("#myCourseCount")).toHaveText("0");
-  await page.getByRole("link", { name: "Top 100", exact: true }).click();
+  await expect(welcome(page)).toBeVisible();
+  await page.getByRole("link", { name: "Courses", exact: true }).click();
   await expect(page.locator("#toplist .row")).toHaveCount(100);
   await expect(page.locator("#topStateRankSelect")).toHaveValue("MI");
-  await page.getByRole("link", { name: "My List", exact: true }).click();
-  await page.locator("#log").click();
-  await expect(page.locator("#modalsearch")).toBeDisabled();
-  await page.getByRole("button", { name: "Sign In", exact: true }).click();
+  await page.goto("/top-100");
+  await expect(page).toHaveURL(/\/courses$/);
+  await page.locator("#authOpen").click();
   await expect(page.locator("#authmodal")).toBeVisible();
   // Clerk's fixed-width card once overflowed the dialog on wide screens and
   // fell short of its padding on phones; it fills the content box instead.
@@ -104,10 +117,11 @@ test.describe("signed in", () => {
     const { owner } = members();
     await signInAs(page, owner);
     await expect(page.locator("#authLabel")).toHaveText(owner.username);
+    await openRanking(page, owner);
     await expect(page.locator("#myCourseCount")).toHaveText("2");
     await expect(page.locator("#mylist .course")).toHaveText(["Test Beta Links", "Test Alpha Links"]);
 
-    await page.locator("#log").click();
+    await openLog(page);
     await page.locator("#modalsearch").fill("Test Alpha");
     await page.locator(".result").filter({ hasText: "Test Alpha Links" }).click();
     await page.locator("#timesPlayed").fill("2");
@@ -120,12 +134,13 @@ test.describe("signed in", () => {
     await page.reload();
     await expect(page.locator("#mylist .course")).toHaveText(["Test Beta Links", "Test Alpha Links"]);
     await page.locator("#authOpen").click();
-    await expect(page.locator("#myCourseCount")).toHaveText("0");
+    await expect(welcome(page)).toBeVisible();
   });
 
   test("course details moves, count editing and confirmed final-round removal work", async ({ page }) => {
     const { owner } = members();
     await signInAs(page, owner);
+    await openRanking(page, owner);
     await expect(page.locator("#myCourseCount")).toHaveText("2");
     await page.locator("#mylist .course").filter({ hasText: "Test Alpha Links" }).click();
     await page.locator("#moveTop").click();
@@ -148,7 +163,8 @@ test.describe("signed in", () => {
   test("manual US course stores its state and logs one round", async ({ page }) => {
     const { owner } = members();
     await signInAs(page, owner);
-    await page.locator("#log").click();
+    await openRanking(page, owner);
+    await openLog(page);
     await page.locator("#add").click();
     await page.locator("#newname").fill("New Test Club");
     await page.locator("#newstate").selectOption("MI");
@@ -158,32 +174,33 @@ test.describe("signed in", () => {
     expect(await courseByName(db, "New Test Club")).toMatchObject({ state: "MI", country: "USA", isCustom: true, createdBy: owner.id });
   });
 
-  test("Friends shows a member's list with on-my-list evidence", async ({ page }) => {
+  test("a friend's profile shows their ranking next to the viewer's", async ({ page }) => {
     const { owner, friend } = members();
     await signInAs(page, owner);
-    await page.getByRole("link", { name: "Friends", exact: true }).click();
-    await expect(page.locator("#friendSelect option")).toHaveCount(2);
-    await page.locator("#friendSelect").selectOption(friend.username);
-    await expect(page.locator("#friendsList .friend-row")).toHaveCount(2);
-    await page.locator("#friendsFilter").selectOption("mine");
-    await expect(page.locator("#friendsList .course")).toHaveText(["Test Alpha Links"]);
-    await expect(page.locator(".friend-list-action")).toBeDisabled();
-    await page.locator("#friendsFilter").selectOption("notmine");
-    await page.locator(".friend-list-action").click();
-    await expect.poll(() => listOrder(db, owner.id)).toContain(fixtureCourses.gamma.id);
+    await friendsLink(page).click();
+    await page.locator(`[data-friend="${friend.username}"]`).click();
+    await expect(page).toHaveURL(new RegExp(`/u/${friend.username}$`));
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await page.getByRole("link", { name: "Ranking", exact: true }).click();
+    await expect(page).toHaveURL(new RegExp(`/u/${friend.username}/ranking$`));
+    const ranking = page.locator("#friendRanking");
+    await expect(ranking.locator("[data-course]")).toHaveCount(2);
+    await page.getByRole("button", { name: "Both played" }).click();
+    await expect(ranking.locator("[data-course]")).toHaveCount(1);
+    await expect(ranking.locator('[data-course="Test Alpha Links"]')).toContainText("You #2");
   });
 
-  test("members befriend by username, accept, and remove a friend after confirming", async ({ page }) => {
+  test("members befriend by username, accept, and remove a friend from their profile", async ({ page }) => {
     const { owner, friend } = members();
     await unfriend(db, owner, friend);
     await signInAs(page, owner);
-    await page.getByRole("link", { name: "Friends", exact: true }).click();
-    await expect(page.locator("#friendSelect option")).toHaveCount(1);
+    await friendsLink(page).click();
     await expect(page.locator("#friendsList")).toContainText("No friends yet");
     await page.goto(`/friends/${friend.username}`);
-    await expect(page.getByRole("alert")).toContainText("None of your friends has that username.");
+    await expect(page).toHaveURL(new RegExp(`/u/${friend.username}$`));
+    await expect(page.getByRole("alert")).toContainText("This profile isn't available");
 
-    await page.getByRole("link", { name: "Friends", exact: true }).click();
+    await friendsLink(page).click();
     await page.locator("#friendSearch").fill(friend.username);
     const result = page.locator("#friendSearchResults .friend-person").filter({ hasText: friend.username });
     await result.getByRole("button", { name: "Add friend" }).click();
@@ -193,19 +210,19 @@ test.describe("signed in", () => {
 
     await clerk.signOut({ page });
     await signInAs(page, friend);
-    await page.getByRole("link", { name: "Friends", exact: true }).click();
+    await expect(friendsLink(page)).toContainText("1");
+    await friendsLink(page).click();
     const request = page.locator('#friendRequests [data-request="incoming"]').filter({ hasText: owner.username });
     await request.getByRole("button", { name: "Accept" }).click();
     await expect(page.locator("#friendRequests")).toHaveCount(0);
     expect(await friendshipStatus(db, owner, friend)).toBe(FriendshipStatus.Accepted);
-    await page.locator("#friendSelect").selectOption(owner.username);
-    await expect(page.locator("#friendsList .friend-row")).toHaveCount(2);
 
-    await page.locator("#removeFriend").click();
-    await expect(page.locator("#confirmRemoveFriendRow")).toContainText(owner.username);
-    await page.locator("#confirmRemoveFriend").click();
+    await page.locator(`[data-friend="${owner.username}"]`).click();
+    await page.getByRole("button", { name: /^More actions/ }).click();
+    await page.getByRole("menuitem", { name: "Remove friend…" }).click();
+    await page.getByRole("button", { name: "Remove friend", exact: true }).click();
     await expect(page).toHaveURL(/\/friends$/);
-    await expect(page.locator("#friendSelect option")).toHaveCount(1);
+    await expect(page.locator("#friendsList")).toContainText("No friends yet");
     await expect.poll(() => friendshipStatus(db, owner, friend)).toBeNull();
   });
 
@@ -213,6 +230,7 @@ test.describe("signed in", () => {
     const { owner } = members();
     await addHiddenCourse(db, owner);
     await signInAs(page, owner);
+    await openRanking(page, owner);
     await expect(page.locator("#myCourseCount")).toHaveText("3");
     await expect(page.locator("#mylist .course")).toHaveText(["Test Beta Links", "Test Alpha Links", "Hidden Course"]);
     await page.locator("#mysearch").fill("Test");
@@ -246,7 +264,8 @@ test.describe("signed in", () => {
   test("course search uses the dataset fallback when the REST API is unavailable", async ({ page }) => {
     const { owner } = members();
     await signInAs(page, owner);
-    await page.locator("#log").click();
+    await openRanking(page, owner);
+    await openLog(page);
     await page.locator("#modalsearch").fill("Fallback Test");
     await page.locator(".result").filter({ hasText: "Fallback Test Links" }).click();
     await page.locator("#timesPlayed").fill("2");

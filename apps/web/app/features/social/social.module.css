@@ -1,0 +1,256 @@
+/*
+ * Shared pieces of the social pages: avatars, course tiles, tags, buttons,
+ * section labels and "coming soon" cards. Colors and fonts come from the
+ * :root tokens and font imports in legacy.css (--bg, --panel, --panel2,
+ * --cream, --muted, --gold, --line, --green; Playfair Display, DM Sans).
+ */
+
+/* Avatars: a monogram in a gold ring, one tone per member. */
+.avatar {
+  --size: 38px;
+  width: var(--size);
+  height: var(--size);
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid rgba(199, 170, 107, 0.55);
+  background: #173524;
+  color: var(--gold);
+  font: 600 calc(var(--size) * 0.36) / 1 "Playfair Display", Georgia, serif;
+  letter-spacing: 0.4px;
+  text-decoration: none;
+  user-select: none;
+}
+.avatar[data-tone="lake"] { background: #183040; }
+.avatar[data-tone="clay"] { background: #3a2a19; }
+.avatar[data-tone="heather"] { background: #2d2438; }
+.avatarXs { --size: 20px; border-width: 1px; }
+.avatarSm { --size: 28px; }
+.avatarLg {
+  --size: clamp(68px, 18vw, 92px);
+  border-width: 1.5px;
+  box-shadow: 0 0 0 6px rgba(199, 170, 107, 0.07), 0 18px 40px -18px rgba(0, 0, 0, 0.8);
+}
+
+/* Course tiles: the poster of a course, generated from its data. */
+.tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  aspect-ratio: 2 / 3;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(199, 170, 107, 0.26);
+  background: linear-gradient(165deg, #245a3d 0%, #143626 55%, #0b1f15 100%);
+  color: var(--cream);
+  text-decoration: none;
+  box-shadow: 0 14px 30px -18px rgba(0, 0, 0, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+.tile[data-tone="sea"] { background: linear-gradient(165deg, #245a6b 0%, #133644 55%, #0a1c24 100%); }
+.tile[data-tone="sand"] { background: linear-gradient(165deg, #6e5731 0%, #3b2f1a 55%, #1d170d 100%); }
+.tile[data-tone="heath"] { background: linear-gradient(165deg, #52405e 0%, #2b2135 55%, #150f1b 100%); }
+/* Contour lines, like an old course map. */
+.tile::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    repeating-radial-gradient(ellipse at 118% -12%, transparent 0 12px, rgba(244, 240, 230, 0.055) 12px 13px),
+    repeating-radial-gradient(ellipse at -20% 120%, transparent 0 16px, rgba(244, 240, 230, 0.035) 16px 17px);
+  pointer-events: none;
+}
+.tile::after {
+  content: "";
+  position: absolute;
+  inset: 45% 0 0;
+  background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.42));
+  pointer-events: none;
+}
+a.tile:hover,
+a.tile:focus-visible {
+  transform: translateY(-3px);
+  border-color: rgba(199, 170, 107, 0.7);
+  box-shadow: 0 22px 36px -18px rgba(0, 0, 0, 0.95), 0 0 0 1px rgba(199, 170, 107, 0.25);
+}
+a.tile:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+.tileNumber {
+  position: relative;
+  z-index: 1;
+  font: 600 clamp(20px, 3.2vw, 34px) / 1 "Playfair Display", Georgia, serif;
+  color: var(--gold);
+  font-variant-numeric: lining-nums tabular-nums;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+}
+.tileText {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 4px;
+}
+.tileName {
+  font: 600 clamp(12px, 1.6vw, 16px) / 1.12 "Playfair Display", Georgia, serif;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+.tilePlace {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 1.1px;
+  text-transform: uppercase;
+  color: rgba(244, 240, 230, 0.66);
+}
+.tileBadge { position: absolute; top: 7px; right: 7px; z-index: 2; }
+/* Thumbnails: number only. */
+.tileThumb { width: 36px; padding: 4px; border-radius: 5px; }
+.tileThumb .tileNumber { font-size: 13px; }
+.tileThumb .tileText { display: none; }
+.tileMini { width: 26px; padding: 3px; border-radius: 4px; }
+.tileMini .tileNumber { font-size: 10px; }
+.tileMini .tileText { display: none; }
+
+/* Section labels with an optional link on the right. */
+.sectionLabel {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.8px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.sectionLabel a {
+  color: var(--gold);
+  font-size: 12px;
+  letter-spacing: 0.3px;
+  text-transform: none;
+  text-decoration: none;
+}
+.sectionLabel a:hover { text-decoration: underline; }
+
+/* Tags on rows. */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  background: rgba(143, 179, 156, 0.13);
+  color: #9fc2aa;
+  white-space: nowrap;
+}
+.tagGold { background: rgba(199, 170, 107, 0.15); color: var(--gold); }
+
+/* Buttons. */
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 38px;
+  padding: 8px 15px;
+  border-radius: 9px;
+  border: 1px solid rgba(199, 170, 107, 0.5);
+  background: rgba(199, 170, 107, 0.1);
+  color: var(--gold);
+  font: 700 13px/1 "DM Sans", Arial, sans-serif;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.button:hover { background: rgba(199, 170, 107, 0.18); }
+.button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.button:disabled { cursor: default; opacity: 0.5; }
+.buttonSolid { background: var(--gold); border-color: var(--gold); color: #1a1407; }
+.buttonSolid:hover { background: #d4b97c; }
+.buttonGhost { border-color: var(--line); background: transparent; color: #d7d9d2; }
+.buttonGhost:hover { background: rgba(255, 255, 255, 0.05); }
+
+/* A section that is not built yet: designed, honest and quiet. */
+.soon {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+  padding: 18px;
+  border: 1px dashed rgba(199, 170, 107, 0.3);
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(199, 170, 107, 0.05), rgba(199, 170, 107, 0.015));
+}
+.soonIcon {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid rgba(199, 170, 107, 0.45);
+  color: var(--gold);
+}
+.soonIcon svg { width: 18px; height: 18px; }
+.soonTitle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 0 4px;
+  font: 600 18px/1.25 "Playfair Display", Georgia, serif;
+  color: var(--cream);
+}
+.soonText { margin: 0; color: #bfc6bf; font-size: 14px; line-height: 1.5; max-width: 60ch; }
+.soonPill {
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(199, 170, 107, 0.45);
+  color: var(--gold);
+  font: 700 10px/1.4 "DM Sans", Arial, sans-serif;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+}
+
+/* Quiet empty states inside a section. */
+.emptyNote {
+  padding: 22px;
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  color: var(--muted);
+  text-align: center;
+  font-size: 14px;
+}
+.emptyNote strong {
+  display: block;
+  margin-bottom: 4px;
+  font: 600 19px "Playfair Display", Georgia, serif;
+  color: var(--cream);
+}
+
+/* Four posters across a phone leave little room for type: smaller names, no place line. */
+@media (max-width: 560px) {
+  .tile { padding: 7px; border-radius: 6px; }
+  .tileName {
+    font-size: 11px;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .tilePlace { display: none; }
+  .tileBadge { top: 5px; right: 5px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tile { transition: none; }
+  a.tile:hover, a.tile:focus-visible { transform: none; }
+}
