@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
+import type { Course } from "@coursebook/domain/catalog/course";
 import type { SearchResult } from "@coursebook/domain/catalog/search-results";
 import { deriveState, isUSCourse, withUSState } from "@coursebook/domain/catalog/geography";
 import { Modal } from "../../shared/ui/Modal";
 import { StateSelect } from "../../shared/ui/StateSelect";
 import { errorMessage } from "../../shared/lib/errors";
+import { localDate } from "../../shared/lib/local-date";
 import { api, unwrap } from "../../lib/api";
 import { fromSearchHit } from "../../lib/api/mappers";
 import { replyMessage, useJournalFetcher } from "../journal/use-journal-fetcher";
@@ -11,9 +13,13 @@ import { replyMessage, useJournalFetcher } from "../journal/use-journal-fetcher"
 const SEARCH_DEBOUNCE_MS = 180;
 
 /**
- * Log a round: search courses through the API, pick one, set the count.
- * A hit already in the catalog posts its id; anything else posts the course
- * details for the API to find or create.
+ * Log a round: search courses through the API, pick one, set the count and
+ * the date played (today unless changed). A hit already in the catalog
+ * posts its id; anything else posts the course details for the API to find
+ * or create.
+ *
+ * @param initial - A catalog course to log, skipping the search (a course row's Log button).
+ * @param onAdd - Opens the hand-entered course dialog; the "+ Add Course" button shows only with it.
  */
 export function LogRoundDialog({
   signedIn,
@@ -22,18 +28,24 @@ export function LogRoundDialog({
   onAdd,
   onSignIn,
   notify,
+  initial = null,
 }: {
   signedIn: boolean;
   played: Readonly<Record<string, number>>;
   onClose: () => void;
-  onAdd: () => void;
+  onAdd?: () => void;
   onSignIn: () => void;
   notify: (message: string) => void;
+  initial?: Course | null;
 }) {
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(initial?.name ?? "");
   const [results, setResults] = useState<SearchResult[]>([]);
-  const [selected, setSelected] = useState<SearchResult | null>(null);
+  const [selected, setSelected] = useState<SearchResult | null>(
+    initial ? { course: initial, display: initial, catalogId: initial.id } : null,
+  );
   const [quantity, setQuantity] = useState("1");
+  const [today] = useState(localDate);
+  const [playedOn, setPlayedOn] = useState(today);
   const [retry, setRetry] = useState(0);
   const [searchError, setSearchError] = useState("");
   const { busy, submit } = useJournalFetcher((reply) => {
@@ -95,11 +107,16 @@ export function LogRoundDialog({
       notify("Select a state before logging this U.S. course");
       return;
     }
+    if (!playedOn || playedOn > today) {
+      notify("Choose the date you played, today or earlier");
+      return;
+    }
     const course = selected.course;
     const count = Math.max(1, Math.floor(Number(quantity)) || 1);
     submit({
       intent: "log",
       quantity: String(count),
+      playedAt: playedOn,
       ...(selected.catalogId
         ? { courseId: selected.catalogId }
         : {
@@ -198,7 +215,9 @@ export function LogRoundDialog({
               <div className="empty">
                 {query.trim().length < 2
                   ? "Start typing a course name."
-                  : "No courses found. Add the course below."}
+                  : onAdd
+                    ? "No courses found. Add the course below."
+                    : "No courses found."}
                 {query.trim().length >= 2 && (
                   <button
                     className="secondary"
@@ -215,9 +234,11 @@ export function LogRoundDialog({
           </div>
 
           <div className="actions" id="searchActions">
-            <button className="secondary" id="add" onClick={onAdd}>
-              + Add Course
-            </button>
+            {onAdd && (
+              <button className="secondary" id="add" onClick={onAdd}>
+                + Add Course
+              </button>
+            )}
           </div>
         </>
       )}
@@ -275,6 +296,24 @@ export function LogRoundDialog({
               value={quantity}
               onChange={(event) => {
                 setQuantity(event.target.value);
+              }}
+            />
+          </div>
+
+          <div className="quantity">
+            <div>
+              <div className="quantitylabel">Date played</div>
+              <div className="quantityhint">Today, unless you're catching up.</div>
+            </div>
+            <input
+              id="playedOn"
+              type="date"
+              aria-label="Date played"
+              max={today}
+              required
+              value={playedOn}
+              onChange={(event) => {
+                setPlayedOn(event.target.value);
               }}
             />
           </div>

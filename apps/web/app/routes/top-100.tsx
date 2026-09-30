@@ -1,41 +1,30 @@
 import { getToken } from "@clerk/react-router";
 import type { Route } from "./+types/top-100";
-import { RankingsPage } from "../features/catalog/RankingsPage";
+import { TopListsPage } from "../features/top-lists/TopListsPage";
 import { api, unwrap } from "../lib/api";
 import { fromRankingEntry } from "../lib/api/mappers";
+import { loadViewerCourses } from "../lib/api/viewer";
 import { RouteError } from "../shared/ui/RouteError";
 import { useShell } from "../shared/ui/shell";
 
-export const meta: Route.MetaFunction = () => [{ title: "Top 100 · coursebook.golf" }];
+export const meta: Route.MetaFunction = () => [{ title: "Top lists · coursebook.golf" }];
 
 /**
  * Published rankings (public and cacheable, requested without a token) and,
- * for members, which of those courses they played or listed.
+ * for members, the courses they played and want to play.
  */
 export async function clientLoader() {
   const signedIn = (await getToken()) !== null;
-  const [rankings, mine] = await Promise.all([
-    api.GET("/v1/rankings"),
-    signedIn ? api.GET("/v1/me/courses") : Promise.resolve(null),
-  ]);
-  const courses = mine ? unwrap(mine).courses : [];
-  return {
-    rankings: unwrap(rankings).entries.map(fromRankingEntry),
-    played: Object.fromEntries(courses.filter((entry) => entry.played > 0).map((entry) => [entry.course.id, entry.played])),
-    onList: courses.map((entry) => entry.course.id),
-    signedIn,
-  };
+  const [rankings, viewer] = await Promise.all([api.GET("/v1/rankings").then(unwrap), signedIn ? loadViewerCourses() : Promise.resolve(null)]);
+  return { rankings: rankings.entries.map(fromRankingEntry), viewer };
 }
 
-
-export default function Top100({ loaderData }: Route.ComponentProps) {
+export default function Courses({ loaderData }: Route.ComponentProps) {
   const shell = useShell();
   return (
-    <RankingsPage
+    <TopListsPage
       rows={loaderData.rankings}
-      played={loaderData.played}
-      onList={loaderData.onList}
-      signedIn={loaderData.signedIn}
+      viewer={loaderData.viewer}
       selectedState={shell.selectedState}
       onState={shell.onState}
       notify={shell.notify}

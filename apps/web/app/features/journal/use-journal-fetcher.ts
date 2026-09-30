@@ -10,7 +10,6 @@ export interface JournalReply {
   removed?: boolean;
   removedCourse?: boolean;
   courseId?: string;
-  added?: boolean;
 }
 
 /**

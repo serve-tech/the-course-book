@@ -6,6 +6,7 @@ import { replyMessages } from "../features/journal/reply-message";
 import type { JournalReply } from "../features/journal/use-journal-fetcher";
 import { api, unwrap } from "../lib/api";
 import { apiFailureMessage } from "../shared/lib/errors";
+import { localDate } from "../shared/lib/local-date";
 import { fromRound, toCourseDetailsRequest } from "../lib/api/mappers";
 
 /**
@@ -30,8 +31,8 @@ const intentSchema = z.discriminatedUnion("intent", [
     quantity: z.preprocess(blank, z.coerce.number().int().min(1).max(100).default(1)),
     playedAt: z.preprocess(blank, z.iso.date().optional()),
   }),
-  z.object({ intent: z.literal("top"), courseId: uuid }),
-  z.object({ intent: z.literal("friend"), courseId: uuid }),
+  z.object({ intent: z.literal("want"), courseId: uuid }),
+  z.object({ intent: z.literal("unwant"), courseId: uuid }),
   z.object({
     intent: z.literal("add-course"),
     name: z.string().trim().min(1, "Enter a course name"),
@@ -58,13 +59,6 @@ const postedCourseSchema = z.object({
   logo: z.string().default(""),
   website: z.string().default(""),
 });
-
-/** Today in the member's time zone, so evening rounds are not dated tomorrow (UTC). */
-function localDate(): string {
-  const now = new Date();
-  const pad = (value: number) => String(value).padStart(2, "0");
-  return `${String(now.getFullYear())}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-}
 
 const failure = (error: string): JournalReply => ({ error });
 
@@ -106,20 +100,12 @@ async function perform(form: JournalIntent): Promise<JournalReply> {
       );
       return { ok: true, message: replyMessages.logged(form.quantity), count: form.quantity, courseId: result.courseId };
     }
-    case "top":
-    case "friend": {
-      const result = unwrap(
-        await api.PUT("/v1/me/courses/{courseId}", {
-          params: { path: { courseId: form.courseId } },
-          body: { playedOn: localDate() },
-        }),
-      );
-      return {
-        ok: true,
-        message: form.intent === "top" ? replyMessages.addedToList(true) : replyMessages.addedToList(result.added),
-        added: result.added,
-      };
-    }
+    case "want":
+      unwrap(await api.PUT("/v1/me/want-to-play/{courseId}", { params: { path: { courseId: form.courseId } } }));
+      return { ok: true, message: replyMessages.wanted(true) };
+    case "unwant":
+      unwrap(await api.DELETE("/v1/me/want-to-play/{courseId}", { params: { path: { courseId: form.courseId } } }));
+      return { ok: true, message: replyMessages.wanted(false) };
     case "add-course": {
       const us = form.country === "USA";
       if (us && !form.state) return failure("Select a state for a U.S. course");

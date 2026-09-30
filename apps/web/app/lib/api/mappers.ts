@@ -1,7 +1,14 @@
 import { courseSchema, type Course, type RankedCourse } from "@coursebook/domain/catalog/course";
 import type { SearchResult } from "@coursebook/domain/catalog/search-results";
 import type { MemberList, MemberListRow } from "@coursebook/domain/friends/types";
-import { FeedItemType, ProfileRelationship, type FeedItem, type Profile, type TimelineRound } from "@coursebook/domain/social/types";
+import {
+  FeedItemType,
+  ProfileRelationship,
+  type FeedItem,
+  type Profile,
+  type TimelineRound,
+  type WantToPlayEntry,
+} from "@coursebook/domain/social/types";
 import type { ListEntry, RoundEntry } from "@coursebook/domain/journal/types";
 import type { ApiSchemas } from "./client";
 
@@ -147,4 +154,8 @@ export function toCourseDetailsRequest(course: Pick<Course, "name" | "location" 
     logoUrl: orNull(course.logo),
     websiteUrl: orNull(course.website),
   };
+}
+
+export function fromWantToPlay(list: ApiSchemas["WantToPlay"]): WantToPlayEntry[] {
+  return list.courses.map((entry) => ({ course: fromApiCourse(entry.course), addedAt: entry.addedAt }));
 }

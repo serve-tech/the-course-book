@@ -5,8 +5,8 @@ describe("journal reply messages", () => {
   it.each([
     [replyMessages.logged(1), "1 round added"],
     [replyMessages.logged(3), "3 rounds added"],
-    [replyMessages.addedToList(true), "Added to My List"],
-    [replyMessages.addedToList(false), "Already on your list"],
+    [replyMessages.wanted(true), "Added to Want to play"],
+    [replyMessages.wanted(false), "Removed from Want to play"],
     [replyMessages.addedCourse(4), "Course added at #4"],
     [replyMessages.moved(1), "Moved to #1"],
     [replyMessages.counted(5, false), "Rounds updated to 5"],

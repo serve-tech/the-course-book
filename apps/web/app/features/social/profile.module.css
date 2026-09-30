@@ -242,6 +242,11 @@
 /* Top list progress. */
 .progressList { display: grid; gap: 16px; }
 .progressRow { display: grid; gap: 7px; }
+/* Each list opens with the member's ticks. */
+a.progressRow { margin: -8px -10px; padding: 8px 10px; border-radius: 10px; color: inherit; text-decoration: none; }
+a.progressRow:hover { background: rgba(255, 255, 255, 0.04); }
+a.progressRow:hover .progressTitle { color: var(--gold); }
+a.progressRow:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 .progressHead { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
 .progressTitle { font: 600 16px "Playfair Display", Georgia, serif; color: var(--cream); }
 .progressCount { font: 600 18px "Playfair Display", Georgia, serif; color: var(--cream); font-variant-numeric: lining-nums tabular-nums; }

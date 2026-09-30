@@ -14,6 +14,7 @@ export default [
       index("routes/profile.timeline.tsx"),
       route("ranking", "routes/profile.ranking.tsx"),
       route("lists", "routes/profile.lists.tsx"),
+      route("lists/:list", "routes/profile.top-list.tsx"),
       route("stats", "routes/profile.stats.tsx"),
     ]),
     route("friends", "routes/friends.tsx"),
