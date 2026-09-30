@@ -25,6 +25,7 @@
     "db:migrate": "pnpm --filter @coursebook/api db:migrate",
     "seed:build": "pnpm --filter @coursebook/api seed:build",
     "import:supabase": "pnpm --filter @coursebook/api import:supabase",
+    "seed:dev": "pnpm --filter @coursebook/api seed:dev",
     "format": "prettier --write apps packages tests/e2e package.json tsconfig.json tsconfig.base.json vitest.config.ts eslint.config.js"
   },
   "devDependencies": {
