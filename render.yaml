@@ -53,10 +53,11 @@ services:
         fromDatabase:
           name: coursebook-db
           property: connectionString
-      # Clerk development instance until cutover (docs/cutover.md step 5).
+      # Clerk production instance for coursebook.golf (Frontend API
+      # clerk.coursebook.golf). The secret key must come from the same instance.
       # Publishable keys are public: they ship in every browser bundle.
       - key: CLERK_PUBLISHABLE_KEY
-        value: pk_test_dGFsZW50ZWQtc3dpbmUtMTI3Ni5jbGVyay5hY2NvdW50cy5kZXYk
+        value: pk_live_Y2xlcmsuY291cnNlYm9vay5nb2xmJA
       - key: CLERK_SECRET_KEY
         sync: false
       # The instance's JWT public key (PEM, Clerk API keys, "Show JWT public
@@ -65,13 +66,13 @@ services:
       - key: CLERK_JWT_KEY
         value: |-
           -----BEGIN PUBLIC KEY-----
-          MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEApNM1XwUiXtIuU5/lT8Eu
-          OWvCCd5Ryz8toSJ9onfon4Nq3/OrSBhwg3s6Ye8xpcYDRSW4sRdYkR5pp+trj5S0
-          /uhbWzKrqchLddgttsEMrNFSnP84zMa1cHslPQ9lMV4fm4ARUDri4Likmck43WQ3
-          ptYAboMKW4fbbGcajW/Lxy6+GMwb55lpAutpC6EoVdU7RdT6TW1yw4fvLiElWAhI
-          3U5HGF/tnn9uYL7PuVGajt2YT7wj7FBQX9AwggXddh3FHj1WnXpMwDhJeJr38Xct
-          81SKMg8VG+3+oyYFxXE0xu82VMA2Vwd4fUtXDI9ATcg21CEIxzlk69Ph5nC8CsSI
-          1QIDAQAB
+          MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAw5QO3s2YwpQ5GCU/Ppvo
+          eWZXbub79uEpfgpj8Z7HJvK/wNE0nCtyzbSl1poGcbq5w0qPwg7dLFFa2g9Bh1At
+          fsuD2/V/02q2m+Zvu1MnDvSwyXfsfe1xGtwyDeTtAHHpcd5U9e43twj4OzR2DOAn
+          dlMyVj72QN0lQWjPgMNcHEMG5VYdDyj+oDM6RB92P2/WtDXHXY2TWA+cBVH3ZmSY
+          F8YDHqQ6KEIhuN9Lx0gjcus/sIN1iP/HobiR1TZXYnuEODCcz7/rZPAOuisacEym
+          dvs1faFUkJDPN4+W0jS5oT3axnM4253JLxqPuBrF1D3kIMZBCjIgJg+be+dUT9rI
+          JwIDAQAB
           -----END PUBLIC KEY-----
       # Exact origins of the web app, comma-separated, no trailing slash.
       - key: WEB_ORIGINS
@@ -121,6 +122,6 @@ services:
         value: "24"
       # VITE_* values are inlined into the bundle at build time; never a secret.
       - key: VITE_API_URL
-        value: https://coursebook-golf-api.onrender.com
+        value: https://api.coursebook.golf
       - key: VITE_CLERK_PUBLISHABLE_KEY
-        value: pk_test_dGFsZW50ZWQtc3dpbmUtMTI3Ni5jbGVyay5hY2NvdW50cy5kZXYk
+        value: pk_live_Y2xlcmsuY291cnNlYm9vay5nb2xmJA

@@ -3,8 +3,8 @@
 A golf course journal: log rounds, rank the courses you have played, compare against published Top 100 lists and see what your friends are playing. Built by Serve Electric: a JSON API (Hono, Drizzle over Postgres, Clerk) and a React Router web app, on Render; native iOS and Android apps will use the same API.
 
 - Repository: https://github.com/serve-tech/the-course-book
-- Production: https://serve-tech.github.io/the-course-book/ (retired static build, still live until cutover); coursebook.golf will point at Render after cutover.
-- Render (production services, before the domain): https://coursebook-golf-web.onrender.com (API https://coursebook-golf-api.onrender.com), deployed from `main`, using the Clerk development instance until launch. The free API sleeps after 15 idle minutes; the first request then waits for it to wake (12.5 s measured on 2026-09-28; Render documents up to about a minute).
+- Production: https://coursebook.golf (API https://api.coursebook.golf) on Render, deployed from `main`, signing in with the Clerk production instance. The `onrender.com` hostnames (https://coursebook-golf-web.onrender.com, https://coursebook-golf-api.onrender.com) serve the same services.
+- Retired: https://serve-tech.github.io/the-course-book/ (the old static build, live until GitHub Pages is disabled). The free API sleeps after 15 idle minutes; the first request then waits for it to wake (12.5 s measured on 2026-09-28; Render documents up to about a minute).
 
 ## Working on the project
 
