@@ -39,7 +39,7 @@ describe("course search", () => {
     expect(results.map((result) => result.course.id)).toEqual([known.id]);
     expect(results.map((result) => result.catalogId)).toEqual([known.id]);
     expect(fetcher).toHaveBeenCalledWith(
-      expect.objectContaining({ href: "https://api.example.test/v1/courses/search?q=Test+Alpha&limit=50" }),
+      expect.objectContaining({ href: "https://api.example.test/v1/courses/search?q=Test+Alpha&limit=50&offset=0" }),
       expect.objectContaining({ cache: "no-store" }),
     );
 
@@ -114,6 +114,52 @@ describe("course search", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     await expect(createCourseSearch(deps(fetcher)).search("Alpha", controller.signal)).rejects.toMatchObject({ name: "AbortError" });
     expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  it("reads beyond 50 upstream matches before alphabetizing", async () => {
+    const records = Array.from({ length: 55 }, (_, index) => ({ id: `course-${index}`, name: `Oakland Course ${String(55 - index).padStart(2, "0")}` }));
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(Response.json({ courses: records.slice(0, 50), total: 55 }))
+      .mockResolvedValueOnce(Response.json({ courses: records.slice(50), total: 55 }));
+    const results = await createCourseSearch(deps(fetcher)).search("Oakland");
+    expect(results).toHaveLength(55);
+    expect(results[0]?.course.name).toBe("Oakland Course 01");
+    expect(fetcher.mock.calls.map(([url]) => url instanceof Request ? url.url : url.toString())).toEqual([
+      "https://api.example.test/v1/courses/search?q=Oakland&limit=50&offset=0",
+      "https://api.example.test/v1/courses/search?q=Oakland&limit=50&offset=50",
+    ]);
+  });
+
+  it("reads all pages of a legacy array response without a total", async () => {
+    const records = Array.from({ length: 50 }, (_, index) => ({ id: `course-${index}`, name: `Oakland Course ${index}` }));
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(Response.json(records)).mockResolvedValueOnce(Response.json([{ name: "Oakland University: Katke-Cousins" }]));
+    const results = await createCourseSearch(deps(fetcher)).search("Oakland");
+    expect(results).toHaveLength(51);
+    expect(results.at(-1)?.course.name).toBe("Oakland University: Katke-Cousins");
+  });
+
+  it.each(["failed", "repeated", "incomplete"])("discards partial REST results and uses the complete dataset for a %s later page", async (failure) => {
+    const first = Array.from({ length: 50 }, (_, index) => ({ id: `rest-${index}`, name: `Oakland REST ${index}` }));
+    const names = Array.from({ length: 61 }, (_, index) => `Oakland Dataset ${String(61 - index).padStart(2, "0")}`);
+    const csv = "id,name,city,state,country\n" + names.map((name, index) => `${index},${name},Rochester,MI,USA`).join("\n");
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(Response.json({ courses: first, total: 100 }))
+      .mockResolvedValueOnce(failure === "failed" ? new Response(null, { status: 503 }) : Response.json({ courses: failure === "repeated" ? first : [], total: 100 }))
+      .mockResolvedValueOnce(new Response(csv));
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const results = await createCourseSearch(deps(fetcher)).search("Oakland");
+    expect(results.map((hit) => hit.course.name)).toEqual([...names].reverse());
+    expect(fetcher).toHaveBeenCalledTimes(3);
+  });
+
+  it("does not fall back after cancellation between upstream pages", async () => {
+    const controller = new AbortController();
+    const fetcher = vi.fn<typeof fetch>().mockImplementation(() => {
+      controller.abort();
+      return Promise.resolve(Response.json({ courses: [{ name: "Oakland" }], total: 100 }));
+    });
+    await expect(createCourseSearch(deps(fetcher)).search("Oakland", controller.signal)).rejects.toMatchObject({ name: "AbortError" });
+    expect(fetcher).toHaveBeenCalledTimes(1);
   });
 
   it("ignores queries shorter than two characters", async () => {

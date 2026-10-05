@@ -1,15 +1,16 @@
 import { useEffect, useState } from "react";
 import type { Course } from "@coursebook/domain/catalog/course";
-import type { SearchResult } from "@coursebook/domain/catalog/search-results";
+import { CourseSearchSource, type SearchResult } from "@coursebook/domain/catalog/search-results";
 import { deriveState, isUSCourse, withUSState } from "@coursebook/domain/catalog/geography";
 import { Modal } from "../../shared/ui/Modal";
 import type { Notify } from "../../shared/ui/shell";
 import { StateSelect } from "../../shared/ui/StateSelect";
-import { errorMessage } from "../../shared/lib/errors";
+import { apiFailureMessage } from "../../shared/lib/errors";
 import { localDate } from "../../shared/lib/local-date";
 import { api, unwrap } from "../../lib/api";
 import { fromSearchHit } from "../../lib/api/mappers";
 import { replyMessage, useJournalFetcher } from "../journal/use-journal-fetcher";
+import styles from "./course-search.module.css";
 
 const SEARCH_DEBOUNCE_MS = 180;
 
@@ -41,6 +42,11 @@ export function LogRoundDialog({
   initial?: Course | null;
 }) {
   const [query, setQuery] = useState(initial?.name ?? "");
+  const [source, setSource] = useState(CourseSearchSource.Catalog);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<SearchResult[]>([]);
   const [selected, setSelected] = useState<SearchResult | null>(
     initial ? { course: initial, display: initial, catalogId: initial.id } : null,
@@ -63,20 +69,27 @@ export function LogRoundDialog({
     const controller = new AbortController();
     const timeout = setTimeout(() => {
       api
-        .GET("/v1/course-search", { params: { query: { q: text } }, signal: controller.signal })
-        .then((result) => unwrap(result).results.map(fromSearchHit))
+        .GET("/v1/course-search", { params: { query: { q: text, page, source } }, signal: controller.signal })
+        .then((result) => {
+          const value = unwrap(result);
+          return { ...value, results: value.results.map(fromSearchHit) };
+        })
         .then(
           (value) => {
             if (controller.signal.aborted) return;
             setSearchError("");
-            setResults(value);
+            setResults(value.results);
+            setTotal(value.total);
+            setPageSize(value.pageSize);
+            setLoading(false);
           },
           (error: unknown) => {
             if (controller.signal.aborted) return;
             console.warn("Course search failed", error);
             setResults([]);
+            setLoading(false);
             setSearchError(
-              errorMessage(error, "Course search is temporarily unavailable. Please try again."),
+              apiFailureMessage(error) ?? "Course search is temporarily unavailable. Please try again.",
             );
           },
         );
@@ -85,16 +98,44 @@ export function LogRoundDialog({
       clearTimeout(timeout);
       controller.abort();
     };
-  }, [query, retry, selected, signedIn]);
+  }, [query, page, source, retry, selected, signedIn]);
 
   const changeQuery = (value: string) => {
     setQuery(value);
+    setSource(CourseSearchSource.Catalog);
+    setPage(1);
+    setTotal(0);
+    setLoading(signedIn && value.trim().length >= 2);
     setResults([]);
     setSearchError("");
   };
 
+  const changeSource = (value: CourseSearchSource) => {
+    setSource(value);
+    setPage(1);
+    setTotal(0);
+    setResults([]);
+    setSearchError("");
+    setLoading(true);
+  };
+
+  const changePage = (value: number) => {
+    setPage(value);
+    setResults([]);
+    setSearchError("");
+    setLoading(true);
+  };
+
+  const retrySearch = () => {
+    setSearchError("");
+    setResults([]);
+    setLoading(true);
+    setRetry((value) => value + 1);
+  };
+
   const choose = (result: SearchResult) => {
     setSelected(result);
+    setLoading(false);
     setQuantity("1");
     setQuery(result.course.name);
     setResults([]);
@@ -177,17 +218,15 @@ export function LogRoundDialog({
                   Sign In
                 </button>
               </div>
+            ) : loading ? (
+              <div className="empty" role="status">Searching courses…</div>
             ) : searchError ? (
-              <div className="empty">
+              <div className="empty" role="alert">
                 {searchError}
                 <button
                   className="secondary"
                   id="apiRetry"
-                  onClick={() => {
-                    setSearchError("");
-                    setResults([]);
-                    setRetry((value) => value + 1);
-                  }}
+                  onClick={retrySearch}
                 >
                   Retry
                 </button>
@@ -219,16 +258,18 @@ export function LogRoundDialog({
               <div className="empty">
                 {query.trim().length < 2
                   ? "Start typing a course name."
-                  : onAdd
-                    ? "No courses found. Add the course below."
-                    : "No courses found."}
+                  : page > 1
+                    ? "No courses on this page. Try the previous page."
+                    : source === CourseSearchSource.Catalog
+                      ? "No courses found in our catalog. Try Search more courses."
+                      : onAdd
+                        ? "No courses found. Add the course below."
+                        : "No courses found."}
                 {query.trim().length >= 2 && (
                   <button
                     className="secondary"
                     id="apiRetry"
-                    onClick={() => {
-                      setRetry((value) => value + 1);
-                    }}
+                    onClick={retrySearch}
                   >
                     Retry
                   </button>
@@ -236,6 +277,33 @@ export function LogRoundDialog({
               </div>
             )}
           </div>
+
+          {signedIn && (total > 0 || page > 1) && (
+            <div className={styles["pagination"]} role="group" aria-label="Course search pages">
+              <div className={styles["summary"]} role="status">
+                {total} {total === 1 ? "course" : "courses"} · A–Z · Page {page} of {Math.max(page, Math.ceil(total / pageSize))}
+              </div>
+              <button className="secondary" disabled={loading || page <= 1} onClick={() => { changePage(page - 1); }}>
+                Previous
+              </button>
+              <button className="secondary" disabled={loading || page * pageSize >= total} onClick={() => { changePage(page + 1); }}>
+                Next
+              </button>
+            </div>
+          )}
+
+          {signedIn && query.trim().length >= 2 && (
+            <div className={styles["discovery"]}>
+              <p>{source === CourseSearchSource.Catalog ? "Can't find your course? Search beyond our catalog." : "Showing results from OpenGolfAPI."}</p>
+              <button
+                className="secondary"
+                disabled={loading}
+                onClick={() => { changeSource(source === CourseSearchSource.Catalog ? CourseSearchSource.External : CourseSearchSource.Catalog); }}
+              >
+                {source === CourseSearchSource.Catalog ? "Search more courses" : "Back to catalog"}
+              </button>
+            </div>
+          )}
 
           <div className="actions" id="searchActions">
             {onAdd && (

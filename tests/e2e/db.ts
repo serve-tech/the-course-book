@@ -34,7 +34,13 @@ export async function ensureFixtureCourses(db: ReturnType<typeof connect>["db"])
   await db
     .insert(courses)
     .values(
-      Object.values(fixtureCourses).map((course) => ({
+      [
+        ...Object.values(fixtureCourses),
+        ...Array.from({ length: 13 }, (_, index) => ({
+          id: `bbbbbbbb-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
+          name: `Pagination Catalog ${String(index + 1).padStart(2, "0")}`,
+        })),
+      ].map((course) => ({
         id: course.id,
         name: course.name,
         nameKey: normalizeName(course.name),

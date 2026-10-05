@@ -123,11 +123,11 @@ export const searchCourses = createRoute({
   operationId: "searchCourses",
   tags: ["Catalog"],
   summary: "Find courses by name",
-  description: "Catalog courses carry their id; other hits carry details to send back when adding the course.",
+  description: "Searches stored courses by default. Use source=external to explicitly search beyond the catalog. Catalog courses carry their id; other hits carry details to send back when adding the course.",
   security: MEMBER,
   request: { query: SearchQuerySchema },
   responses: {
-    200: json(SearchResultsSchema, "Up to ten hits, best first."),
+    200: json(SearchResultsSchema, "An alphabetical page of up to ten hits with the total match count."),
     400: invalid,
     401: unauthenticated,
     403: forbidden,

@@ -183,7 +183,7 @@ export interface paths {
         };
         /**
          * Find courses by name
-         * @description Catalog courses carry their id; other hits carry details to send back when adding the course.
+         * @description Searches stored courses by default. Use source=external to explicitly search beyond the catalog. Catalog courses carry their id; other hits carry details to send back when adding the course.
          */
         get: operations["searchCourses"];
         put?: never;
@@ -632,8 +632,14 @@ export interface components {
             scope: string;
         };
         SearchResults: {
-            /** @description At most 10, best match first. */
+            /** @description At most 10, ordered alphabetically by course name, then location and id. */
             results: components["schemas"]["SearchHit"][];
+            /** @description The requested page, starting at 1. */
+            page: number;
+            /** @description Results per page (10). */
+            pageSize: number;
+            /** @description Total matching courses after catalog resolution and deduplication. */
+            total: number;
         };
         SearchHit: {
             /**
@@ -1464,6 +1470,10 @@ export interface operations {
     searchCourses: {
         parameters: {
             query: {
+                /** @description Defaults to catalog (stored courses only). Request external explicitly to discover courses beyond the catalog. */
+                source?: "catalog" | "external" | null;
+                /** @description Page number, starting at 1. Defaults to 1; each page contains at most 10 hits. */
+                page?: number | null;
                 /** @description Course name, at least two characters. */
                 q: string;
             };
@@ -1473,7 +1483,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Up to ten hits, best first. */
+            /** @description An alphabetical page of up to ten hits with the total match count. */
             200: {
                 headers: {
                     [name: string]: unknown;
