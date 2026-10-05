@@ -98,6 +98,13 @@ const pageCardOffset = (page: Page, sectionId: string) =>
     return Math.round((inner.left + inner.right) / 2 - (outer.left + outer.right) / 2);
   }, sectionId);
 
+/**
+ * The signed-in member's avatar in the top bar, linking to their profile.
+ * Phones hide it (the tab bar has Profile), so it is matched by element, not
+ * by role, which skips hidden elements.
+ */
+const accountAvatar = (page: Page) => page.locator("#authbar a");
+
 test("anonymous navigation, dialogs and mobile layout remain usable", async ({ page }) => {
   test.skip(!clerkAvailable, "Clerk development instance keys are not configured");
   await page.goto("/");
@@ -157,7 +164,7 @@ test.describe("signed in", () => {
   test("sign-in shows the stored order and logging preserves it", async ({ page }) => {
     const { owner } = members();
     await signInAs(page, owner);
-    await expect(page.locator("#authLabel")).toHaveText(owner.username);
+    await expect(accountAvatar(page)).toHaveAttribute("href", "/u/" + owner.username);
     await openRanking(page, owner);
     await expect(page.locator("#myCourseCount")).toHaveText("2");
     await expect(page.locator("#mylist .course")).toHaveText(["Test Beta Links", "Test Alpha Links"]);
@@ -410,11 +417,12 @@ test.describe("account deletion", () => {
     });
     try {
       await signInAs(page, { id: created.id, username: "e2e_del_" + suffix, displayName: "Leaving", email });
-      await expect(page.locator("#authLabel")).toHaveText("e2e_del_" + suffix);
+      await expect(accountAvatar(page)).toHaveAttribute("href", "/u/e2e_del_" + suffix);
       await page.getByRole("link", { name: "Account", exact: true }).click();
       await page.locator("#deleteAccount").click();
       await page.locator("#confirmDeleteAccount").click();
-      await expect(page.locator("#authLabel")).toHaveText("Not signed in");
+      await expect(page.locator("#authOpen")).toHaveText("Sign in");
+      await expect(accountAvatar(page)).toHaveCount(0);
       await expect
         .poll(async () => (await clerkClient.users.getUserList({ userId: [created.id] })).data.length)
         .toBe(0);
