@@ -4,7 +4,7 @@ A golf course journal: log rounds, rank the courses you have played, compare aga
 
 - Repository: https://github.com/serve-tech/the-course-book
 - Production: https://serve-tech.github.io/the-course-book/ (retired static build, still live until cutover); coursebook.golf will point at Render after cutover.
-- Render (production services, before the domain): https://coursebook-golf-web.onrender.com (API https://coursebook-golf-api.onrender.com), deployed from `main`, using the Clerk development instance until launch. The free API sleeps after 15 idle minutes; the first request then waits for it to wake (12.5 s measured on 2026-09-28; Render documents up to about a minute).
+- Render (production services, before the domain): https://coursebook-golf-web.onrender.com (API https://coursebook-golf-api.onrender.com), deployed from `main`, using the Clerk development instance until launch.
 
 ## Working on the project
 
@@ -51,7 +51,7 @@ The rebuild and the split into an API with clients are on `main` ([rebuild decis
 
 ## Deployment and data
 
-`render.yaml` is the Render Blueprint: the API as a Docker web service (`apps/api/Dockerfile`), the web app as a static site (`apps/web/build/client`) and a Postgres 17 database, the API and database in Ohio (the static site is on Render's global CDN), all on free plans for now (the database must move to a paid plan before it expires, 30 days after creation). Non-secret settings (Clerk publishable and JWT public keys, `WEB_ORIGINS`, `PUBLIC_WEB_URL`, `VITE_API_URL`) are values in `render.yaml`; the only secret, `CLERK_SECRET_KEY`, is entered in the Render dashboard; the database URL is wired from the database resource. The API runs its migrations on start. Create or update the infrastructure by syncing the Blueprint from the Render dashboard, never by hand-creating services. Both services deploy from `main` after its CI checks pass.
+`render.yaml` is the Render Blueprint: the API as a Docker web service (`apps/api/Dockerfile`), the web app as a static site (`apps/web/build/client`) and a Postgres 17 database, the API and database in Ohio (the static site is on Render's global CDN), the database and API on Render's smallest paid plans and the static site free. Non-secret settings (Clerk publishable and JWT public keys, `WEB_ORIGINS`, `PUBLIC_WEB_URL`, `VITE_API_URL`) are values in `render.yaml`; the only secret, `CLERK_SECRET_KEY`, is entered in the Render dashboard; the database URL is wired from the database resource. The API runs its migrations on start. Create or update the infrastructure by syncing the Blueprint from the Render dashboard, never by hand-creating services. Both services deploy from `main` after its CI checks pass.
 
 Local check of the API image:
 

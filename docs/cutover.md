@@ -47,7 +47,7 @@ On 2026-09-28 the maintainer skipped the local real run (step 3.3); dry runs aga
 
 ## 4. Upgrade the database, freeze and import (maintainer)
 
-1. Move `coursebook-db` to a paid plan (the maintainer deferred this on 2026-09-28; member data has been in the free database since then, so the upgrade is due before it expires on **2026-10-28**, and Render deletes it with all data 14 days later): in `render.yaml` set `plan: basic-256mb` and `diskSizeGB: 1` (otherwise a paid database defaults to 15 GB), commit, and sync the Blueprint. Free Render databases expire 30 days after creation and have no backups. Confirm the data survived the upgrade (the seeded catalog is still there).
+1. Move `coursebook-db` to a paid plan (the maintainer deferred this on 2026-09-28; member data has been in the free database since then, so the upgrade is due before it expires on **2026-10-28**, and Render deletes it with all data 14 days later): `render.yaml` sets `plan: basic-256mb` and `diskSizeGB: 1` (otherwise a paid database defaults to 15 GB, and storage can never shrink); merging that change syncs the Blueprint and applies it. Free Render databases expire 30 days after creation and have no backups, so first add a payment method to the workspace and take a `pg_dump` of the external URL, kept outside the repository. Render keeps the data but takes the database offline for a few minutes while the instance type changes ([Render docs](https://render.com/docs/postgresql-creating-connecting)); paid databases get point-in-time recovery (3 days on Hobby). Confirm the data survived the upgrade (the seeded catalog and the members are still there).
 2. Announce a short freeze to members.
 3. Freeze writes while leaving reads (explicit maintainer approval required; this is the only change ever made to the retired project). The old app writes only through Supabase's REST API as the `anon` and `authenticated` roles, with no stored procedures, so revoking their write privileges stops every write while the site keeps showing data. In the Supabase SQL editor, first save the current grants so the undo restores exactly them:
    ```sql
@@ -78,7 +78,7 @@ On 2026-09-28 the maintainer skipped the local real run (step 3.3); dry runs aga
 ## 6. After cutover
 
 - Requirements before the iOS and Android apps ship (release gates, not follow-ups):
-  - Move `coursebook-golf-api` to `plan: starter` so apps never wait for a cold start; raise the minimum versions in `/v1/client-config` (`MIN_IOS_VERSION`, `MIN_ANDROID_VERSION`) only when an old app build must stop working.
+  - Raise the minimum versions in `/v1/client-config` (`MIN_IOS_VERSION`, `MIN_ANDROID_VERSION`) only when an old app build must stop working.
   - A contract compatibility check in CI against the released contract: commit the contract each app release ships with as a baseline and fail on breaking changes. `pnpm contract:check` only proves the committed file matches today's routes, so a rename that regenerates both still passes.
   - Swift and Kotlin client generation and compilation from `contract/openapi.json` in CI (the spikes proved it once; CI must keep proving it).
   - An `Idempotency-Key` on the round-logging `POST` operations. Today a retry after a lost response logs the rounds again ([api.md](api.md)); phone networks make that likely, and the web benefits too.
