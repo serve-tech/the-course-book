@@ -1,4 +1,5 @@
 import { SignUp } from "@clerk/react-router";
+import styles from "../features/auth/auth.module.css";
 import type { Route } from "./+types/sign-up.$";
 
 export const meta: Route.MetaFunction = () => [{ title: "Create account · coursebook.golf" }];
@@ -7,7 +8,9 @@ export const meta: Route.MetaFunction = () => [{ title: "Create account · cours
 export default function SignUpPage() {
   return (
     <section className="page active" id="signup">
-      <SignUp routing="path" path="/sign-up" signInUrl="/sign-in" />
+      <div className={styles.page}>
+        <SignUp routing="path" path="/sign-up" signInUrl="/sign-in" />
+      </div>
     </section>
   );
 }

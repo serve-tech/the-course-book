@@ -83,6 +83,21 @@ const authCardInset = (page: Page) =>
     return { left: Math.round(inner.left - contentLeft), right: Math.round(contentRight - inner.right) };
   });
 
+/**
+ * How far the center of Clerk's card on a full-page sign-in or sign-up sits
+ * from the center of its page section (the content column), in whole pixels;
+ * 0 when centered.
+ */
+const pageCardOffset = (page: Page, sectionId: string) =>
+  page.evaluate((id) => {
+    const section = document.getElementById(id);
+    const card = section?.querySelector(".cl-cardBox");
+    if (!section || !card) return null;
+    const outer = section.getBoundingClientRect();
+    const inner = card.getBoundingClientRect();
+    return Math.round((inner.left + inner.right) / 2 - (outer.left + outer.right) / 2);
+  }, sectionId);
+
 test("anonymous navigation, dialogs and mobile layout remain usable", async ({ page }) => {
   test.skip(!clerkAvailable, "Clerk development instance keys are not configured");
   await page.goto("/");
@@ -112,9 +127,10 @@ test("anonymous navigation, dialogs and mobile layout remain usable", async ({ p
   await expect.poll(() => authCardInset(page)).toEqual({ left: 0, right: 0 });
   await page.locator("#authmodal").getByRole("button", { name: "Close" }).click();
   await expect(page.locator("#authmodal")).toHaveCount(0);
-  // The dialog no longer links to the full-page sign-up; direct links still reach it.
+  // The full-page sign-up once left Clerk's card against the column's left edge.
   await page.goto("/sign-up");
   await expect(page.locator("#signup .cl-cardBox.cl-signUp-start")).toBeVisible();
+  await expect.poll(() => pageCardOffset(page, "signup")).toBe(0);
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
   ).toBe(true);
