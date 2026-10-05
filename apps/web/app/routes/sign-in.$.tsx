@@ -7,7 +7,7 @@ export const meta: Route.MetaFunction = () => [{ title: "Sign in · coursebook.g
 export default function SignInPage() {
   return (
     <section className="page active" id="signin">
-      <SignIn routing="path" path="/sign-in" signUpUrl="/sign-up" />
+      <SignIn routing="path" path="/sign-in" signUpUrl="/sign-up" withSignUp />
     </section>
   );
 }

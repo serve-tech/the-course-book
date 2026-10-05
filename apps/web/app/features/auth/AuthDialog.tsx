@@ -18,19 +18,24 @@ const FILL_DIALOG = {
  * Sign-in dialog. Keeps the legacy modal chrome and element ids while Clerk's
  * component handles credentials, social sign-in and verification. Hash
  * routing runs the multi-step flow inside the dialog without changing the
- * page path. Clerk's own "Sign up" link goes to the full-page `/sign-up`; the
- * layout hides the dialog once the path changes.
+ * page path.
+ *
+ * `withSignUp` makes it Clerk's sign-in-or-up flow: an email or Google
+ * account with no member behind it creates one, and Clerk asks for the
+ * missing username in the same dialog. Google returns to this page with the
+ * step in the hash, and the layout reopens the dialog to finish it
+ * (`isClerkFlowHash`).
  */
 export function AuthDialog({ onClose }: { onClose: () => void }) {
   return (
     <Modal id="authmodal" className="authmodal" title="Sign in" eyebrow="Your account" onClose={onClose}>
       <div className="sub" id="authSub">
-        Sign in to keep your courses, rankings and rounds synced to your
-        account.
+        Sign in or create an account to keep your courses, rankings and rounds
+        synced.
       </div>
 
       <div id="authClerk" style={{ marginTop: "18px" }}>
-        <SignIn routing="hash" signUpUrl="/sign-up" appearance={FILL_DIALOG} />
+        <SignIn routing="hash" signUpUrl="/sign-up" withSignUp appearance={FILL_DIALOG} />
       </div>
     </Modal>
   );

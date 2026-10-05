@@ -110,15 +110,24 @@ test("anonymous navigation, dialogs and mobile layout remain usable", async ({ p
   // fell short of its padding on phones; it fills the content box instead.
   await expect(page.locator("#authClerk .cl-cardBox.cl-signIn-start")).toBeVisible();
   await expect.poll(() => authCardInset(page)).toEqual({ left: 0, right: 0 });
-  // Clerk's "Sign up" link goes to the full-page sign-up, which the dialog
-  // once kept covering.
-  await page.locator("#authClerk .cl-footerActionLink").click();
-  await expect(page).toHaveURL(/\/sign-up/);
+  await page.locator("#authmodal").getByRole("button", { name: "Close" }).click();
   await expect(page.locator("#authmodal")).toHaveCount(0);
+  // The dialog no longer links to the full-page sign-up; direct links still reach it.
+  await page.goto("/sign-up");
   await expect(page.locator("#signup .cl-cardBox.cl-signUp-start")).toBeVisible();
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
   ).toBe(true);
+  // Google returns to the page the dialog was opened on, as a full page load
+  // with Clerk's next step in the hash (a new account: #/create/sso-callback,
+  // then #/create/continue for the username). The dialog once stayed closed,
+  // so the account was never created. A step that needs no sign-in in
+  // progress stands in for them here; closing the dialog clears it.
+  await page.goto("/courses#/factor-one");
+  await expect(page.locator("#authmodal")).toBeVisible();
+  await page.locator("#authmodal").getByRole("button", { name: "Close" }).click();
+  await expect(page.locator("#authmodal")).toHaveCount(0);
+  expect(await page.evaluate(() => location.hash)).toBe("");
 });
 
 test.describe("signed in", () => {
