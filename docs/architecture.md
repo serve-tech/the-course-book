@@ -15,7 +15,7 @@ On `main` (PR #4, merged 2026-09-29): the API with its read and write operations
 | Database | Postgres 17 | `coursebook-db` |
 | Contract | [contract/openapi.json](../contract/openapi.json), generated from the API's route definitions; clients generate their code from it | not deployed; also served at `/v1/openapi.json` |
 
-[render.yaml](../render.yaml) is the source of truth. Staging uses free plans; the cutover moves the database, then the API, to paid plans.
+[render.yaml](../render.yaml) is the source of truth. The database (`basic-256mb`, 1 GB) and API (`starter`) are on paid plans; the static site is free.
 
 ## Responsibilities
 
@@ -141,7 +141,7 @@ Validate untrusted input at boundaries: request parameters and bodies (contract 
 
 ## Hosting and operations
 
-- **Cold starts:** a free web service sleeps after 15 idle minutes and takes up to about a minute to wake (Render's figure; 12.5 s measured on staging, 2026-09-28); the web app shows "Waking the server…" when a request is slow and waits up to 90 seconds. The static site never sleeps. Before the native apps ship, the API moves to a paid plan so phones never wait.
+- **Cold starts:** the API is on a paid plan and does not sleep (a free web service sleeps after 15 idle minutes and took 12.5 s to wake on staging, 2026-09-28). The web app still shows "Waking the server…" when a request is slow and waits up to 90 seconds. The static site never sleeps.
 - **Migrations** run in the API process before it listens (free plans have no pre-deploy step), under a session advisory lock, so an overlapping deploy migrates once. Migrations must stay backward-compatible with the previous release, which keeps serving while the new one starts.
 - **Per-process caches:** the catalog snapshot (10 minutes, invalidated after a course is created), the search dataset and the provisioning cache assume one API instance; correctness never depends on them.
 - **Logs:** one JSON line per API request with its request id, which also appears in every error envelope and the `X-Request-Id` header. Server-side failures (unexpected errors and 5xx `AppError`s) are also logged with the request id and their cause; 4xx errors are not.

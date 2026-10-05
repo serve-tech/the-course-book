@@ -7,12 +7,11 @@
 # Service names set the onrender.com hostnames. coursebook-api.onrender.com is
 # taken by another account, hence the coursebook-golf- prefix.
 #
-# Production runs on free plans for now (.planning/research/2026-09-25-free-tier-hosting.md):
-# the API sleeps after 15 idle minutes and takes seconds to about a minute to
-# wake, and free Postgres has no backups and expires 30 days after creation, so
-# coursebook-db must move to basic-256mb with diskSizeGB 1 before it expires
-# (docs/cutover.md). coursebook-golf-api moves to starter before the mobile apps
-# ship. Omitting `plan` selects a paid plan, so every resource states one.
+# The database and API are on the smallest paid plans; free Postgres has no
+# backups and expires 30 days after creation, and a free API sleeps after 15
+# idle minutes (.planning/research/2026-09-25-free-tier-hosting.md). The static
+# site stays free. Omitting `plan` selects a paid plan, so every resource states
+# one.
 #
 # The API and database run in Ohio (us-east-2), closest to most members; the
 # static site is served from Render's global CDN and has no region. Render
@@ -23,17 +22,19 @@
 # main (required checks) is what keeps failing commits out.
 databases:
   - name: coursebook-db
-    plan: free
+    plan: basic-256mb
+    # A paid database defaults to 15 GB, and storage can never shrink.
+    diskSizeGB: 1
     region: ohio
     postgresMajorVersion: "17"
 
 services:
   # JSON API for the web, iOS and Android clients. Migrations run when the
-  # container starts (free plans have no pre-deploy step).
+  # container starts (chosen on the free plan, which has no pre-deploy step).
   - type: web
     name: coursebook-golf-api
     runtime: docker
-    plan: free
+    plan: starter
     region: ohio
     branch: main
     dockerContext: .
