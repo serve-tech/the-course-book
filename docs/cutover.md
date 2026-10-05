@@ -2,7 +2,7 @@
 
 Each step names who does it and what proves it worked. The retired Supabase project is never modified except for the write freeze in step 4.3 (a reversible privilege change that needs the maintainer's explicit approval at the time); it is exported from, then paused.
 
-The Render footprint is three resources from [render.yaml](../render.yaml): `coursebook-golf-api` (Docker web service), `coursebook-golf-web` (static site) and `coursebook-db` (Postgres). Every non-secret setting (publishable keys, the JWT public key, origins and URLs) is a value in `render.yaml`, so changing one is a commit and a Blueprint sync. The one secret, `CLERK_SECRET_KEY`, is `sync: false`: Render asks for it when the Blueprint is created and ignores it on later syncs, so later changes are made in the dashboard. Staging starts on free plans; step 4 moves the database to a paid plan before real member data goes in.
+The Render footprint is three resources from [render.yaml](../render.yaml): `coursebook-golf-api` (Docker web service), `coursebook-golf-web` (static site) and `coursebook-db` (Postgres). Since 2026-10-05 every environment variable is set in Doppler and synced to Render ([decision](../.planning/decisions/2026-10-05-doppler-is-the-single-source-of-truth-for-render-environment-variables.md)); the steps below that edit variables in `render.yaml` or the dashboard describe how the cutover ran before that. Staging starts on free plans; step 4 moves the database to a paid plan before real member data goes in.
 
 ## 0. Preconditions
 
