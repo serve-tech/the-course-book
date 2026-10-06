@@ -33,8 +33,6 @@ function rankingsBody(rankings: readonly RankedCourse[]) {
   return cached;
 }
 
-const isAbort = (error: unknown) => error instanceof Error && error.name === "AbortError";
-
 /** Published rankings and course search. */
 export function registerCatalogRoutes(app: OpenAPIHono<AppEnv>, deps: AppDependencies): void {
   app.openapi(guarded(listRankings), async (c) => {
@@ -57,7 +55,10 @@ export function registerCatalogRoutes(app: OpenAPIHono<AppEnv>, deps: AppDepende
       const paged = pageSearchResults(results, page ?? 1);
       return c.json({ ...paged, results: paged.results.map(toSearchHit) }, 200);
     } catch (error) {
-      if (isAbort(error)) throw error;
+      // A cancelled request lands here too, with its abort reason (a string
+      // from @hono/node-server). Wrap it all the same: Hono passes only Errors
+      // to the error handler, which then sees the aborted request and does
+      // not report it as a server error.
       throw new AppError(503, ErrorCode.SearchUnavailable, SEARCH_UNAVAILABLE, { cause: error });
     }
   });

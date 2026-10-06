@@ -39,7 +39,9 @@ export interface CourseSearch {
    *
    * Raises:
    *     Error: `SEARCH_UNAVAILABLE` (with the cause) when both sources fail,
-   *         or the caller's AbortError when `signal` aborts.
+   *         or, when `signal` aborts, its abort reason as thrown by
+   *         `throwIfAborted` (an AbortError by default; whatever the caller
+   *         aborted with otherwise, such as @hono/node-server's string).
    */
   search(query: string, signal?: AbortSignal): Promise<SearchResult[]>;
 }
@@ -107,7 +109,7 @@ export function createCourseSearch(deps: SearchDependencies): CourseSearch {
      *
      * Raises:
      *     Error with `SEARCH_UNAVAILABLE` when both sources fail; the
-     *     caller's AbortError when the request was cancelled.
+     *     signal's abort reason when the request was cancelled.
      */
     async search(query: string, signal: AbortSignal = new AbortController().signal): Promise<SearchResult[]> {
       const text = query.trim();

@@ -57,6 +57,12 @@ const exceptionMessages: Partial<Record<ContentfulStatusCode, string>> = {
 };
 
 /**
+ * nginx's "client closed request". Not a standard status: only the request
+ * log sees it, because the client that would read it is gone.
+ */
+export const CLIENT_CLOSED_REQUEST = 499;
+
+/**
  * Map thrown errors to the envelope.
  *
  * Args:
@@ -66,9 +72,18 @@ const exceptionMessages: Partial<Record<ContentfulStatusCode, string>> = {
  *         Client errors (4xx) are expected traffic and are not logged. It
  *         gets the thrown value; `createApp` passes it through
  *         `loggableError` before it reaches the logger.
+ *
+ * Note:
+ *     A request whose client went away is answered with
+ *     `CLIENT_CLOSED_REQUEST` and not logged, whatever failed. The web app
+ *     cancels a stale search on every keystroke, and @hono/node-server then
+ *     aborts the request's signal with a string reason, which surfaces as
+ *     the failure of whatever was waiting on it (course discovery wraps it
+ *     in `search_unavailable`). That is a cancellation, not a server error.
  */
 export function errorHandler(log: (message: string, detail: unknown) => void): ErrorHandler<AppEnv> {
   return (error, c) => {
+    if (c.req.raw.signal.aborted) return new Response(null, { status: CLIENT_CLOSED_REQUEST });
     if (error instanceof AppError) {
       if (error.status >= 500) log(`API error ${error.code} ${c.get("requestId")}`, error);
       return c.json(errorBody(c, error.code, error.message), error.status);

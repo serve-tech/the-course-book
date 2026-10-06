@@ -15,7 +15,9 @@ import {
 } from "../contract/schemas";
 import { courseRankings, courses, friendships, users } from "../db/schema";
 import { FriendshipStatus } from "../domain/friendship";
-import { invalidateCatalog } from "../services/catalog";
+import { CLIENT_CLOSED_REQUEST } from "../http/errors";
+import { allCourses, invalidateCatalog } from "../services/catalog";
+import { createCourseSearch } from "../services/search";
 import { logRounds } from "../services/journal";
 import { createTestApp, TEST_CLIENT_CONFIG } from "../test/app";
 import { resetMemberData, testDatabase } from "../test/db";
@@ -198,12 +200,37 @@ describe("GET /v1/course-search", () => {
     expect((await t.get("/v1/course-search?q=Arcadia")).status).toBe(401);
   });
 
-  it("reports search_unavailable when discovery fails", async () => {
+  it("reports search_unavailable when discovery fails, and logs it", async () => {
     const t = createTestApp(db);
     t.setSearchResults(new Error("both sources down"));
     const result = await t.get("/v1/course-search?q=Arcadia&source=external", t.bearer("user_1", "golfer_1"));
     expect(result.status).toBe(503);
     expect(ApiErrorSchema.parse(result.body).error.code).toBe("search_unavailable");
+    expect(t.errors).toHaveLength(1);
+  });
+
+  it("neither reports nor logs a search the client cancelled as a server error", async () => {
+    // @hono/node-server aborts the request of a closed connection with a string, not an Error.
+    const client = new AbortController();
+    const search = createCourseSearch({
+      catalog: () => allCourses(db),
+      apiUrl: "http://opengolf.invalid/v1/courses/search",
+      csvUrl: "http://opengolf.invalid/opengolfapi-us.csv",
+      fetcher: (_input, init) => {
+        client.abort("Client connection prematurely closed.");
+        // Throws the string reason, as fetch rejects with it.
+        init?.signal?.throwIfAborted();
+        return Promise.reject(new Error("the request signal should have been aborted"));
+      },
+    });
+    const t = createTestApp(db, { search });
+    const response = await t.app.request("/v1/course-search?q=Arcadia&source=external", {
+      headers: t.bearer("user_1", "golfer_1"),
+      signal: client.signal,
+    });
+    expect(response.status).toBe(CLIENT_CLOSED_REQUEST);
+    expect(t.errors).toEqual([]);
+    expect(t.requests).toEqual([expect.objectContaining({ path: "/v1/course-search", status: CLIENT_CLOSED_REQUEST })]);
   });
 });
 
