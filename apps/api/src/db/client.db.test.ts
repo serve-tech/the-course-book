@@ -13,7 +13,7 @@ afterAll(async () => {
 
 /** The pool's statement timeout in milliseconds, as Postgres applies it. */
 const statementTimeout = async (pool: typeof server.pool) =>
-  (await pool.query<{ ms: number }>("select extract(epoch from current_setting('statement_timeout')::interval)::int * 1000 as ms")).rows[0]?.ms;
+  (await pool.query<{ ms: number }>("select (extract(epoch from current_setting('statement_timeout')::interval) * 1000)::int as ms")).rows[0]?.ms;
 
 describe("database pools", () => {
   it("gives the API server's pool its connection and statement timeouts", async () => {
@@ -30,6 +30,10 @@ describe("database pools", () => {
     await expect(short.pool.query("select pg_sleep(1)")).rejects.toMatchObject({ code: "57014" });
   });
 
+  it("reads a short timeout in milliseconds", async () => {
+    expect(await statementTimeout(short.pool)).toBe(50);
+  });
+
   it("cancels a wait for a member lock that outlasts the timeout", async () => {
     const holder = await unlimited.pool.connect();
     try {
@@ -40,8 +44,13 @@ describe("database pools", () => {
         /canceling statement due to statement timeout/,
       );
     } finally {
-      await holder.query("rollback");
-      holder.release();
+      try {
+        await holder.query("rollback");
+      } finally {
+        holder.release();
+      }
     }
+    // Once the lock is free the same pool takes it, so the wait, not the statements around it, timed out.
+    await expect(withJournalLock(short.db, "user_locked", () => Promise.resolve("locked"))).resolves.toBe("locked");
   });
 });

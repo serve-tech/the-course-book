@@ -156,10 +156,14 @@ describe("authentication", () => {
       });
       const result = await t.get("/v1/me", { authorization: header });
       expectError(result, 401, "unauthenticated");
+      // Public operations too: a credential that cannot be checked is never ignored.
+      expectError(await t.get("/v1/client-config", { authorization: header }), 401, "unauthenticated");
       expect(calls).toBe(0);
-      expect(t.warnings).toEqual([
-        { message: "Session token rejected", detail: { requestId: result.headers.get("x-request-id"), reason: SessionRejection.NotBearer } },
-      ]);
+      expect(t.warnings).toHaveLength(2);
+      expect(t.warnings[0]).toEqual({
+        message: "Session token rejected",
+        detail: { requestId: result.headers.get("x-request-id"), reason: SessionRejection.NotBearer },
+      });
     },
   );
 

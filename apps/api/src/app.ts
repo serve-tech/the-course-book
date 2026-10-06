@@ -43,7 +43,9 @@ export interface RequestLog {
  * token, with plain fields. `error` takes a `LoggedError`, never the thrown
  * value, so a query's parameters or a Postgres error's row values cannot
  * reach the log (`loggableError`). `detail` carries fields such as the
- * request id, so every kind of line can be found by `requestId`.
+ * request id, so a request's lines can be found by `requestId`; it is
+ * omitted for process-level failures (an idle pool connection, the catalog
+ * warm-up, shutdown) that belong to no request.
  */
 export interface Logger {
   request(entry: RequestLog): void;

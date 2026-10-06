@@ -59,8 +59,9 @@ export interface ClerkVerifierOptions {
  *
  * Note:
  *     Call it only for an `Authorization: Bearer <token>` header
- *     (`isBearerHeader`). Without one, Clerk follows its cookie flow, which
- *     a bearer-only API never wants.
+ *     (`isBearerHeader`). Otherwise Clerk takes a bare value as a token and
+ *     follows its cookie flow for anything else, which a bearer-only API
+ *     never wants.
  */
 export function createClerkSessionVerifier(options: ClerkVerifierOptions): SessionVerifier {
   const clerk = createClerkClient({

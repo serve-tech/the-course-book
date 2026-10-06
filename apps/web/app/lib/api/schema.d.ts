@@ -927,7 +927,7 @@ export interface operations {
                     "application/json": components["schemas"]["ApiError"];
                 };
             };
-            /** @description The Clerk account cannot use the app: `username_invalid`. */
+            /** @description Not returned since account deletion stopped provisioning the member; kept so existing clients still compile. */
             403: {
                 headers: {
                     [name: string]: unknown;

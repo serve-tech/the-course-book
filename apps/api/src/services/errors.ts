@@ -1,10 +1,13 @@
 /**
- * Expected failures raised by server modules.
+ * Expected failures raised by server modules, and `causeChain`.
  *
  * Services throw `AppError` instead of framework responses so they stay
  * independent of the transport. The API's error handler (`http/errors.ts`)
  * maps `status` to the response status and exposes `code` so clients can
  * branch without parsing messages.
+ *
+ * The module imports nothing, so every layer may use it, `db/` included
+ * (`isUniqueViolation` walks the cause chain with `causeChain`).
  */
 
 /**

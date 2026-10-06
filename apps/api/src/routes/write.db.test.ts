@@ -277,20 +277,24 @@ describe("DELETE /v1/me", () => {
 
   /*
    * Clerk allows usernames the product rejects (4-64 characters, hyphens),
-   * so provisioning answers 403 `username_invalid`. Deletion must not
-   * depend on it: the member keeps the right to delete their account.
+   * so provisioning answers 403 `username_invalid`, and a username another
+   * member's row still holds is 409 `username_taken`. Deletion must not
+   * depend on provisioning: the member keeps the right to delete their
+   * account.
    */
   it.each([
-    ["with a member row from before the username changed", true],
-    ["with no member row", false],
-  ])("deletes an account whose Clerk username breaks the product rule, %s", async (_label, hasRow) => {
+    ["breaks the product rule, with a member row from before the username changed", true, "bad-name", 403],
+    ["breaks the product rule, with no member row", false, "bad-name", 403],
+    ["belongs to another member, with a member row from before the username changed", true, "taken_name", 409],
+  ])("deletes an account whose Clerk username %s", async (_label, hasRow, username, refused) => {
     const t = createTestApp(db);
+    await db.insert(users).values({ id: "user_2", username: "taken_name", displayName: "Holder" });
     if (hasRow) {
       await db.insert(users).values({ id: "user_1", username: "golfer_1", displayName: "Golfer", email: "golfer@example.com" });
       await logRounds(db, "user_1", { courseId: await seeded("usa1") }, 1);
     }
-    const auth = t.bearer("user_1", "bad-name");
-    expect((await t.get("/v1/me", auth)).status).toBe(403);
+    const auth = t.bearer("user_1", username);
+    expect((await t.get("/v1/me", auth)).status).toBe(refused);
 
     const response = await t.app.request("/v1/me", { method: "DELETE", headers: auth });
     expect(response.status).toBe(204);
@@ -299,6 +303,8 @@ describe("DELETE /v1/me", () => {
     const [row] = await db.select().from(users).where(eq(users.id, "user_1"));
     expect(row).toMatchObject({ displayName: "Deleted member", email: null });
     expect(row?.deletedAt).not.toBeNull();
+    const [holder] = await db.select().from(users).where(eq(users.id, "user_2"));
+    expect(holder).toMatchObject({ username: "taken_name", deletedAt: null });
   });
 });
 

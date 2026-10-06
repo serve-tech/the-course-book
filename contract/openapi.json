@@ -1365,7 +1365,7 @@
             }
           },
           "403": {
-            "description": "The Clerk account cannot use the app: `username_invalid`.",
+            "description": "Not returned since account deletion stopped provisioning the member; kept so existing clients still compile.",
             "content": {
               "application/json": {
                 "schema": {

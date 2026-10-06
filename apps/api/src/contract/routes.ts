@@ -508,7 +508,7 @@ export const deleteMe = createRoute({
   responses: {
     204: { description: "The account is deleted; sign the member out." },
     401: unauthenticated,
-    403: forbidden,
+    403: failure("Not returned since account deletion stopped provisioning the member; kept so existing clients still compile."),
     502: failure("The data is deleted but the sign-in account could not be: `account_deletion_incomplete`. Retry."),
   },
 });
