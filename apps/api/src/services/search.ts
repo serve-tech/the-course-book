@@ -1,13 +1,12 @@
 import type { Database } from "../db/client";
 import { normalizeName, type Course } from "@coursebook/domain/catalog/course";
-import { resolveAPICourse } from "../domain/identity";
+import { resolveSearchResults } from "../domain/course-search";
 import {
-  extractCourses,
+  extractCoursePage,
   matchesQuery,
   parseAPICourse,
   type RawCourse,
 } from "../domain/opengolf";
-import { searchScore } from "@coursebook/domain/catalog/ranking-selectors";
 import type { SearchResult } from "@coursebook/domain/catalog/search-results";
 import { allCourses } from "./catalog";
 import { searchEnv } from "./env";
@@ -30,12 +29,13 @@ export const SEARCH_UNAVAILABLE =
   "Course search is temporarily unavailable. Please try again.";
 
 const API_TIMEOUT_MS = 8_000;
+const UPSTREAM_PAGE_SIZE = 50;
 const CSV_TIMEOUT_MS = 15_000;
 
 /** Course search as the API uses it; injectable for tests. */
 export interface CourseSearch {
   /**
-   * Up to ten results for `query`, best first.
+   * All resolved matches for `query`, alphabetically by name, location, then id.
    *
    * Raises:
    *     Error: `SEARCH_UNAVAILABLE` (with the cause) when both sources fail,
@@ -71,41 +71,34 @@ export function createCourseSearch(deps: SearchDependencies): CourseSearch {
   };
 
   const endpoint = async (text: string, signal: AbortSignal): Promise<RawCourse[]> => {
-    const url = new URL(deps.apiUrl);
-    url.searchParams.set("q", text);
-    url.searchParams.set("limit", "50");
-    const response = await fetcher(url, {
-      headers: { Accept: "application/json" },
-      cache: "no-store",
-      signal: AbortSignal.any([signal, AbortSignal.timeout(API_TIMEOUT_MS)]),
-    });
-    if (!response.ok) throw new Error("OpenGolfAPI " + String(response.status));
-    return extractCourses(await response.json());
-  };
-
-  const build = (raw: RawCourse[], catalog: readonly Course[], text: string): SearchResult[] => {
-    const found = new Map<string, SearchResult>();
-    for (const record of raw) {
-      try {
-        const apiCourse = parseAPICourse(record);
-        const known = resolveAPICourse(catalog, apiCourse);
-        const course = known
-          ? {
-              ...known,
-              city: apiCourse.city || known.city,
-              state: apiCourse.state || known.state,
-              country: apiCourse.country || known.country,
-              location: apiCourse.location || known.location,
-            }
-          : apiCourse;
-        if (!found.has(course.id)) found.set(course.id, { course, display: course, catalogId: known?.id ?? null });
-      } catch (error) {
-        console.warn("Unable to parse OpenGolfAPI course result", error, record);
+    // One deadline for the whole discovery, not eight seconds per upstream page.
+    const requestSignal = AbortSignal.any([signal, AbortSignal.timeout(API_TIMEOUT_MS)]);
+    const rows: RawCourse[] = [];
+    const seenPages = new Set<string>();
+    for (;;) {
+      requestSignal.throwIfAborted();
+      const url = new URL(deps.apiUrl);
+      url.searchParams.set("q", text);
+      url.searchParams.set("limit", String(UPSTREAM_PAGE_SIZE));
+      url.searchParams.set("offset", String(rows.length));
+      const response = await fetcher(url, {
+        headers: { Accept: "application/json" },
+        cache: "no-store",
+        signal: requestSignal,
+      });
+      if (!response.ok) throw new Error("OpenGolfAPI " + String(response.status));
+      const page = extractCoursePage(await response.json());
+      requestSignal.throwIfAborted();
+      if (page.courses.length === 0) {
+        if (page.total !== null && rows.length < page.total) throw new Error("OpenGolfAPI returned an incomplete search");
+        return rows;
       }
+      const fingerprint = JSON.stringify(page.courses);
+      if (seenPages.has(fingerprint)) throw new Error("OpenGolfAPI repeated a search page");
+      seenPages.add(fingerprint);
+      rows.push(...page.courses);
+      if (page.total !== null ? rows.length >= page.total : page.courses.length < UPSTREAM_PAGE_SIZE) return rows;
     }
-    return [...found.values()]
-      .sort((a, b) => searchScore(b.course, text) - searchScore(a.course, text))
-      .slice(0, 10);
   };
 
   return {
@@ -128,7 +121,7 @@ export function createCourseSearch(deps: SearchDependencies): CourseSearch {
         console.warn("OpenGolfAPI REST course search failed; trying dataset fallback", error);
         try {
           const rows = await loadDataset(signal);
-          raw = rows.filter((row) => matchesQuery(row, text)).slice(0, 50);
+          raw = rows.filter((row) => matchesQuery(row, text));
         } catch (fallbackError) {
           signal.throwIfAborted();
           console.warn("OpenGolfAPI dataset fallback failed", fallbackError);
@@ -136,7 +129,17 @@ export function createCourseSearch(deps: SearchDependencies): CourseSearch {
         }
       }
       signal.throwIfAborted();
-      return build(raw, await deps.catalog(), text);
+      const courses = raw.flatMap((record) => {
+        try {
+          return [parseAPICourse(record)];
+        } catch (error) {
+          console.warn("Unable to parse OpenGolfAPI course result", error, record);
+          return [];
+        }
+      });
+      const catalog = await deps.catalog();
+      signal.throwIfAborted();
+      return resolveSearchResults(courses, catalog);
     },
   };
 }

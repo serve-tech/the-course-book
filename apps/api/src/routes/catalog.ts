@@ -1,3 +1,4 @@
+import { CourseSearchSource } from "@coursebook/domain/catalog/search-results";
 import { createHash } from "node:crypto";
 import type { OpenAPIHono } from "@hono/zod-openapi";
 import type { RankedCourse } from "@coursebook/domain/catalog/course";
@@ -11,6 +12,8 @@ import { etagMatches } from "../http/etag";
 import { publishedRankings } from "../services/catalog";
 import { AppError, ErrorCode } from "../services/errors";
 import { SEARCH_UNAVAILABLE } from "../services/search";
+import { pageSearchResults } from "../domain/course-search";
+import { searchCatalogCourses } from "../services/catalog-search";
 
 /**
  * The rankings body and its ETag, computed once per catalog snapshot. The
@@ -44,10 +47,15 @@ export function registerCatalogRoutes(app: OpenAPIHono<AppEnv>, deps: AppDepende
 
   app.openapi(guarded(searchCourses), async (c) => {
     await requireUser(c, deps.provisioner);
-    const { q } = c.req.valid("query");
+    const { q, page, source } = c.req.valid("query");
+    if (source !== CourseSearchSource.External) {
+      const paged = await searchCatalogCourses(deps.db, q, page ?? 1);
+      return c.json({ ...paged, results: paged.results.map(toSearchHit) }, 200);
+    }
     try {
       const results = await deps.search.search(q, c.req.raw.signal);
-      return c.json({ results: results.map(toSearchHit) }, 200);
+      const paged = pageSearchResults(results, page ?? 1);
+      return c.json({ ...paged, results: paged.results.map(toSearchHit) }, 200);
     } catch (error) {
       if (isAbort(error)) throw error;
       throw new AppError(503, ErrorCode.SearchUnavailable, SEARCH_UNAVAILABLE, { cause: error });

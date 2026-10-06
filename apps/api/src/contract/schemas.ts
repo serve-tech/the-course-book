@@ -1,3 +1,4 @@
+import { CourseSearchSource } from "@coursebook/domain/catalog/search-results";
 import { z } from "@hono/zod-openapi";
 import { ErrorCode } from "../services/errors";
 
@@ -123,7 +124,12 @@ export const SearchHitSchema = z
   .openapi("SearchHit");
 
 export const SearchResultsSchema = z
-  .object({ results: z.array(SearchHitSchema).openapi({ description: "At most 10, best match first." }) })
+  .object({
+    results: z.array(SearchHitSchema).openapi({ description: "At most 10, ordered alphabetically by course name, then location and id." }),
+    page: z.number().int().min(1).openapi({ description: "The requested page, starting at 1." }),
+    pageSize: z.number().int().min(1).openapi({ description: "Results per page (10)." }),
+    total: z.number().int().nonnegative().openapi({ description: "Total matching courses after catalog resolution and deduplication." }),
+  })
   .openapi("SearchResults");
 
 export const MemberSchema = z
@@ -425,10 +431,13 @@ export const UsernameParamsSchema = z.object({
 });
 
 export const SearchQuerySchema = z.object({
+  source: z.enum(CourseSearchSource).nullish().openapi({ param: { name: "source", in: "query" }, description: "Defaults to catalog (stored courses only). Request external explicitly to discover courses beyond the catalog." }),
+  page: z.coerce.number().int().min(1).max(2_147_483_647).nullish().openapi({ param: { name: "page", in: "query" }, description: "Page number, starting at 1. Defaults to 1; each page contains at most 10 hits." }),
   q: z
     .string()
     .trim()
     .min(2, "Enter at least two characters.")
+    .refine((query) => !query.includes("\0"), "Course search cannot contain a null character.")
     .openapi({ param: { name: "q", in: "query" }, description: "Course name, at least two characters." }),
 });
 
