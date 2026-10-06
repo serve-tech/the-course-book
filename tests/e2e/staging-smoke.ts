@@ -85,7 +85,11 @@ try {
   await page.goto(WEB + "/");
   await clerk.signIn({ page, emailAddress: email });
   await page.goto(WEB + "/");
-  await expect(page.locator("#authbar a")).toHaveAttribute("href", "/u/" + username, { timeout: 120_000 });
+  const accountMenu = page.locator("#authbar").getByRole("button", { name: /^Account menu for / });
+  await expect(accountMenu).toBeVisible({ timeout: 120_000 });
+  await accountMenu.click();
+  await expect(page.getByRole("menuitem", { name: "Profile" })).toHaveAttribute("href", "/u/" + username);
+  await page.keyboard.press("Escape");
 
   // Pebble Beach is in the seeded catalog; Pinehurst's first hit is not.
   for (const query of ["Pebble Beach", "Pinehurst"]) {

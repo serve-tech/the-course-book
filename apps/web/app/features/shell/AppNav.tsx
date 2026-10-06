@@ -1,7 +1,6 @@
 import { Link, NavLink } from "react-router";
 import { BrandMark } from "../../shared/ui/Brand";
-import { Avatar } from "../social/Avatar";
-import { AvatarSize } from "../social/sizes";
+import { AccountMenu } from "./AccountMenu";
 import { logPath, profilePath } from "../social/paths";
 import { cx } from "../../shared/lib/cx";
 import styles from "./nav.module.css";
@@ -23,10 +22,11 @@ interface NavProps {
 }
 
 /**
- * The top bar: brand, destinations (Home, Courses, Friends, Profile), Log a
- * round and the account: the member's avatar, linking to their profile, and
- * Sign out, or only Sign in when signed out. On phones the destinations move
- * to `TabBar`, which also carries Profile, so the avatar is hidden there.
+ * The top bar: brand, destinations (Home, Courses, Friends, Profile) and the
+ * account: the member's avatar, which opens the account menu (Profile,
+ * Account, Sign out), or Sign in when signed out. Logging a round lives on
+ * the pages (Ranking, course rows) and the phone tab bar, not here. On phones
+ * the destinations move to `TabBar`.
  */
 export function TopBar({ member, incomingRequests, onSignIn, onSignOut, onNavigate }: NavProps) {
   return (
@@ -62,22 +62,14 @@ export function TopBar({ member, incomingRequests, onSignIn, onSignOut, onNaviga
           </button>
         )}
       </nav>
-      <div className={styles.right}>
-        {member && (
-          <Link to={logPath(member.username)} className={styles.log} onClick={onNavigate}>
-            + Log a round
-          </Link>
-        )}
-        <div className={styles.account} id="authbar">
-          {member && (
-            <span className={styles.accountAvatar}>
-              <Avatar member={member} size={AvatarSize.Medium} link />
-            </span>
-          )}
-          <button type="button" className={styles.accountButton} id="authOpen" onClick={member ? onSignOut : onSignIn}>
-            {member ? "Sign out" : "Sign in"}
+      <div className={styles.right} id="authbar">
+        {member ? (
+          <AccountMenu member={member} onSignOut={onSignOut} onNavigate={onNavigate} />
+        ) : (
+          <button type="button" className={styles.accountButton} id="authOpen" onClick={onSignIn}>
+            Sign in
           </button>
-        </div>
+        )}
       </div>
     </header>
   );

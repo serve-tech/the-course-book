@@ -1,6 +1,6 @@
 /*
- * Application navigation: a sticky top bar (brand, destinations, Log and the
- * account) and, on phones, a bottom tab bar. The legacy stylesheet styles
+ * Application navigation: a sticky top bar (brand, destinations and the
+ * account menu) and, on phones, a bottom tab bar. The legacy stylesheet styles
  * bare `header` and `nav` elements, so these rules set every property the
  * layout relies on.
  */
@@ -76,27 +76,40 @@
 }
 
 .right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
-.log {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 38px;
-  padding: 0 15px;
-  border-radius: 9px;
-  border: 0;
-  background: var(--gold);
-  color: #1a1407;
-  font: 800 13.5px "DM Sans", Arial, sans-serif;
-  text-decoration: none;
-  cursor: pointer;
-  white-space: nowrap;
+/* The account menu: the avatar opens Profile, Account and Sign out. */
+.accountMenu { position: relative; display: flex; }
+.avatarButton { padding: 0; border: 0; border-radius: 50%; background: none; cursor: pointer; }
+.avatarButton:hover > span, .avatarButton[aria-expanded="true"] > span { border-color: var(--gold); }
+.avatarButton:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 10px);
+  z-index: 45;
+  width: 220px;
+  padding: 6px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: #10281c;
+  box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.9);
 }
-.log:hover { background: #d4b97c; }
-.log:focus-visible { outline: 2px solid var(--cream); outline-offset: 2px; }
-.account { display: flex; align-items: center; gap: 10px; }
-.accountAvatar { display: flex; }
-.accountAvatar a:hover { border-color: var(--gold); }
-.accountAvatar a:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.menuHeader { display: grid; gap: 2px; padding: 8px 10px 10px; margin-bottom: 4px; border-bottom: 1px solid var(--line); }
+.menuHeader b { color: var(--cream); font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.menuHeader span { color: var(--muted); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.menuItem {
+  display: block;
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #cfd3cb;
+  text-align: left;
+  text-decoration: none;
+  font: 600 14px "DM Sans", Arial, sans-serif;
+  cursor: pointer;
+}
+.menuItem:hover, .menuItem:focus-visible { background: rgba(255, 255, 255, 0.06); color: var(--cream); outline: none; }
 .accountButton {
   height: 34px;
   padding: 0 13px;
@@ -134,7 +147,7 @@
   .topbar { height: 56px; gap: 12px; padding: 0 16px; padding-top: env(safe-area-inset-top, 0px); }
   .brandLink b { font-size: 18px; }
   .brandLink :global(.mark) { width: 30px; height: 30px; }
-  .links, .log, .accountAvatar { display: none; }
+  .links { display: none; }
   .main { padding: 20px 16px 40px; }
   /* Room for the fixed tab bar below everything, the footer's links included. */
   .shell { padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
