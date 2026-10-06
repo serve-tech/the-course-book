@@ -56,9 +56,9 @@ export function registerCatalogRoutes(app: OpenAPIHono<AppEnv>, deps: AppDepende
       return c.json({ ...paged, results: paged.results.map(toSearchHit) }, 200);
     } catch (error) {
       // A cancelled request lands here too, with its abort reason (a string
-      // from @hono/node-server). Wrap it all the same: Hono passes only Errors
-      // to the error handler, which then sees the aborted request and does
-      // not report it as a server error.
+      // from @hono/node-server). Wrap it all the same, keeping it as the
+      // cause: Hono passes only Errors to the error handler, which finds the
+      // reason in the cause chain (isCancellation) and does not log it.
       throw new AppError(503, ErrorCode.SearchUnavailable, SEARCH_UNAVAILABLE, { cause: error });
     }
   });

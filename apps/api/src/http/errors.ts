@@ -67,6 +67,27 @@ export const CLIENT_CLOSED_REQUEST = 499;
 export type ErrorLog = (message: string, error: LoggedError, detail: { requestId: string }) => void;
 
 /**
+ * Whether a failure is the cancellation of its request.
+ *
+ * @hono/node-server aborts a request's signal when the client goes away:
+ * with the string "Client connection prematurely closed.", or, when the
+ * incoming stream failed, with that stream error's text (`String(error)`,
+ * e.g. "Error: aborted"). Whatever was waiting on the signal or the body
+ * then fails with the reason itself or with the stream error.
+ *
+ * Args:
+ *     error: The failure.
+ *     reason: The aborted signal's reason.
+ *
+ * Returns:
+ *     True when the reason, or an error whose text it is, is in the
+ *     failure's cause chain.
+ */
+export function isCancellation(error: unknown, reason: unknown): boolean {
+  return causeChain(error).some((link) => link === reason || (link instanceof Error && String(link) === reason));
+}
+
+/**
  * The log message for a failure the server must report, or null for an
  * expected client error (4xx), which is traffic rather than a fault.
  */
@@ -101,7 +122,7 @@ export function errorHandler(log: ErrorLog): ErrorHandler<AppEnv> {
   return (error, c) => {
     const failure = serverFailure(error);
     const { signal } = c.req.raw;
-    const cancellation = signal.aborted && causeChain(error).includes(signal.reason);
+    const cancellation = signal.aborted && isCancellation(error, signal.reason);
     if (failure && !cancellation) log(failure, loggableError(error), { requestId: c.get("requestId") });
     if (signal.aborted) return new Response(null, { status: CLIENT_CLOSED_REQUEST });
     if (error instanceof AppError) return c.json(errorBody(c, error.code, error.message), error.status);
