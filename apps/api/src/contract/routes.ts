@@ -60,6 +60,7 @@ const json = <T extends z.ZodType>(schema: T, description: string) => ({
 const failure = (description: string) => json(ApiErrorSchema, description);
 const unauthenticated = failure("No valid session: `unauthenticated`, or `account_deleted` after the account was deleted.");
 const forbidden = failure("The Clerk account cannot use the app: `username_invalid`.");
+const usernameTaken = failure("Another member holds the Clerk account's username: `username_taken`. Choose a different username.");
 const invalid = failure("Invalid parameters: `validation_failed`.");
 const invalidBody = failure(
   "Invalid body: `validation_failed`, `us_state_required`, or `bad_request` for unreadable JSON. " +
@@ -76,7 +77,7 @@ export const getMe = createRoute({
   tags: ["Account"],
   summary: "The signed-in member",
   security: MEMBER,
-  responses: { 200: json(MeSchema, "The member."), 401: unauthenticated, 403: forbidden },
+  responses: { 200: json(MeSchema, "The member."), 401: unauthenticated, 403: forbidden, 409: usernameTaken },
 });
 
 export const listMyCourses = createRoute({
@@ -86,7 +87,7 @@ export const listMyCourses = createRoute({
   tags: ["My List"],
   summary: "The signed-in member's list in personal rank order",
   security: MEMBER,
-  responses: { 200: json(MyCoursesSchema, "The list."), 401: unauthenticated, 403: forbidden },
+  responses: { 200: json(MyCoursesSchema, "The list."), 401: unauthenticated, 403: forbidden, 409: usernameTaken },
 });
 
 export const listMyCourseRounds = createRoute({
@@ -98,7 +99,7 @@ export const listMyCourseRounds = createRoute({
   description: "A course that is not on the member's list has no rounds.",
   security: MEMBER,
   request: { params: CourseIdParamsSchema },
-  responses: { 200: json(RoundsSchema, "The rounds."), 400: invalid, 401: unauthenticated, 403: forbidden },
+  responses: { 200: json(RoundsSchema, "The rounds."), 400: invalid, 401: unauthenticated, 403: forbidden, 409: usernameTaken },
 });
 
 export const listRankings = createRoute({
@@ -131,6 +132,7 @@ export const searchCourses = createRoute({
     400: invalid,
     401: unauthenticated,
     403: forbidden,
+    409: usernameTaken,
     503: failure("Course discovery is unavailable: `search_unavailable`. Retry later."),
   },
 });
@@ -144,7 +146,7 @@ export const listMembers = createRoute({
   description: "Only accepted friends are listed; pending requests are in `listFriendRequests`.",
   security: MEMBER,
   request: { query: MembersQuerySchema },
-  responses: { 200: json(MembersSchema, "One page of members."), 400: invalid, 401: unauthenticated, 403: forbidden },
+  responses: { 200: json(MembersSchema, "One page of members."), 400: invalid, 401: unauthenticated, 403: forbidden, 409: usernameTaken },
 });
 
 export const getMemberList = createRoute({
@@ -161,6 +163,7 @@ export const getMemberList = createRoute({
     401: unauthenticated,
     403: forbidden,
     404: failure("No such member, or not a friend: `member_not_found`."),
+    409: usernameTaken,
   },
 });
 
@@ -178,7 +181,7 @@ export const getMemberProfile = createRoute({
     "A member who is not a friend is indistinguishable from no member.",
   security: MEMBER,
   request: { params: UsernameParamsSchema },
-  responses: { 200: json(ProfileSchema, "The profile."), 401: unauthenticated, 403: forbidden, 404: notVisible },
+  responses: { 200: json(ProfileSchema, "The profile."), 401: unauthenticated, 403: forbidden, 404: notVisible, 409: usernameTaken },
 });
 
 export const listMemberRounds = createRoute({
@@ -190,7 +193,7 @@ export const listMemberRounds = createRoute({
   description: "Newest played first; undated rounds last. Dates and courses only.",
   security: MEMBER,
   request: { params: UsernameParamsSchema, query: PageQuerySchema },
-  responses: { 200: json(TimelineSchema, "One page of rounds."), 400: invalidCursor, 401: unauthenticated, 403: forbidden, 404: notVisible },
+  responses: { 200: json(TimelineSchema, "One page of rounds."), 400: invalidCursor, 401: unauthenticated, 403: forbidden, 404: notVisible, 409: usernameTaken },
 });
 
 export const listWantToPlay = createRoute({
@@ -202,7 +205,7 @@ export const listWantToPlay = createRoute({
   description: "Newest first. A member who is not a friend is indistinguishable from no member.",
   security: MEMBER,
   request: { params: UsernameParamsSchema },
-  responses: { 200: json(WantToPlaySchema, "The Want to play list."), 401: unauthenticated, 403: forbidden, 404: notVisible },
+  responses: { 200: json(WantToPlaySchema, "The Want to play list."), 401: unauthenticated, 403: forbidden, 404: notVisible, 409: usernameTaken },
 });
 
 export const listTopLists = createRoute({
@@ -212,7 +215,7 @@ export const listTopLists = createRoute({
   tags: ["Top Lists"],
   summary: "Every published list with the member's progress and their friends'",
   security: MEMBER,
-  responses: { 200: json(TopListsSchema, "Every list, national first."), 401: unauthenticated, 403: forbidden },
+  responses: { 200: json(TopListsSchema, "Every list, national first."), 401: unauthenticated, 403: forbidden, 409: usernameTaken },
 });
 
 export const getTopList = createRoute({
@@ -229,6 +232,7 @@ export const getTopList = createRoute({
     401: unauthenticated,
     403: forbidden,
     404: failure("No published list with that type and scope: `top_list_not_found`."),
+    409: usernameTaken,
   },
 });
 
@@ -241,7 +245,7 @@ export const getFeed = createRoute({
   description: "Rounds logged long after they were played are collapsed into one backfill item per friend and day.",
   security: MEMBER,
   request: { query: PageQuerySchema },
-  responses: { 200: json(FeedSchema, "One page of the feed."), 400: invalidCursor, 401: unauthenticated, 403: forbidden },
+  responses: { 200: json(FeedSchema, "One page of the feed."), 400: invalidCursor, 401: unauthenticated, 403: forbidden, 409: usernameTaken },
 });
 
 export const searchMembers = createRoute({
@@ -258,6 +262,7 @@ export const searchMembers = createRoute({
     400: invalid,
     401: unauthenticated,
     403: forbidden,
+    409: usernameTaken,
   },
 });
 
@@ -268,7 +273,7 @@ export const listFriendRequests = createRoute({
   tags: ["Members"],
   summary: "The member's pending friend requests, incoming and outgoing",
   security: MEMBER,
-  responses: { 200: json(FriendRequestsSchema, "Pending requests."), 401: unauthenticated, 403: forbidden },
+  responses: { 200: json(FriendRequestsSchema, "Pending requests."), 401: unauthenticated, 403: forbidden, 409: usernameTaken },
 });
 
 export const befriendMember = createRoute({
@@ -288,6 +293,7 @@ export const befriendMember = createRoute({
     401: unauthenticated,
     403: forbidden,
     404: failure("No such member: `member_not_found`."),
+    409: usernameTaken,
   },
 });
 
@@ -304,6 +310,7 @@ export const removeFriend = createRoute({
     401: unauthenticated,
     403: forbidden,
     404: failure("No such member: `member_not_found`; nothing between the two: `friendship_not_found`."),
+    409: usernameTaken,
   },
 });
 
@@ -334,6 +341,7 @@ export const addToList = createRoute({
     401: unauthenticated,
     403: forbidden,
     404: failure("No such catalog course: `course_not_found`."),
+    409: usernameTaken,
   },
 });
 
@@ -349,7 +357,7 @@ export const addCourse = createRoute({
     "retrying after a lost response logs the rounds again.",
   security: MEMBER,
   request: jsonBody(AddCourseRequestSchema),
-  responses: { 200: json(AddedCourseSchema, "The course and the updated list."), 400: invalidBody, 401: unauthenticated, 403: forbidden },
+  responses: { 200: json(AddedCourseSchema, "The course and the updated list."), 400: invalidBody, 401: unauthenticated, 403: forbidden, 409: usernameTaken },
 });
 
 export const logRounds = createRoute({
@@ -367,6 +375,7 @@ export const logRounds = createRoute({
     401: unauthenticated,
     403: forbidden,
     404: failure("No such catalog course: `course_not_found`."),
+    409: usernameTaken,
   },
 });
 
@@ -385,6 +394,7 @@ export const moveCourse = createRoute({
     401: unauthenticated,
     403: forbidden,
     404: failure("The course is not on the list: `not_on_list`."),
+    409: usernameTaken,
   },
 });
 
@@ -403,6 +413,7 @@ export const setPlayCount = createRoute({
     401: unauthenticated,
     403: forbidden,
     404: failure("The course is not on the list: `not_on_list`."),
+    409: usernameTaken,
   },
 });
 
@@ -421,6 +432,7 @@ export const removeCourse = createRoute({
     401: unauthenticated,
     403: forbidden,
     404: failure("The course is not on the list: `not_on_list`."),
+    409: usernameTaken,
   },
 });
 
@@ -439,6 +451,7 @@ export const deleteRound = createRoute({
     401: unauthenticated,
     403: forbidden,
     404: failure("No such round: `round_not_found`."),
+    409: usernameTaken,
   },
 });
 
@@ -459,6 +472,7 @@ export const addWantToPlay = createRoute({
     401: unauthenticated,
     403: forbidden,
     404: failure("No such catalog course: `course_not_found`."),
+    409: usernameTaken,
   },
 });
 
@@ -476,6 +490,7 @@ export const removeWantToPlay = createRoute({
     400: invalid,
     401: unauthenticated,
     403: forbidden,
+    409: usernameTaken,
   },
 });
 

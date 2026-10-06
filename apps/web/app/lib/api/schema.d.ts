@@ -466,7 +466,7 @@ export interface components {
         };
         ApiErrorBody: {
             /**
-             * @description Stable machine-readable code. Current values: bad_request, validation_failed, us_state_required, unauthenticated, account_deleted, username_invalid, not_found, course_not_found, not_on_list, round_not_found, member_not_found, friendship_not_found, top_list_not_found, payload_too_large, unsupported_media_type, account_deletion_incomplete, search_unavailable, internal. New codes may appear; treat unknown codes by HTTP status.
+             * @description Stable machine-readable code. Current values: bad_request, validation_failed, us_state_required, unauthenticated, account_deleted, username_invalid, username_taken, not_found, course_not_found, not_on_list, round_not_found, member_not_found, friendship_not_found, top_list_not_found, payload_too_large, unsupported_media_type, account_deletion_incomplete, search_unavailable, internal. New codes may appear; treat unknown codes by HTTP status.
              * @example not_on_list
              */
             code: string;
@@ -891,6 +891,15 @@ export interface operations {
                     "application/json": components["schemas"]["ApiError"];
                 };
             };
+            /** @description Another member holds the Clerk account's username: `username_taken`. Choose a different username. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
         };
     };
     deleteMe: {
@@ -974,6 +983,15 @@ export interface operations {
                     "application/json": components["schemas"]["ApiError"];
                 };
             };
+            /** @description Another member holds the Clerk account's username: `username_taken`. Choose a different username. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
         };
     };
     addCourse: {
@@ -1025,6 +1043,15 @@ export interface operations {
                     "application/json": components["schemas"]["ApiError"];
                 };
             };
+            /** @description Another member holds the Clerk account's username: `username_taken`. Choose a different username. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
         };
     };
     listMyCourseRounds: {
@@ -1067,6 +1094,15 @@ export interface operations {
             };
             /** @description The Clerk account cannot use the app: `username_invalid`. */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Another member holds the Clerk account's username: `username_taken`. Choose a different username. */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1136,6 +1172,15 @@ export interface operations {
                     "application/json": components["schemas"]["ApiError"];
                 };
             };
+            /** @description Another member holds the Clerk account's username: `username_taken`. Choose a different username. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
         };
     };
     addToList: {
@@ -1198,6 +1243,15 @@ export interface operations {
                     "application/json": components["schemas"]["ApiError"];
                 };
             };
+            /** @description Another member holds the Clerk account's username: `username_taken`. Choose a different username. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
         };
     };
     removeCourse: {
@@ -1249,6 +1303,15 @@ export interface operations {
             };
             /** @description The course is not on the list: `not_on_list`. */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Another member holds the Clerk account's username: `username_taken`. Choose a different username. */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1318,6 +1381,15 @@ export interface operations {
                     "application/json": components["schemas"]["ApiError"];
                 };
             };
+            /** @description Another member holds the Clerk account's username: `username_taken`. Choose a different username. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
         };
     };
     setPlayCount: {
@@ -1380,6 +1452,15 @@ export interface operations {
                     "application/json": components["schemas"]["ApiError"];
                 };
             };
+            /** @description Another member holds the Clerk account's username: `username_taken`. Choose a different username. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
         };
     };
     deleteRound: {
@@ -1431,6 +1512,15 @@ export interface operations {
             };
             /** @description No such round: `round_not_found`. */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Another member holds the Clerk account's username: `username_taken`. Choose a different username. */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1519,6 +1609,15 @@ export interface operations {
                     "application/json": components["schemas"]["ApiError"];
                 };
             };
+            /** @description Another member holds the Clerk account's username: `username_taken`. Choose a different username. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
             /** @description Course discovery is unavailable: `search_unavailable`. Retry later. */
             503: {
                 headers: {
@@ -1579,6 +1678,15 @@ export interface operations {
                     "application/json": components["schemas"]["ApiError"];
                 };
             };
+            /** @description Another member holds the Clerk account's username: `username_taken`. Choose a different username. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
         };
     };
     getMemberList: {
@@ -1628,6 +1736,15 @@ export interface operations {
                     "application/json": components["schemas"]["ApiError"];
                 };
             };
+            /** @description Another member holds the Clerk account's username: `username_taken`. Choose a different username. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
         };
     };
     getMemberProfile: {
@@ -1670,6 +1787,15 @@ export interface operations {
             };
             /** @description No such member, or not a friend: `member_not_found`. */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Another member holds the Clerk account's username: `username_taken`. Choose a different username. */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1740,6 +1866,15 @@ export interface operations {
                     "application/json": components["schemas"]["ApiError"];
                 };
             };
+            /** @description Another member holds the Clerk account's username: `username_taken`. Choose a different username. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
         };
     };
     searchMembers: {
@@ -1790,6 +1925,15 @@ export interface operations {
                     "application/json": components["schemas"]["ApiError"];
                 };
             };
+            /** @description Another member holds the Clerk account's username: `username_taken`. Choose a different username. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
         };
     };
     listFriendRequests: {
@@ -1821,6 +1965,15 @@ export interface operations {
             };
             /** @description The Clerk account cannot use the app: `username_invalid`. */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Another member holds the Clerk account's username: `username_taken`. Choose a different username. */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1886,6 +2039,15 @@ export interface operations {
                     "application/json": components["schemas"]["ApiError"];
                 };
             };
+            /** @description Another member holds the Clerk account's username: `username_taken`. Choose a different username. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
         };
     };
     removeFriend: {
@@ -1926,6 +2088,15 @@ export interface operations {
             };
             /** @description No such member: `member_not_found`; nothing between the two: `friendship_not_found`. */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Another member holds the Clerk account's username: `username_taken`. Choose a different username. */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1975,6 +2146,15 @@ export interface operations {
             };
             /** @description No such member, or not a friend: `member_not_found`. */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Another member holds the Clerk account's username: `username_taken`. Choose a different username. */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2040,6 +2220,15 @@ export interface operations {
                     "application/json": components["schemas"]["ApiError"];
                 };
             };
+            /** @description Another member holds the Clerk account's username: `username_taken`. Choose a different username. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
         };
     };
     removeWantToPlay: {
@@ -2089,6 +2278,15 @@ export interface operations {
                     "application/json": components["schemas"]["ApiError"];
                 };
             };
+            /** @description Another member holds the Clerk account's username: `username_taken`. Choose a different username. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
         };
     };
     listTopLists: {
@@ -2120,6 +2318,15 @@ export interface operations {
             };
             /** @description The Clerk account cannot use the app: `username_invalid`. */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Another member holds the Clerk account's username: `username_taken`. Choose a different username. */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2177,6 +2384,15 @@ export interface operations {
                     "application/json": components["schemas"]["ApiError"];
                 };
             };
+            /** @description Another member holds the Clerk account's username: `username_taken`. Choose a different username. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
         };
     };
     getFeed: {
@@ -2222,6 +2438,15 @@ export interface operations {
             };
             /** @description The Clerk account cannot use the app: `username_invalid`. */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Another member holds the Clerk account's username: `username_taken`. Choose a different username. */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

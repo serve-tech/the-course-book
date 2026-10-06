@@ -21,6 +21,7 @@ export enum ErrorCode {
   Unauthenticated = "unauthenticated",
   AccountDeleted = "account_deleted",
   UsernameInvalid = "username_invalid",
+  UsernameTaken = "username_taken",
   NotFound = "not_found",
   CourseNotFound = "course_not_found",
   NotOnList = "not_on_list",

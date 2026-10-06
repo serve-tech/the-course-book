@@ -25,6 +25,7 @@ Every failure returns:
 | 401 | `unauthenticated`, `account_deleted` |
 | 403 | `username_invalid` |
 | 404 | `not_found`, `course_not_found`, `not_on_list`, `round_not_found`, `member_not_found`, `friendship_not_found`, `top_list_not_found` |
+| 409 | `username_taken` (another member holds the Clerk account's username; choose a different one) |
 | 413 | `payload_too_large` |
 | 415 | `unsupported_media_type` |
 | 500 | `internal` |

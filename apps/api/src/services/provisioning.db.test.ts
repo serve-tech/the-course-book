@@ -3,7 +3,7 @@ import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { users } from "../db/schema";
 import { resetMemberData, testDatabase } from "../test/db";
 import { ErrorCode } from "./errors";
-import { provisionUser } from "./provisioning";
+import { provisionUser, USERNAME_TAKEN } from "./provisioning";
 
 const { db, pool } = testDatabase();
 
@@ -48,6 +48,24 @@ describe("user provisioning", () => {
   it("falls back to the username as display name", async () => {
     const user = await provisionUser(db, "user_1", { ...identity, displayName: "  " });
     expect(user.displayName).toBe("golfer_1");
+  });
+
+  it.each([
+    ["the same spelling", "golfer_1"],
+    ["another case", "GOLFER_1"],
+  ])("answers 409 username_taken when another member holds the username in %s", async (_label, username) => {
+    await provisionUser(db, "user_1", identity);
+    await expect(provisionUser(db, "user_2", { ...identity, username, email: "second@example.com" })).rejects.toMatchObject({
+      status: 409,
+      code: ErrorCode.UsernameTaken,
+      message: USERNAME_TAKEN,
+    });
+    expect(await db.select({ id: users.id }).from(users)).toEqual([{ id: "user_1" }]);
+  });
+
+  it("lets a member keep their own username in another case", async () => {
+    await provisionUser(db, "user_1", identity);
+    expect(await provisionUser(db, "user_1", { ...identity, username: "Golfer_1" })).toMatchObject({ username: "Golfer_1" });
   });
 
   it("rejects usernames outside the product rule with a 403 AppError", async () => {

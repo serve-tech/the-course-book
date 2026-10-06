@@ -159,6 +159,14 @@ describe("authentication", () => {
     expect((await t.get("/v1/me", t.bearer("user_2", "golfer_2"))).status).toBe(200);
   });
 
+  it("answers 409 username_taken, unlogged, when another member holds the username", async () => {
+    const t = createTestApp(db);
+    expect((await t.get("/v1/me", t.bearer("user_1", "golfer_1"))).status).toBe(200);
+    const error = expectError(await t.get("/v1/me", t.bearer("user_2", "GOLFER_1")), 409, "username_taken");
+    expect(error.message).toBe("That username belongs to another member. Please choose a different username.");
+    expect(t.errors).toEqual([]);
+  });
+
   it("refuses accounts whose username breaks the product rule", async () => {
     const t = createTestApp(db);
     expectError(await t.get("/v1/me", t.bearer("user_1", "bad-name")), 403, "username_invalid");
