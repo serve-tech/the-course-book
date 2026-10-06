@@ -70,7 +70,7 @@ A bug fix needs a regression that would fail with the bug present.
 
 ## Live checks
 
-Do not sign into production or create/delete real records as part of an automated test. `pnpm smoke:staging` ([staging-smoke.ts](../tests/e2e/staging-smoke.ts)) runs the main signed-in flows against the deployed staging site with a throwaway Clerk development-instance user and refuses any key other than a development one (`sk_test_`); an interrupted run deletes its account through the API before deleting the Clerk user, so no orphan member row is left. Local development uses the docker-compose database and a Clerk development instance. A live production check needs explicit authorization, a defined account and an agreed cleanup plan.
+Do not sign into production or create or delete real records as part of an automated test. There is no staging environment: verification happens in CI (`verify`, `browser` and `docker`, which run the real API image, the static web app, Postgres and a Clerk development instance) and locally (`pnpm dev` and `pnpm test:e2e`, using the docker-compose database and a Clerk development instance); see the [decision record](../.planning/decisions/2026-10-06-test-in-ci-and-locally-not-against-production.md). A live check against production needs explicit maintainer authorization, a defined account and an agreed cleanup plan.
 
 ## CI and handoff
 

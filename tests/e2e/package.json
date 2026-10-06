@@ -6,7 +6,6 @@
   "description": "Playwright user flows against the built web app, the test database, an OpenGolfAPI stub and a Clerk development instance.",
   "scripts": {
     "test": "playwright test",
-    "smoke:staging": "tsx staging-smoke.ts",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
