@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { createApp } from "../app";
+import { SessionRejection } from "../auth/session";
 import { createDatabase } from "../db/client";
 import { contractDocument } from "./emit";
 
@@ -55,7 +56,7 @@ describe("published contract", () => {
   it("is served unchanged at /v1/openapi.json", async () => {
     const app = createApp({
       db: createDatabase("postgres://contract@127.0.0.1:1/contract").db,
-      verifySession: () => Promise.resolve({ ok: false, reason: "unused" }),
+      verifySession: () => Promise.resolve({ ok: false, reason: SessionRejection.NoActiveSession }),
       provisioner: { resolve: () => Promise.reject(new Error("unused")), forget: () => undefined },
       accounts: { deleteUser: () => Promise.reject(new Error("unused")) },
       search: { search: () => Promise.resolve([]) },
@@ -95,7 +96,7 @@ describe("published contract", () => {
   it("rejects every secured operation without a token", async () => {
     const app = createApp({
       db: createDatabase("postgres://contract@127.0.0.1:1/contract").db,
-      verifySession: () => Promise.resolve({ ok: false, reason: "unused" }),
+      verifySession: () => Promise.resolve({ ok: false, reason: SessionRejection.NoActiveSession }),
       provisioner: { resolve: () => Promise.reject(new Error("must not be reached")), forget: () => undefined },
       accounts: { deleteUser: () => Promise.reject(new Error("must not be reached")) },
       search: { search: () => Promise.reject(new Error("must not be reached")) },

@@ -21,13 +21,14 @@ export enum SessionRejection {
 /**
  * The outcome of verifying a request's token.
  *
- * A rejection carries the reason only: Clerk's `AuthErrorReason` or
- * `TokenVerificationErrorReason` (for example `token-invalid-signature`,
- * `jwk-kid-mismatch`, or `session-token-expired-…` for an expired token) or
- * a `SessionRejection`,
- * and `azp` when that claim was the reason. It never carries the token or
- * other claims, and not Clerk's message either, which can quote claim
- * values.
+ * A rejection carries its reason and, only when the `azp` claim was the
+ * reason, that claim. The reason is a `SessionRejection` or Clerk's reason
+ * (`token-invalid-signature`, `jwk-kid-mismatch`, …). Clerk declares its
+ * reasons as literal unions but composes values outside them, e.g.
+ * `session-token-expired-refresh-non-eligible-no-refresh-cookie` for an
+ * expired token, so `reason` is typed as the string it really is. A
+ * rejection never carries the token, other claims or Clerk's message, which
+ * can quote claim values.
  */
 export type SessionVerification =
   | { ok: true; session: VerifiedSession }
@@ -57,8 +58,9 @@ export interface ClerkVerifierOptions {
  * native tokens without `azp` are accepted.
  *
  * Note:
- *     Call it only when an Authorization header is present. Without one,
- *     Clerk follows its cookie flow, which a bearer-only API never wants.
+ *     Call it only for an `Authorization: Bearer <token>` header
+ *     (`isBearerHeader`). Without one, Clerk follows its cookie flow, which
+ *     a bearer-only API never wants.
  */
 export function createClerkSessionVerifier(options: ClerkVerifierOptions): SessionVerifier {
   const clerk = createClerkClient({

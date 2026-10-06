@@ -74,8 +74,10 @@ export const memberOnly: MiddlewareHandler<AppEnv> = async (c, next) => {
  * The signed-in member for a secured operation, provisioned on first use.
  *
  * Raises:
- *     AppError: 401 `unauthenticated` for anonymous requests; 403
- *         `username_invalid` when the Clerk username breaks the product rule.
+ *     AppError: 401 `unauthenticated` for anonymous requests; 401
+ *         `account_deleted` after the account was deleted; 403
+ *         `username_invalid` when the Clerk username breaks the product
+ *         rule; 409 `username_taken` when another member holds the username.
  */
 export async function requireUser(c: Context<AppEnv>, provisioner: Provisioner): Promise<AppUser> {
   const session = c.get("session");
