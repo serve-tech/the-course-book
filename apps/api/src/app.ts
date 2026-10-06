@@ -42,12 +42,13 @@ export interface RequestLog {
  * `warn` reports expected but noteworthy events, such as a rejected session
  * token, with plain fields. `error` takes a `LoggedError`, never the thrown
  * value, so a query's parameters or a Postgres error's row values cannot
- * reach the log (`loggableError`).
+ * reach the log (`loggableError`). `detail` carries fields such as the
+ * request id, so every kind of line can be found by `requestId`.
  */
 export interface Logger {
   request(entry: RequestLog): void;
   warn(message: string, detail: Record<string, unknown>): void;
-  error(message: string, error: LoggedError): void;
+  error(message: string, error: LoggedError, detail?: Record<string, unknown>): void;
 }
 
 /** Everything the API needs from the outside; tests pass fakes for Clerk and search. */
@@ -64,16 +65,19 @@ export interface AppDependencies {
   logger?: Logger;
 }
 
-/** One JSON line per entry, for Render's log stream. */
+/**
+ * One JSON line per entry, for Render's log stream. `level` and `message`
+ * come last, so a detail field cannot replace them.
+ */
 export const consoleLogger: Logger = {
   request: (entry) => {
     console.log(JSON.stringify(entry));
   },
   warn: (message, detail) => {
-    console.warn(JSON.stringify({ level: "warn", message, ...detail }));
+    console.warn(JSON.stringify({ ...detail, level: "warn", message }));
   },
-  error: (message, error) => {
-    console.error(JSON.stringify({ level: "error", message, error }));
+  error: (message, error, detail = {}) => {
+    console.error(JSON.stringify({ ...detail, level: "error", message, error }));
   },
 };
 
@@ -120,14 +124,11 @@ const noStore: MiddlewareHandler<AppEnv> = async (c, next) => {
  *
  * Middleware order matters: request id, logging and security headers wrap
  * everything; CORS answers preflights before authentication; the body limit
- * and session checks apply to `/v1` only. `/healthz` stays outside `/v1`, unlogged, for
- * Render's frequent probes.
+ * and session checks apply to `/v1` only. `/healthz` stays outside `/v1`,
+ * unlogged, for Render's frequent probes.
  */
 export function createApp(deps: AppDependencies): OpenAPIHono<AppEnv> {
   const logger = deps.logger ?? consoleLogger;
-  const logError = (message: string, error: unknown) => {
-    logger.error(message, loggableError(error));
-  };
   const app = new OpenAPIHono<AppEnv>({ defaultHook: validationHook });
 
   app.use("*", serverRequestId);
@@ -178,7 +179,7 @@ export function createApp(deps: AppDependencies): OpenAPIHono<AppEnv> {
       await checkDatabase(deps.db);
       return c.json({ ok: true });
     } catch (error) {
-      logError("Health check failed", error);
+      logger.error("Health check failed", loggableError(error), { requestId: c.get("requestId") });
       return c.json({ ok: false }, 503);
     }
   });
@@ -201,6 +202,10 @@ export function createApp(deps: AppDependencies): OpenAPIHono<AppEnv> {
   app.doc("/v1/openapi.json", documentConfig);
 
   app.notFound(notFoundHandler);
-  app.onError(errorHandler(logError));
+  app.onError(
+    errorHandler((message, error, detail) => {
+      logger.error(message, error, detail);
+    }),
+  );
   return app;
 }

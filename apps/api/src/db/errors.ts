@@ -1,10 +1,8 @@
 import pg from "pg";
+import { causeChain } from "../services/errors";
 
 /** Postgres SQLSTATE `unique_violation`. */
 const UNIQUE_VIOLATION = "23505";
-
-/** Causes deeper than this are not searched, which also ends a cyclic chain. */
-const MAX_DEPTH = 8;
 
 /**
  * Whether a failure is a unique violation of one constraint or index.
@@ -23,10 +21,7 @@ const MAX_DEPTH = 8;
  *     names `constraint`.
  */
 export function isUniqueViolation(error: unknown, constraint: string): boolean {
-  let current = error;
-  for (let depth = 0; current instanceof Error && depth <= MAX_DEPTH; depth += 1) {
-    if (current instanceof pg.DatabaseError && current.code === UNIQUE_VIOLATION && current.constraint === constraint) return true;
-    current = current.cause;
-  }
-  return false;
+  return causeChain(error).some(
+    (link) => link instanceof pg.DatabaseError && link.code === UNIQUE_VIOLATION && link.constraint === constraint,
+  );
 }

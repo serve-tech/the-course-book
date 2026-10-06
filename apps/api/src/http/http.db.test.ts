@@ -1,8 +1,11 @@
+import { TokenVerificationErrorReason } from "@clerk/backend/errors";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { SessionRejection } from "../auth/session";
 import { ApiErrorSchema } from "../contract/schemas";
 import { createDatabase } from "../db/client";
 import { users } from "../db/schema";
+import { USERNAME_TAKEN } from "../services/provisioning";
 import { createTestApp, WEB_ORIGIN } from "../test/app";
 import { resetMemberData, testDatabase } from "../test/db";
 
@@ -38,11 +41,13 @@ describe("health", () => {
     const unreachable = createDatabase("postgres://coursebook:coursebook@127.0.0.1:1/coursebook_test");
     try {
       const t = createTestApp(unreachable.db);
-      expect(await t.get("/healthz")).toMatchObject({ status: 503, body: { ok: false } });
+      const result = await t.get("/healthz");
+      expect(result).toMatchObject({ status: 503, body: { ok: false } });
       expect(t.errors).toHaveLength(1);
+      expect(t.errors[0]?.detail).toEqual({ requestId: result.headers.get("x-request-id") });
       // The logger gets the log-safe description, not the thrown error.
-      expect(t.errors[0]).not.toBeInstanceOf(Error);
-      expect(JSON.stringify(t.errors[0])).toContain("ECONNREFUSED");
+      expect(t.errors[0]?.error).not.toBeInstanceOf(Error);
+      expect(JSON.stringify(t.errors[0]?.error)).toContain("ECONNREFUSED");
     } finally {
       await unreachable.pool.end();
     }
@@ -69,7 +74,11 @@ describe("error envelope", () => {
     });
     const error = expectError(await t.get("/v1/me", t.bearer("user_1", "golfer_1")), 500, "internal");
     expect(error.message).not.toContain("boom");
-    expect(t.errors).toEqual([expect.objectContaining({ message: "boom" })]);
+    expect(t.errors).toHaveLength(1);
+    expect(t.errors[0]?.message).toBe("Unhandled API error");
+    expect(t.errors[0]?.error).toMatchObject({ name: "Error", message: "boom" });
+    // The request id is a field, so the error line joins its request line.
+    expect(t.errors[0]?.detail).toEqual({ requestId: error.requestId });
   });
 
   it("logs a failed query's SQL and constraint, never its parameters or the row's values", async () => {
@@ -85,8 +94,10 @@ describe("error envelope", () => {
     const logged = JSON.stringify(t.errors);
     expect(logged).not.toContain("private@example.com");
     expect(logged).not.toContain("golfer_2");
-    expect(t.errors[0]).toMatchObject({ message: "Failed query", cause: { code: "23505", constraint: "users_pkey" } });
-    expect(t.errors[0]?.query).toContain('insert into "users"');
+    // Postgres's detail, "Key (id)=(user_1) already exists.", quotes the row.
+    expect(logged).not.toContain("already exists");
+    expect(t.errors[0]?.error).toMatchObject({ message: "Failed query", cause: { code: "23505", constraint: "users_pkey" } });
+    expect(t.errors[0]?.error.query).toContain('insert into "users"');
   });
 });
 
@@ -96,30 +107,36 @@ describe("authentication", () => {
     expectError(await t.get("/v1/me"), 401, "unauthenticated");
   });
 
+  // Clerk composes some reasons, e.g. "session-token-expired-refresh-non-eligible-no-refresh-cookie".
   it.each([
     [
       "an expired token",
       (t: ReturnType<typeof createTestApp>) => t.tokens.issue({ sub: "user_1", username: "golfer_1" }, { expiresIn: -120 }),
-      { reason: "session-token-expired-refresh-non-eligible-no-refresh-cookie" },
+      /^session-token-expired/,
+      {},
     ],
     [
       "a forged token",
       (t: ReturnType<typeof createTestApp>) => t.tokens.forge({ sub: "user_1", username: "golfer_1" }),
-      { reason: "token-invalid-signature" },
+      new RegExp("^" + TokenVerificationErrorReason.TokenInvalidSignature + "$"),
+      {},
     ],
     [
       "a web token from another origin",
       (t: ReturnType<typeof createTestApp>) => t.tokens.issue({ sub: "user_1", username: "golfer_1", azp: "https://evil.example" }),
-      { reason: "unauthorized-party", azp: "https://evil.example" },
+      new RegExp("^" + SessionRejection.UnauthorizedParty + "$"),
+      { azp: "https://evil.example" },
     ],
-  ])("rejects %s even on a public operation and logs why, without the token", async (_label, token, logged) => {
+  ])("rejects %s even on a public operation and logs why, without the token", async (_label, token, reason, azp) => {
     const t = createTestApp(db);
     const sent = token(t);
     const result = await t.get("/v1/client-config", { authorization: "Bearer " + sent });
     expectError(result, 401, "unauthenticated");
-    expect(t.warnings).toEqual([
-      { message: "Session token rejected", detail: { requestId: result.headers.get("x-request-id"), ...logged } },
-    ]);
+    expect(t.warnings).toHaveLength(1);
+    const { message, detail } = t.warnings[0] ?? { message: "", detail: {} };
+    expect(message).toBe("Session token rejected");
+    expect(detail).toEqual({ requestId: result.headers.get("x-request-id"), reason: detail["reason"], ...azp });
+    expect(String(detail["reason"])).toMatch(reason);
     const warning = JSON.stringify(t.warnings);
     expect(warning).not.toContain(sent);
     expect(warning).not.toContain("user_1");
@@ -141,7 +158,7 @@ describe("authentication", () => {
       expectError(result, 401, "unauthenticated");
       expect(calls).toBe(0);
       expect(t.warnings).toEqual([
-        { message: "Session token rejected", detail: { requestId: result.headers.get("x-request-id"), reason: "not-bearer" } },
+        { message: "Session token rejected", detail: { requestId: result.headers.get("x-request-id"), reason: SessionRejection.NotBearer } },
       ]);
     },
   );
@@ -153,17 +170,19 @@ describe("authentication", () => {
     expectError(await t.get("/v1/me", { authorization: token }), 401, "unauthenticated");
   });
 
-  it("accepts web tokens from the web origin and native tokens without azp", async () => {
+  it("accepts web tokens from the web origin and native tokens without azp, and warns about neither", async () => {
     const t = createTestApp(db);
     expect((await t.get("/v1/me", t.bearer("user_1", "golfer_1", { azp: WEB_ORIGIN }))).status).toBe(200);
     expect((await t.get("/v1/me", t.bearer("user_2", "golfer_2"))).status).toBe(200);
+    expect((await t.get("/v1/client-config")).status).toBe(200);
+    expect(t.warnings).toEqual([]);
   });
 
   it("answers 409 username_taken, unlogged, when another member holds the username", async () => {
     const t = createTestApp(db);
     expect((await t.get("/v1/me", t.bearer("user_1", "golfer_1"))).status).toBe(200);
     const error = expectError(await t.get("/v1/me", t.bearer("user_2", "GOLFER_1")), 409, "username_taken");
-    expect(error.message).toBe("That username belongs to another member. Please choose a different username.");
+    expect(error.message).toBe(USERNAME_TAKEN);
     expect(t.errors).toEqual([]);
   });
 
@@ -219,7 +238,8 @@ describe("security headers", () => {
   it.each([
     ["a public response", (t: ReturnType<typeof createTestApp>) => t.app.request("/v1/client-config")],
     ["a member's response", (t: ReturnType<typeof createTestApp>) => t.app.request("/v1/me", { headers: t.bearer("user_1", "golfer_1") })],
-    ["an error envelope", (t: ReturnType<typeof createTestApp>) => t.app.request("/v1/nothing-here")],
+    ["a not-found envelope", (t: ReturnType<typeof createTestApp>) => t.app.request("/v1/nothing-here")],
+    ["an error thrown by middleware", (t: ReturnType<typeof createTestApp>) => t.app.request("/v1/me")],
     [
       "a CORS preflight",
       (t: ReturnType<typeof createTestApp>) =>

@@ -11,6 +11,7 @@ import {
   PlayCountSchema,
 } from "../contract/schemas";
 import { courses, rounds, userCourses, users } from "../db/schema";
+import { CLIENT_CLOSED_REQUEST } from "../http/errors";
 import { invalidateCatalog } from "../services/catalog";
 import { logRounds, roundHistory } from "../services/journal";
 import { createTestApp } from "../test/app";
@@ -239,7 +240,7 @@ describe("DELETE /v1/me", () => {
     expect(errorOf(await first.json()).code).toBe("account_deletion_incomplete");
     // The Clerk failure behind the 502 reaches the log, not just the client.
     expect(t.errors).toHaveLength(1);
-    expect(t.errors[0]).toMatchObject({ code: "account_deletion_incomplete", cause: { message: "Clerk unavailable" } });
+    expect(t.errors[0]?.error).toMatchObject({ code: "account_deletion_incomplete", cause: { message: "Clerk unavailable" } });
     const [row] = await db.select().from(users).where(eq(users.id, "user_1"));
     expect(row?.deletedAt).not.toBeNull();
     t.failAccountDeletion(null);
@@ -252,6 +253,26 @@ describe("DELETE /v1/me", () => {
     const t = createTestApp(db);
     expect((await t.app.request("/v1/me", { method: "DELETE" })).status).toBe(401);
     expect(t.deletedAccounts).toEqual([]);
+  });
+
+  it("still logs a Clerk failure after the member has left", async () => {
+    const client = new AbortController();
+    const t = createTestApp(db, {
+      accounts: {
+        deleteUser: () => {
+          // The member closes the app while Clerk is being called.
+          client.abort("Client connection prematurely closed.");
+          return Promise.reject(new Error("Clerk unavailable"));
+        },
+      },
+    });
+    const auth = t.bearer("user_1", "golfer_1");
+    expect((await t.get("/v1/me", auth)).status).toBe(200);
+    const response = await t.app.request("/v1/me", { method: "DELETE", headers: auth, signal: client.signal });
+    expect(response.status).toBe(CLIENT_CLOSED_REQUEST);
+    // The cancellation did not cause this failure, so it is still logged.
+    expect(t.errors).toHaveLength(1);
+    expect(t.errors[0]?.error).toMatchObject({ code: "account_deletion_incomplete", cause: { message: "Clerk unavailable" } });
   });
 
   /*

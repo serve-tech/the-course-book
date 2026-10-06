@@ -24,7 +24,7 @@ export const TEST_CLIENT_CONFIG = {
 export function createTestApp(db: Database, overrides: Partial<AppDependencies> = {}) {
   const tokens = createTestTokens();
   const requests: RequestLog[] = [];
-  const errors: LoggedError[] = [];
+  const errors: { message: string; error: LoggedError; detail: Record<string, unknown> | undefined }[] = [];
   const warnings: { message: string; detail: Record<string, unknown> }[] = [];
   let searchResults: SearchResult[] | Error = [];
   const deletedAccounts: string[] = [];
@@ -32,7 +32,7 @@ export function createTestApp(db: Database, overrides: Partial<AppDependencies> 
   const logger: Logger = {
     request: (entry) => requests.push(entry),
     warn: (message, detail) => warnings.push({ message, detail }),
-    error: (_message, error) => errors.push(error),
+    error: (message, error, detail) => errors.push({ message, error, detail }),
   };
   const app = createApp({
     db,

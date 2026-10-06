@@ -58,3 +58,31 @@ export class AppError extends Error {
     this.name = "AppError";
   }
 }
+
+/** Causes deeper than this are not followed, which also ends a cyclic chain. */
+const MAX_CAUSE_DEPTH = 8;
+
+/**
+ * A failure followed by its `cause`s, outermost first.
+ *
+ * Drizzle wraps the driver's error, and services and routes wrap again (for
+ * example `AppError(…, { cause })`), so a check for one underlying failure
+ * has to look along the chain. The walk stops at a value that is not an
+ * `Error` (included, since a cause may be any value) and after
+ * `MAX_CAUSE_DEPTH` causes.
+ *
+ * Args:
+ *     error: Anything thrown or rejected.
+ *
+ * Returns:
+ *     `error` and each successive `cause`.
+ */
+export function causeChain(error: unknown): unknown[] {
+  const chain: unknown[] = [error];
+  let current = error;
+  while (current instanceof Error && current.cause !== undefined && chain.length <= MAX_CAUSE_DEPTH) {
+    current = current.cause;
+    chain.push(current);
+  }
+  return chain;
+}
