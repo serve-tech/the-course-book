@@ -1,12 +1,13 @@
-import type { RequestIdVariables } from "hono/request-id";
 import type { VerifiedSession } from "../auth/session";
 
 /**
- * Per-request context of the API: the request id (set by `hono/request-id`)
- * and the verified session, null for anonymous requests.
+ * Per-request context of the API: the request id (set by `serverRequestId`
+ * in app.ts, never taken from the client) and the verified session, null
+ * for anonymous requests.
  */
 export interface AppEnv {
-  Variables: RequestIdVariables & {
+  Variables: {
+    requestId: string;
     session: VerifiedSession | null;
   };
 }

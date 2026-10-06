@@ -1,10 +1,11 @@
 import { createClerkClient } from "@clerk/backend";
 import { serve } from "@hono/node-server";
-import { createApp } from "./app";
+import { consoleLogger, createApp } from "./app";
 import { createClerkAccountDirectory } from "./auth/accounts";
 import { createClerkSessionVerifier } from "./auth/session";
-import { createDatabase } from "./db/client";
+import { createDatabase, REQUEST_POOL_TIMEOUTS } from "./db/client";
 import { runMigrations } from "./db/migrate";
+import { loggableError } from "./http/loggable-error";
 import { allCourses, catalog } from "./services/catalog";
 import { apiEnv, clerkEnv, databaseEnv, searchEnv } from "./services/env";
 import { createProvisioner, identityFromClerkUser, provisionUser } from "./services/provisioning";
@@ -27,11 +28,12 @@ const api = apiEnv();
 
 await runMigrations(database.DATABASE_URL);
 
-const { db, pool } = createDatabase(database.DATABASE_URL);
+// Migrations above use their own pool, without these timeouts.
+const { db, pool } = createDatabase(database.DATABASE_URL, REQUEST_POOL_TIMEOUTS);
 // An idle client can lose its connection (database restart, network blip);
 // pg reports that on the pool, and an unhandled 'error' event would crash.
 pool.on("error", (error) => {
-  console.error("Idle database connection failed", error);
+  consoleLogger.error("Idle database connection failed", loggableError(error));
 });
 
 const clerkClient = createClerkClient({ secretKey: clerk.CLERK_SECRET_KEY });
@@ -65,7 +67,7 @@ const server = serve({ fetch: app.fetch, port: api.PORT }, (info) => {
   console.log(JSON.stringify({ event: "listening", port: info.port }));
   // Load the catalog now so the first member after a cold start does not wait for it.
   catalog(db).catch((error: unknown) => {
-    console.error("Catalog warm-up failed", error);
+    consoleLogger.error("Catalog warm-up failed", loggableError(error));
   });
 });
 
@@ -75,7 +77,7 @@ function shutdown(signal: string): void {
     pool.end().then(
       () => process.exit(0),
       (error: unknown) => {
-        console.error("Closing the database pool failed", error);
+        consoleLogger.error("Closing the database pool failed", loggableError(error));
         process.exit(1);
       },
     );

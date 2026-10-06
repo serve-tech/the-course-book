@@ -1,5 +1,4 @@
-import type { Database } from "../db/client";
-import { normalizeName, type Course } from "@coursebook/domain/catalog/course";
+import type { Course } from "@coursebook/domain/catalog/course";
 import { resolveSearchResults } from "../domain/course-search";
 import {
   extractCoursePage,
@@ -8,8 +7,6 @@ import {
   type RawCourse,
 } from "../domain/opengolf";
 import type { SearchResult } from "@coursebook/domain/catalog/search-results";
-import { allCourses } from "./catalog";
-import { searchEnv } from "./env";
 
 /**
  * Course discovery: OpenGolfAPI's REST search with its published CSV dataset
@@ -39,7 +36,9 @@ export interface CourseSearch {
    *
    * Raises:
    *     Error: `SEARCH_UNAVAILABLE` (with the cause) when both sources fail,
-   *         or the caller's AbortError when `signal` aborts.
+   *         or, when `signal` aborts, its abort reason as thrown by
+   *         `throwIfAborted` (an AbortError by default; whatever the caller
+   *         aborted with otherwise, such as @hono/node-server's string).
    */
   search(query: string, signal?: AbortSignal): Promise<SearchResult[]>;
 }
@@ -49,12 +48,18 @@ export function createCourseSearch(deps: SearchDependencies): CourseSearch {
   let dataset: RawCourse[] | null = null;
   let loading: Promise<RawCourse[]> | null = null;
 
+  /*
+   * The download is shared by every search waiting for it, so only its own
+   * timeout may cancel it: tied to the first caller's request, one member's
+   * cancelled search failed everyone else's. Each caller stops waiting when
+   * its own request is cancelled; the download carries on for the others.
+   */
   const loadDataset = (signal: AbortSignal): Promise<RawCourse[]> => {
     if (dataset) return Promise.resolve(dataset);
     loading ??= fetcher(deps.csvUrl, {
       headers: { Accept: "text/csv" },
       cache: "no-store",
-      signal: AbortSignal.any([signal, AbortSignal.timeout(CSV_TIMEOUT_MS)]),
+      signal: AbortSignal.timeout(CSV_TIMEOUT_MS),
     })
       .then(async (response) => {
         if (!response.ok)
@@ -67,7 +72,7 @@ export function createCourseSearch(deps: SearchDependencies): CourseSearch {
         loading = null;
         throw error;
       });
-    return loading;
+    return untilAborted(loading, signal);
   };
 
   const endpoint = async (text: string, signal: AbortSignal): Promise<RawCourse[]> => {
@@ -107,7 +112,7 @@ export function createCourseSearch(deps: SearchDependencies): CourseSearch {
      *
      * Raises:
      *     Error with `SEARCH_UNAVAILABLE` when both sources fail; the
-     *     caller's AbortError when the request was cancelled.
+     *     signal's abort reason when the request was cancelled.
      */
     async search(query: string, signal: AbortSignal = new AbortController().signal): Promise<SearchResult[]> {
       const text = query.trim();
@@ -144,25 +149,38 @@ export function createCourseSearch(deps: SearchDependencies): CourseSearch {
   };
 }
 
-let service: ReturnType<typeof createCourseSearch> | undefined;
-
-/** Process-wide search bound to the environment and the catalog snapshot. */
-export function searchCourses(
-  db: Database,
-  query: string,
-  signal?: AbortSignal,
-): Promise<SearchResult[]> {
-  service ??= createCourseSearch({
-    catalog: () => allCourses(db),
-    apiUrl: searchEnv().OPENGOLF_API_URL,
-    csvUrl: searchEnv().OPENGOLF_CSV_URL,
+/**
+ * Wait for `work`, or stop waiting when `signal` aborts.
+ *
+ * Args:
+ *     work: A promise others may share; it is neither cancelled nor changed.
+ *     signal: The caller's own signal.
+ *
+ * Returns:
+ *     What `work` resolves to.
+ *
+ * Raises:
+ *     An Error whose cause is the abort reason when the signal aborts first
+ *     or already had (`search` then throws the reason itself); otherwise
+ *     whatever `work` rejects with.
+ *
+ * Note:
+ *     `work` is always raced, even for an aborted signal, so a later
+ *     rejection of the shared promise is handled rather than unhandled
+ *     (which would end the process).
+ */
+async function untilAborted<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
+  let stop: () => void = () => undefined;
+  const aborted = new Promise<never>((_resolve, reject) => {
+    stop = () => {
+      reject(new Error("Stopped waiting for the dataset: the search was cancelled.", { cause: signal.reason }));
+    };
   });
-  return service.search(query, signal);
+  signal.addEventListener("abort", stop, { once: true });
+  if (signal.aborted) stop();
+  try {
+    return await Promise.race([work, aborted]);
+  } finally {
+    signal.removeEventListener("abort", stop);
+  }
 }
-
-/** Exposed for tests that need a fresh service after changing dependencies. */
-export function resetCourseSearch(): void {
-  service = undefined;
-}
-
-export { normalizeName };

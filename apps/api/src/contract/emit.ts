@@ -1,4 +1,5 @@
 import { createApp } from "../app";
+import { SessionRejection } from "../auth/session";
 import { createDatabase } from "../db/client";
 import { documentConfig } from "./document";
 
@@ -12,7 +13,7 @@ import { documentConfig } from "./document";
 export function contractDocument() {
   const app = createApp({
     db: createDatabase("postgres://contract@127.0.0.1:1/contract").db,
-    verifySession: () => Promise.resolve(null),
+    verifySession: () => Promise.resolve({ ok: false, reason: SessionRejection.NoActiveSession }),
     provisioner: {
       resolve: () => Promise.reject(new Error("unused while emitting the contract")),
       forget: () => undefined,

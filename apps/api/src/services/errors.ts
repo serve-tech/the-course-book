@@ -1,10 +1,13 @@
 /**
- * Expected failures raised by server modules.
+ * Expected failures raised by server modules, and `causeChain`.
  *
- * Services throw `AppError` instead of framework responses so they can serve
- * any transport. The transport layer (today the React Router routes, later
- * the JSON API) maps `status` to the response status and exposes `code` so
- * clients can branch without parsing messages.
+ * Services throw `AppError` instead of framework responses so they stay
+ * independent of the transport. The API's error handler (`http/errors.ts`)
+ * maps `status` to the response status and exposes `code` so clients can
+ * branch without parsing messages.
+ *
+ * The module imports nothing, so every layer may use it, `db/` included
+ * (`isUniqueViolation` walks the cause chain with `causeChain`).
  */
 
 /**
@@ -21,6 +24,7 @@ export enum ErrorCode {
   Unauthenticated = "unauthenticated",
   AccountDeleted = "account_deleted",
   UsernameInvalid = "username_invalid",
+  UsernameTaken = "username_taken",
   NotFound = "not_found",
   CourseNotFound = "course_not_found",
   NotOnList = "not_on_list",
@@ -56,4 +60,32 @@ export class AppError extends Error {
     super(message, options);
     this.name = "AppError";
   }
+}
+
+/** Causes deeper than this are not followed, which also ends a cyclic chain. */
+const MAX_CAUSE_DEPTH = 8;
+
+/**
+ * A failure followed by its `cause`s, outermost first.
+ *
+ * Drizzle wraps the driver's error, and services and routes wrap again (for
+ * example `AppError(…, { cause })`), so a check for one underlying failure
+ * has to look along the chain. The walk stops at a value that is not an
+ * `Error` (included, since a cause may be any value) and after
+ * `MAX_CAUSE_DEPTH` causes.
+ *
+ * Args:
+ *     error: Anything thrown or rejected.
+ *
+ * Returns:
+ *     `error` and each successive `cause`.
+ */
+export function causeChain(error: unknown): unknown[] {
+  const chain: unknown[] = [error];
+  let current = error;
+  while (current instanceof Error && current.cause !== undefined && chain.length <= MAX_CAUSE_DEPTH) {
+    current = current.cause;
+    chain.push(current);
+  }
+  return chain;
 }
