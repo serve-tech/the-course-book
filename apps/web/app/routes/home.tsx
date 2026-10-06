@@ -9,7 +9,7 @@ import { fromFeedItem } from "../lib/api/mappers";
 import { RouteError } from "../shared/ui/RouteError";
 import { useShell } from "../shared/ui/shell";
 
-export const meta: Route.MetaFunction = () => [{ title: "coursebook.golf" }];
+export const meta: Route.MetaFunction = () => [{ title: "The Course Book" }];
 
 const FIRST_PAGE = 30;
 

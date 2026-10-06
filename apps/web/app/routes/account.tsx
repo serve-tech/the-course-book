@@ -6,7 +6,7 @@ import { errorMessage } from "../shared/lib/errors";
 import { Modal } from "../shared/ui/Modal";
 import { useShell } from "../shared/ui/shell";
 
-export const meta: Route.MetaFunction = () => [{ title: "Account · coursebook.golf" }];
+export const meta: Route.MetaFunction = () => [{ title: "Account · The Course Book" }];
 
 /**
  * Account page with self-service deletion (App Store 5.1.1(v), and the web

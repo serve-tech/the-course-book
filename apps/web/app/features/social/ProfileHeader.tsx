@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router";
 import { ProfileRelationship, type Profile } from "@coursebook/domain/social/types";
 import { cx } from "../../shared/lib/cx";
 import { useActionFetcher } from "../../shared/lib/use-action-fetcher";
+import { useDismiss } from "../../shared/lib/use-dismiss";
 import type { FriendReply } from "../../routes/friends";
 import { replyMessage } from "../journal/use-journal-fetcher";
 import { FriendIntent, UnfriendReason } from "../friends/friend-actions";
@@ -99,21 +100,11 @@ function FriendMenu({ username, name, notify }: { username: string; name: string
     if (!reply.error) void navigate("/friends", { replace: true });
   });
 
-  useEffect(() => {
-    if (!open) return;
-    const close = (event: Event) => {
-      if (event instanceof KeyboardEvent ? event.key === "Escape" : !wrap.current?.contains(event.target as Node)) {
-        setOpen(false);
-        setConfirming(false);
-      }
-    };
-    document.addEventListener("pointerdown", close);
-    document.addEventListener("keydown", close);
-    return () => {
-      document.removeEventListener("pointerdown", close);
-      document.removeEventListener("keydown", close);
-    };
-  }, [open]);
+  const close = useCallback(() => {
+    setOpen(false);
+    setConfirming(false);
+  }, []);
+  useDismiss(open, wrap, close);
 
   return (
     <div className={profileStyles.menuWrap} ref={wrap}>

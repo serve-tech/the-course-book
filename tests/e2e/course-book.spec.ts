@@ -98,12 +98,16 @@ const pageCardOffset = (page: Page, sectionId: string) =>
     return Math.round((inner.left + inner.right) / 2 - (outer.left + outer.right) / 2);
   }, sectionId);
 
-/**
- * The signed-in member's avatar in the top bar, linking to their profile.
- * Phones hide it (the tab bar has Profile), so it is matched by element, not
- * by role, which skips hidden elements.
- */
-const accountAvatar = (page: Page) => page.locator("#authbar a");
+/** The signed-in member's avatar in the top bar, which opens the account menu. */
+const accountMenuButton = (page: Page) => page.locator("#authbar").getByRole("button", { name: /^Account menu for / });
+
+/** Checks who is signed in through the account menu's Profile link, then closes the menu. */
+async function expectSignedInAs(page: Page, username: string) {
+  await accountMenuButton(page).click();
+  await expect(page.getByRole("menuitem", { name: "Profile" })).toHaveAttribute("href", "/u/" + username);
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("menu")).toHaveCount(0);
+}
 
 test("anonymous navigation, dialogs and mobile layout remain usable", async ({ page }) => {
   test.skip(!clerkAvailable, "Clerk development instance keys are not configured");
@@ -164,7 +168,7 @@ test.describe("signed in", () => {
   test("sign-in shows the stored order and logging preserves it", async ({ page }) => {
     const { owner } = members();
     await signInAs(page, owner);
-    await expect(accountAvatar(page)).toHaveAttribute("href", "/u/" + owner.username);
+    await expectSignedInAs(page, owner.username);
     await openRanking(page, owner);
     await expect(page.locator("#myCourseCount")).toHaveText("2");
     await expect(page.locator("#mylist .course")).toHaveText(["Test Beta Links", "Test Alpha Links"]);
@@ -181,7 +185,8 @@ test.describe("signed in", () => {
 
     await page.reload();
     await expect(page.locator("#mylist .course")).toHaveText(["Test Beta Links", "Test Alpha Links"]);
-    await page.locator("#authOpen").click();
+    await accountMenuButton(page).click();
+    await page.getByRole("menuitem", { name: "Sign out" }).click();
     await expect(welcome(page)).toBeVisible();
   });
 
@@ -463,12 +468,12 @@ test.describe("account deletion", () => {
     });
     try {
       await signInAs(page, { id: created.id, username: "e2e_del_" + suffix, displayName: "Leaving", email });
-      await expect(accountAvatar(page)).toHaveAttribute("href", "/u/e2e_del_" + suffix);
+      await expectSignedInAs(page, "e2e_del_" + suffix);
       await page.getByRole("link", { name: "Account", exact: true }).click();
       await page.locator("#deleteAccount").click();
       await page.locator("#confirmDeleteAccount").click();
       await expect(page.locator("#authOpen")).toHaveText("Sign in");
-      await expect(accountAvatar(page)).toHaveCount(0);
+      await expect(accountMenuButton(page)).toHaveCount(0);
       await expect
         .poll(async () => (await clerkClient.users.getUserList({ userId: [created.id] })).data.length)
         .toBe(0);

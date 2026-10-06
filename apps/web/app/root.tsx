@@ -18,7 +18,7 @@ export const links: Route.LinksFunction = () => [
 ];
 
 export const meta: Route.MetaFunction = () => [
-  { title: "coursebook.golf" },
+  { title: "The Course Book" },
   { name: "theme-color", content: "#0b2117" },
   { name: "apple-mobile-web-app-title", content: "Course Book" },
 ];
@@ -57,7 +57,7 @@ export default function App() {
 
 /** Shown while the first route data loads in the browser. */
 export function HydrateFallback() {
-  return <p className="empty">Loading coursebook.golf…</p>;
+  return <p className="empty">Loading The Course Book…</p>;
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {

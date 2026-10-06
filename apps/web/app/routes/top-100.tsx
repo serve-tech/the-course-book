@@ -20,7 +20,7 @@ import { usePreference } from "../shared/lib/use-preference";
 import { RouteError } from "../shared/ui/RouteError";
 import { useShell } from "../shared/ui/shell";
 
-export const meta: Route.MetaFunction = () => [{ title: "Top lists · coursebook.golf" }];
+export const meta: Route.MetaFunction = () => [{ title: "Top lists · The Course Book" }];
 
 /**
  * The Top list the page shows (`?list=`, else the tab remembered on this

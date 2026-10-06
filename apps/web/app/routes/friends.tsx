@@ -15,7 +15,7 @@ import { apiFailureMessage } from "../shared/lib/errors";
 import { RouteError } from "../shared/ui/RouteError";
 import { useShell } from "../shared/ui/shell";
 
-export const meta: Route.MetaFunction = () => [{ title: "Friends · coursebook.golf" }];
+export const meta: Route.MetaFunction = () => [{ title: "Friends · The Course Book" }];
 
 const NO_REQUESTS: FriendRequests = { incoming: [], outgoing: [] };
 

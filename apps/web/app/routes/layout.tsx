@@ -228,7 +228,7 @@ export default function Layout({ loaderData }: Route.ComponentProps) {
         >
           {refreshing ? "Refreshing…" : "Refresh App"}
         </button>
-        <span id="refreshedDate">coursebook.golf</span>
+        <span id="refreshedDate">The Course Book</span>
         <span className="app-footer-links">
           <Link to="/account">Account</Link> · <Link to="/privacy">Privacy</Link>
         </span>
