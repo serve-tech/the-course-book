@@ -3,7 +3,7 @@ import { serve } from "@hono/node-server";
 import { consoleLogger, createApp } from "./app";
 import { createClerkAccountDirectory } from "./auth/accounts";
 import { createClerkSessionVerifier } from "./auth/session";
-import { createDatabase } from "./db/client";
+import { createDatabase, REQUEST_POOL_TIMEOUTS } from "./db/client";
 import { runMigrations } from "./db/migrate";
 import { loggableError } from "./http/loggable-error";
 import { allCourses, catalog } from "./services/catalog";
@@ -28,7 +28,8 @@ const api = apiEnv();
 
 await runMigrations(database.DATABASE_URL);
 
-const { db, pool } = createDatabase(database.DATABASE_URL);
+// Migrations above use their own pool, without these timeouts.
+const { db, pool } = createDatabase(database.DATABASE_URL, REQUEST_POOL_TIMEOUTS);
 // An idle client can lose its connection (database restart, network blip);
 // pg reports that on the pool, and an unhandled 'error' event would crash.
 pool.on("error", (error) => {
