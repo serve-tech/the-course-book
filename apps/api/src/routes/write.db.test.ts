@@ -253,6 +253,32 @@ describe("DELETE /v1/me", () => {
     expect((await t.app.request("/v1/me", { method: "DELETE" })).status).toBe(401);
     expect(t.deletedAccounts).toEqual([]);
   });
+
+  /*
+   * Clerk allows usernames the product rejects (4-64 characters, hyphens),
+   * so provisioning answers 403 `username_invalid`. Deletion must not
+   * depend on it: the member keeps the right to delete their account.
+   */
+  it.each([
+    ["with a member row from before the username changed", true],
+    ["with no member row", false],
+  ])("deletes an account whose Clerk username breaks the product rule, %s", async (_label, hasRow) => {
+    const t = createTestApp(db);
+    if (hasRow) {
+      await db.insert(users).values({ id: "user_1", username: "golfer_1", displayName: "Golfer", email: "golfer@example.com" });
+      await logRounds(db, "user_1", { courseId: await seeded("usa1") }, 1);
+    }
+    const auth = t.bearer("user_1", "bad-name");
+    expect((await t.get("/v1/me", auth)).status).toBe(403);
+
+    const response = await t.app.request("/v1/me", { method: "DELETE", headers: auth });
+    expect(response.status).toBe(204);
+    expect(t.deletedAccounts).toEqual(["user_1"]);
+    expect(await db.select().from(rounds).where(eq(rounds.userId, "user_1"))).toHaveLength(0);
+    const [row] = await db.select().from(users).where(eq(users.id, "user_1"));
+    expect(row).toMatchObject({ displayName: "Deleted member", email: null });
+    expect(row?.deletedAt).not.toBeNull();
+  });
 });
 
 describe("privacy", () => {

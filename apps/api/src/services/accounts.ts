@@ -21,11 +21,20 @@ import { withJournalLock } from "./journal";
  *
  * The tombstone, rather than removing the row, stops a session token that
  * outlives the deletion (up to a minute) from provisioning a fresh row from
- * its claims: provisioning never refreshes a deleted row. The Clerk account
- * is deleted separately, after this commits (see the DELETE /v1/me route).
+ * its claims: provisioning never refreshes a deleted row. A member who has
+ * no row yet (never provisioned, for example because their Clerk username
+ * breaks the product rule) gets a tombstone too, for the same reason. The
+ * Clerk account is deleted separately, after this commits (see the
+ * DELETE /v1/me route).
+ *
+ * Args:
+ *     db: Database handle.
+ *     userId: The member's Clerk id (`users.id`), taken from the verified
+ *         session; the member does not need to be provisioned.
  *
  * Raises:
- *     AppError: 401 `account_deleted` when the account was already deleted.
+ *     AppError: 401 `account_deleted` when the account was already deleted;
+ *         the existing tombstone is left as it is.
  */
 export async function deleteAccountData(db: Database, userId: string): Promise<void> {
   await withJournalLock(db, userId, async (tx) => {
@@ -33,17 +42,17 @@ export async function deleteAccountData(db: Database, userId: string): Promise<v
     await tx.delete(wantToPlay).where(eq(wantToPlay.userId, userId));
     await removeAllFriendships(tx, userId);
     await tx.update(courses).set({ createdBy: null }).where(eq(courses.createdBy, userId));
+    const tombstone = {
+      username: "deleted_" + randomBytes(8).toString("hex"),
+      displayName: "Deleted member",
+      email: null,
+      avatarUrl: null,
+      legacySupabaseId: null,
+      deletedAt: sql`now()`,
+    };
     await tx
-      .update(users)
-      .set({
-        username: "deleted_" + randomBytes(8).toString("hex"),
-        displayName: "Deleted member",
-        email: null,
-        avatarUrl: null,
-        legacySupabaseId: null,
-        deletedAt: sql`now()`,
-        updatedAt: sql`now()`,
-      })
-      .where(eq(users.id, userId));
+      .insert(users)
+      .values({ id: userId, ...tombstone })
+      .onConflictDoUpdate({ target: users.id, set: { ...tombstone, updatedAt: sql`now()` } });
   });
 }
