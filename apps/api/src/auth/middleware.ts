@@ -4,23 +4,35 @@ import { AppError, ErrorCode } from "../services/errors";
 import type { AppUser, Provisioner } from "../services/provisioning";
 import type { SessionVerifier } from "./session";
 
+/** Receives one warning per rejected token: the request id, the reason and, for an `azp` rejection, the `azp`. */
+export type RejectionLog = (message: string, detail: Record<string, unknown>) => void;
+
 /**
  * Resolve the request's session from `Authorization: Bearer <token>`.
  *
  * No header means anonymous, without calling Clerk. A header that does not
  * verify is a 401, never a silent downgrade to anonymous: a client whose
  * token expired must learn it rather than see empty personal data.
+ *
+ * Args:
+ *     verify: Checks the token (Clerk in production and tests).
+ *     warn: Logs each rejection with its reason, so a wrong
+ *         `CLERK_JWT_KEY` or a missing web origin shows up in the logs
+ *         rather than only as 401s. It never receives the token.
  */
-export function sessionMiddleware(verify: SessionVerifier): MiddlewareHandler<AppEnv> {
+export function sessionMiddleware(verify: SessionVerifier, warn: RejectionLog): MiddlewareHandler<AppEnv> {
   return async (c, next) => {
     if (!c.req.header("authorization")) {
       c.set("session", null);
       return next();
     }
-    const session = await verify(c.req.raw);
-    if (!session)
+    const result = await verify(c.req.raw);
+    if (!result.ok) {
+      const azp = "azp" in result ? { azp: result.azp } : {};
+      warn("Session token rejected", { requestId: c.get("requestId"), reason: result.reason, ...azp });
       throw new AppError(401, ErrorCode.Unauthenticated, "Your session has expired. Sign in again.");
-    c.set("session", session);
+    }
+    c.set("session", result.session);
     await next();
   };
 }

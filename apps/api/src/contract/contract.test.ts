@@ -55,7 +55,7 @@ describe("published contract", () => {
   it("is served unchanged at /v1/openapi.json", async () => {
     const app = createApp({
       db: createDatabase("postgres://contract@127.0.0.1:1/contract").db,
-      verifySession: () => Promise.resolve(null),
+      verifySession: () => Promise.resolve({ ok: false, reason: "unused" }),
       provisioner: { resolve: () => Promise.reject(new Error("unused")), forget: () => undefined },
       accounts: { deleteUser: () => Promise.reject(new Error("unused")) },
       search: { search: () => Promise.resolve([]) },
@@ -95,7 +95,7 @@ describe("published contract", () => {
   it("rejects every secured operation without a token", async () => {
     const app = createApp({
       db: createDatabase("postgres://contract@127.0.0.1:1/contract").db,
-      verifySession: () => Promise.resolve(null),
+      verifySession: () => Promise.resolve({ ok: false, reason: "unused" }),
       provisioner: { resolve: () => Promise.reject(new Error("must not be reached")), forget: () => undefined },
       accounts: { deleteUser: () => Promise.reject(new Error("must not be reached")) },
       search: { search: () => Promise.reject(new Error("must not be reached")) },

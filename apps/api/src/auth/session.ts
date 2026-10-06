@@ -8,8 +8,31 @@ export interface VerifiedSession {
   claims: Record<string, unknown>;
 }
 
-/** Verifies the bearer token on a request; null when it is not acceptable. */
-export type SessionVerifier = (request: Request) => Promise<VerifiedSession | null>;
+/** Reasons the API adds to Clerk's own when it rejects a token. */
+export enum SessionRejection {
+  /** Clerk verified the token, but its session is pending or names no user. */
+  NoActiveSession = "no-active-session",
+  /** The token's `azp` is not one of the web origins (`isAuthorizedParty`). */
+  UnauthorizedParty = "unauthorized-party",
+}
+
+/**
+ * The outcome of verifying a request's token.
+ *
+ * A rejection carries the reason only: Clerk's `AuthErrorReason` or
+ * `TokenVerificationErrorReason` (for example `token-invalid-signature`,
+ * `jwk-kid-mismatch`, or `session-token-expired-…` for an expired token) or
+ * a `SessionRejection`,
+ * and `azp` when that claim was the reason. It never carries the token or
+ * other claims, and not Clerk's message either, which can quote claim
+ * values.
+ */
+export type SessionVerification =
+  | { ok: true; session: VerifiedSession }
+  | { ok: false; reason: string; azp?: unknown };
+
+/** Verifies the bearer token on a request. */
+export type SessionVerifier = (request: Request) => Promise<SessionVerification>;
 
 export interface ClerkVerifierOptions {
   secretKey: string;
@@ -46,12 +69,13 @@ export function createClerkSessionVerifier(options: ClerkVerifierOptions): Sessi
       acceptsToken: "session_token",
       ...(options.jwtKey ? { jwtKey: options.jwtKey } : {}),
     });
-    if (!state.isAuthenticated) return null;
+    if (!state.isAuthenticated) return { ok: false, reason: state.reason };
     // Typed as signed in, but a pending session (sts: "pending") yields a
     // signed-out object because treatPendingAsSignedOut defaults to true.
     const auth: SignedInAuthObject | SignedOutAuthObject = state.toAuth();
-    if (!auth.userId) return null;
-    if (!isAuthorizedParty(auth.sessionClaims["azp"], options.webOrigins)) return null;
-    return { clerkId: auth.userId, claims: auth.sessionClaims };
+    if (!auth.userId) return { ok: false, reason: SessionRejection.NoActiveSession };
+    const azp = auth.sessionClaims["azp"];
+    if (!isAuthorizedParty(azp, options.webOrigins)) return { ok: false, reason: SessionRejection.UnauthorizedParty, azp };
+    return { ok: true, session: { clerkId: auth.userId, claims: auth.sessionClaims } };
   };
 }

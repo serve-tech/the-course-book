@@ -38,12 +38,14 @@ export interface RequestLog {
 /**
  * Where the API writes its logs.
  *
- * `error` takes a `LoggedError`, never the thrown value, so a query's
- * parameters or a Postgres error's row values cannot reach the log
- * (`loggableError`).
+ * `warn` reports expected but noteworthy events, such as a rejected session
+ * token, with plain fields. `error` takes a `LoggedError`, never the thrown
+ * value, so a query's parameters or a Postgres error's row values cannot
+ * reach the log (`loggableError`).
  */
 export interface Logger {
   request(entry: RequestLog): void;
+  warn(message: string, detail: Record<string, unknown>): void;
   error(message: string, error: LoggedError): void;
 }
 
@@ -65,6 +67,9 @@ export interface AppDependencies {
 export const consoleLogger: Logger = {
   request: (entry) => {
     console.log(JSON.stringify(entry));
+  },
+  warn: (message, detail) => {
+    console.warn(JSON.stringify({ level: "warn", message, ...detail }));
   },
   error: (message, error) => {
     console.error(JSON.stringify({ level: "error", message, error }));
@@ -125,7 +130,12 @@ export function createApp(deps: AppDependencies): OpenAPIHono<AppEnv> {
       },
     }),
   );
-  app.use("/v1/*", sessionMiddleware(deps.verifySession));
+  app.use(
+    "/v1/*",
+    sessionMiddleware(deps.verifySession, (message, detail) => {
+      logger.warn(message, detail);
+    }),
+  );
   for (const path of ["/v1/me", "/v1/me/*", "/v1/members", "/v1/members/*", "/v1/member-search", "/v1/course-search", "/v1/feed", "/v1/top-lists", "/v1/top-lists/*"])
     app.use(path, noStore);
 

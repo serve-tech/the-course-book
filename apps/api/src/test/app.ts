@@ -25,11 +25,13 @@ export function createTestApp(db: Database, overrides: Partial<AppDependencies> 
   const tokens = createTestTokens();
   const requests: RequestLog[] = [];
   const errors: LoggedError[] = [];
+  const warnings: { message: string; detail: Record<string, unknown> }[] = [];
   let searchResults: SearchResult[] | Error = [];
   const deletedAccounts: string[] = [];
   let accountDeletionFailure: Error | null = null;
   const logger: Logger = {
     request: (entry) => requests.push(entry),
+    warn: (message, detail) => warnings.push({ message, detail }),
     error: (_message, error) => errors.push(error),
   };
   const app = createApp({
@@ -73,6 +75,7 @@ export function createTestApp(db: Database, overrides: Partial<AppDependencies> 
     app,
     tokens,
     requests,
+    warnings,
     errors,
     bearer,
     setSearchResults: (value: SearchResult[] | Error) => {

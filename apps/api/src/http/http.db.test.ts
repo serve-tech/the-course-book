@@ -97,12 +97,33 @@ describe("authentication", () => {
   });
 
   it.each([
-    ["an expired token", (t: ReturnType<typeof createTestApp>) => t.tokens.issue({ sub: "user_1", username: "golfer_1" }, { expiresIn: -120 })],
-    ["a forged token", (t: ReturnType<typeof createTestApp>) => t.tokens.forge({ sub: "user_1", username: "golfer_1" })],
-    ["a web token from another origin", (t: ReturnType<typeof createTestApp>) => t.tokens.issue({ sub: "user_1", username: "golfer_1", azp: "https://evil.example" })],
-  ])("rejects %s even on a public operation", async (_label, token) => {
+    [
+      "an expired token",
+      (t: ReturnType<typeof createTestApp>) => t.tokens.issue({ sub: "user_1", username: "golfer_1" }, { expiresIn: -120 }),
+      { reason: "session-token-expired-refresh-non-eligible-no-refresh-cookie" },
+    ],
+    [
+      "a forged token",
+      (t: ReturnType<typeof createTestApp>) => t.tokens.forge({ sub: "user_1", username: "golfer_1" }),
+      { reason: "token-invalid-signature" },
+    ],
+    [
+      "a web token from another origin",
+      (t: ReturnType<typeof createTestApp>) => t.tokens.issue({ sub: "user_1", username: "golfer_1", azp: "https://evil.example" }),
+      { reason: "unauthorized-party", azp: "https://evil.example" },
+    ],
+  ])("rejects %s even on a public operation and logs why, without the token", async (_label, token, logged) => {
     const t = createTestApp(db);
-    expectError(await t.get("/v1/client-config", { authorization: "Bearer " + token(t) }), 401, "unauthenticated");
+    const sent = token(t);
+    const result = await t.get("/v1/client-config", { authorization: "Bearer " + sent });
+    expectError(result, 401, "unauthenticated");
+    expect(t.warnings).toEqual([
+      { message: "Session token rejected", detail: { requestId: result.headers.get("x-request-id"), ...logged } },
+    ]);
+    const warning = JSON.stringify(t.warnings);
+    expect(warning).not.toContain(sent);
+    expect(warning).not.toContain("user_1");
+    expect(warning).not.toContain("golfer_1");
   });
 
   it("accepts web tokens from the web origin and native tokens without azp", async () => {
