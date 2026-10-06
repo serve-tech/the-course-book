@@ -1,3 +1,4 @@
+import { isClerkAPIResponseError } from "@clerk/backend/errors";
 import { DrizzleQueryError } from "drizzle-orm";
 import pg from "pg";
 
@@ -21,6 +22,10 @@ export interface LoggedError {
   code?: string;
   /** HTTP status of an `AppError` or an API client error, e.g. Clerk's. */
   status?: number;
+  /** Clerk's trace id for a Backend API error, for a support request. */
+  clerkTraceId?: string;
+  /** The `code` of each error in a Clerk Backend API response, e.g. `resource_not_found`. */
+  clerkCodes?: string[];
   /** SQL text of a failed Drizzle query, without its parameters. */
   query?: string;
   constraint?: string;
@@ -47,7 +52,12 @@ const DATABASE_FIELDS = ["code", "constraint", "table", "column", "routine"] as 
  *   dropped, and so is the message, which repeats them.
  * - Postgres errors (`pg.DatabaseError`): `message`, `code`, `constraint`,
  *   `table`, `column` and `routine` are kept; `detail`, `hint`, `where` and
- *   `internalQuery` are dropped because they can quote row values.
+ *   `internalQuery` are dropped because they can quote row values. Note
+ *   that a data exception's message (SQLSTATE class 22, e.g. `invalid input
+ *   syntax for type uuid: "…"`) quotes the rejected input; request
+ *   validation keeps such input from reaching the database.
+ * - Clerk Backend API errors: additionally the trace id and each error's
+ *   `code`, not their messages or `meta`, which can name the user.
  * - Other errors: `name`, `message`, a string `code` and a numeric `status`
  *   (for `AppError` and API client errors).
  * - Non-`Error` values (for example an abort reason string): their type and,
@@ -81,6 +91,10 @@ function describe(error: unknown, depth: number): LoggedError {
   } else {
     if ("code" in error && typeof error.code === "string") logged.code = error.code;
     if ("status" in error && typeof error.status === "number") logged.status = error.status;
+    if (isClerkAPIResponseError(error)) {
+      if (error.clerkTraceId) logged.clerkTraceId = error.clerkTraceId;
+      logged.clerkCodes = error.errors.map((item) => item.code);
+    }
   }
   const frames = stackFrames(error);
   if (frames.length) logged.stack = frames;

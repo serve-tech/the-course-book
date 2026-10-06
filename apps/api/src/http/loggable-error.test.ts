@@ -1,3 +1,4 @@
+import { ClerkAPIResponseError } from "@clerk/backend/errors";
 import { DrizzleQueryError } from "drizzle-orm";
 import pg from "pg";
 import { describe, expect, it } from "vitest";
@@ -65,6 +66,17 @@ describe("loggableError", () => {
       code: "account_deletion_incomplete",
       cause: { name: "Error", message: "Clerk unavailable", status: 503, code: "ECONNRESET" },
     });
+  });
+
+  it("keeps a Clerk error's trace id and codes, not the messages or meta that can name the user", () => {
+    const clerk = new ClerkAPIResponseError("Not Found", {
+      data: [{ code: "resource_not_found", message: "not found", long_message: `No user ${EMAIL}`, meta: { email_addresses: [EMAIL] } }],
+      status: 404,
+      clerkTraceId: "trace_123",
+    });
+    const logged = loggableError(new AppError(502, ErrorCode.AccountDeletionIncomplete, "Your data is deleted…", { cause: clerk }));
+    expect(logged.cause).toMatchObject({ status: 404, clerkTraceId: "trace_123", clerkCodes: ["resource_not_found"] });
+    expect(JSON.stringify(logged)).not.toContain(EMAIL);
   });
 
   it("describes each member of an AggregateError", () => {
