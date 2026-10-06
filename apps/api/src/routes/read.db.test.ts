@@ -17,8 +17,8 @@ import { courseRankings, courses, friendships, users } from "../db/schema";
 import { FriendshipStatus } from "../domain/friendship";
 import { CLIENT_CLOSED_REQUEST } from "../http/errors";
 import { allCourses, invalidateCatalog } from "../services/catalog";
-import { createCourseSearch } from "../services/search";
 import { logRounds } from "../services/journal";
+import { createCourseSearch } from "../services/search";
 import { createTestApp, TEST_CLIENT_CONFIG } from "../test/app";
 import { resetMemberData, testDatabase } from "../test/db";
 

@@ -1,8 +1,8 @@
 import type { SearchResult } from "@coursebook/domain/catalog/search-results";
 import { createApp, type AppDependencies, type Logger, type RequestLog } from "../app";
 import { createClerkSessionVerifier } from "../auth/session";
-import type { LoggedError } from "../http/loggable-error";
 import type { Database } from "../db/client";
+import type { LoggedError } from "../http/loggable-error";
 import { createProvisioner, provisionUser } from "../services/provisioning";
 import { createTestTokens, TEST_PUBLISHABLE_KEY, TEST_SECRET_KEY } from "./tokens";
 
