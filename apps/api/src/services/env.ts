@@ -39,14 +39,16 @@ const origin = z
   .url()
   .refine((value) => new URL(value).origin === value, "Use a bare origin such as https://coursebook.golf, without a path or trailing slash.");
 
+/** Comma-separated exact web origins, split and trimmed; empty parts are dropped. */
+const originList = z
+  .string()
+  .default("")
+  .transform((value) => value.split(",").map((part) => part.trim()).filter(Boolean));
+
 const apiSchema = z.object({
   PORT: z.coerce.number().int().min(1).max(65535).default(3001),
   /** Comma-separated exact web origins for CORS and the token `azp` check. */
-  WEB_ORIGINS: z
-    .string()
-    .default("")
-    .transform((value) => value.split(",").map((part) => part.trim()).filter(Boolean))
-    .pipe(z.array(origin)),
+  WEB_ORIGINS: originList.pipe(z.array(origin)),
   /** The Clerk instance's JWT public key (PEM) for networkless verification. */
   CLERK_JWT_KEY: z.string().startsWith("-----BEGIN PUBLIC KEY-----").optional(),
   /** Public web address, used for the privacy and account-deletion links. */
@@ -70,13 +72,30 @@ export const clerkEnv = memo(() => clerkSchema.parse(process.env));
 export const searchEnv = memo(() => searchSchema.parse(process.env));
 
 /**
+ * Production needs at least one web origin. Without one, CORS refuses the
+ * web app and every web token fails the `azp` check, so the API would start
+ * and answer 401 to every signed-in request.
+ */
+const productionApiSchema = apiSchema.extend({
+  WEB_ORIGINS: originList.pipe(
+    z.array(origin).min(1, "Set WEB_ORIGINS to the web app's origins, e.g. https://coursebook.golf; production needs at least one."),
+  ),
+});
+
+/**
  * Parse API server settings from an environment-like object.
  *
+ * Args:
+ *     source: Variables such as `process.env`. `NODE_ENV=production` (set by
+ *         the Docker image) makes `WEB_ORIGINS` required.
+ *
  * Raises:
- *     ZodError: When a value is malformed, e.g. a web origin with a path.
+ *     ZodError: When a value is malformed, e.g. a web origin with a path, or
+ *         when production has no web origin.
  */
 export function parseApiEnv(source: Record<string, string | undefined>) {
-  return apiSchema.parse(source);
+  const schema = source["NODE_ENV"] === "production" ? productionApiSchema : apiSchema;
+  return schema.parse(source);
 }
 
 /** API server settings: port, web origins, token key and client configuration. */

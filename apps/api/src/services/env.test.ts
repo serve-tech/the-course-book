@@ -20,6 +20,22 @@ describe("API environment", () => {
   });
 
   it.each([
+    ["missing", {}],
+    ["empty", { WEB_ORIGINS: "" }],
+    ["only separators", { WEB_ORIGINS: " , ," }],
+  ])("requires a web origin in production when WEB_ORIGINS is %s", (_label, source) => {
+    expect(() => parseApiEnv({ NODE_ENV: "production", ...source })).toThrow(/WEB_ORIGINS/);
+  });
+
+  it("accepts web origins in production", () => {
+    expect(parseApiEnv({ NODE_ENV: "production", WEB_ORIGINS: "https://coursebook.golf" }).WEB_ORIGINS).toEqual(["https://coursebook.golf"]);
+  });
+
+  it("allows no web origin outside production", () => {
+    expect(parseApiEnv({ NODE_ENV: "development" }).WEB_ORIGINS).toEqual([]);
+  });
+
+  it.each([
     ["a trailing slash", { WEB_ORIGINS: "https://coursebook.golf/" }],
     ["a path", { WEB_ORIGINS: "https://coursebook.golf/app" }],
     ["a malformed version", { MIN_IOS_VERSION: "1.0" }],

@@ -27,7 +27,7 @@ Every production environment variable lives in Doppler, which syncs it to the Re
 | API | `CLERK_SECRET_KEY` | Clerk production instance secret key; the only secret besides the database URL |
 | API | `CLERK_PUBLISHABLE_KEY` | Clerk production publishable key (`pk_live_…`, encodes `clerk.coursebook.golf`); public |
 | API | `CLERK_JWT_KEY` | The production instance's JWT public key (PEM; Clerk API keys, "Show JWT public key"), so tokens verify without a network call after a restart. Optional; without it the API fetches Clerk's keys |
-| API | `WEB_ORIGINS` | `https://coursebook.golf,https://www.coursebook.golf,https://coursebook-golf-web.onrender.com`: exact origins, comma-separated, no trailing slash; used for CORS and the token `azp` check |
+| API | `WEB_ORIGINS` | `https://coursebook.golf,https://www.coursebook.golf,https://coursebook-golf-web.onrender.com`: exact origins, comma-separated, no trailing slash; used for CORS and the token `azp` check. Required: with `NODE_ENV=production` (set by the Docker image) the API refuses to start without at least one |
 | API | `PUBLIC_WEB_URL` | `https://coursebook.golf` (privacy and account-deletion links) |
 | API | `MIN_IOS_VERSION`, `MIN_ANDROID_VERSION`, `OPENGOLF_API_URL`, `OPENGOLF_CSV_URL`, `PORT` | Unset; the defaults in `env.ts` apply (Render sets `PORT`) |
 | Web | `VITE_API_URL` | `https://api.coursebook.golf` |
