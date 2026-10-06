@@ -83,6 +83,28 @@ const authCardInset = (page: Page) =>
     return { left: Math.round(inner.left - contentLeft), right: Math.round(contentRight - inner.right) };
   });
 
+/**
+ * How far the center of Clerk's card on a full-page sign-in or sign-up sits
+ * from the center of its page section (the content column), in whole pixels;
+ * 0 when centered.
+ */
+const pageCardOffset = (page: Page, sectionId: string) =>
+  page.evaluate((id) => {
+    const section = document.getElementById(id);
+    const card = section?.querySelector(".cl-cardBox");
+    if (!section || !card) return null;
+    const outer = section.getBoundingClientRect();
+    const inner = card.getBoundingClientRect();
+    return Math.round((inner.left + inner.right) / 2 - (outer.left + outer.right) / 2);
+  }, sectionId);
+
+/**
+ * The signed-in member's avatar in the top bar, linking to their profile.
+ * Phones hide it (the tab bar has Profile), so it is matched by element, not
+ * by role, which skips hidden elements.
+ */
+const accountAvatar = (page: Page) => page.locator("#authbar a");
+
 test("anonymous navigation, dialogs and mobile layout remain usable", async ({ page }) => {
   test.skip(!clerkAvailable, "Clerk development instance keys are not configured");
   await page.goto("/");
@@ -110,15 +132,25 @@ test("anonymous navigation, dialogs and mobile layout remain usable", async ({ p
   // fell short of its padding on phones; it fills the content box instead.
   await expect(page.locator("#authClerk .cl-cardBox.cl-signIn-start")).toBeVisible();
   await expect.poll(() => authCardInset(page)).toEqual({ left: 0, right: 0 });
-  // Clerk's "Sign up" link goes to the full-page sign-up, which the dialog
-  // once kept covering.
-  await page.locator("#authClerk .cl-footerActionLink").click();
-  await expect(page).toHaveURL(/\/sign-up/);
+  await page.locator("#authmodal").getByRole("button", { name: "Close" }).click();
   await expect(page.locator("#authmodal")).toHaveCount(0);
+  // The full-page sign-up once left Clerk's card against the column's left edge.
+  await page.goto("/sign-up");
   await expect(page.locator("#signup .cl-cardBox.cl-signUp-start")).toBeVisible();
+  await expect.poll(() => pageCardOffset(page, "signup")).toBe(0);
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
   ).toBe(true);
+  // Google returns to the page the dialog was opened on, as a full page load
+  // with Clerk's next step in the hash (a new account: #/create/sso-callback,
+  // then #/create/continue for the username). The dialog once stayed closed,
+  // so the account was never created. A step that needs no sign-in in
+  // progress stands in for them here; closing the dialog clears it.
+  await page.goto("/courses#/factor-one");
+  await expect(page.locator("#authmodal")).toBeVisible();
+  await page.locator("#authmodal").getByRole("button", { name: "Close" }).click();
+  await expect(page.locator("#authmodal")).toHaveCount(0);
+  expect(await page.evaluate(() => location.hash)).toBe("");
 });
 
 test.describe("signed in", () => {
@@ -132,7 +164,7 @@ test.describe("signed in", () => {
   test("sign-in shows the stored order and logging preserves it", async ({ page }) => {
     const { owner } = members();
     await signInAs(page, owner);
-    await expect(page.locator("#authLabel")).toHaveText(owner.username);
+    await expect(accountAvatar(page)).toHaveAttribute("href", "/u/" + owner.username);
     await openRanking(page, owner);
     await expect(page.locator("#myCourseCount")).toHaveText("2");
     await expect(page.locator("#mylist .course")).toHaveText(["Test Beta Links", "Test Alpha Links"]);
@@ -431,11 +463,12 @@ test.describe("account deletion", () => {
     });
     try {
       await signInAs(page, { id: created.id, username: "e2e_del_" + suffix, displayName: "Leaving", email });
-      await expect(page.locator("#authLabel")).toHaveText("e2e_del_" + suffix);
+      await expect(accountAvatar(page)).toHaveAttribute("href", "/u/e2e_del_" + suffix);
       await page.getByRole("link", { name: "Account", exact: true }).click();
       await page.locator("#deleteAccount").click();
       await page.locator("#confirmDeleteAccount").click();
-      await expect(page.locator("#authLabel")).toHaveText("Not signed in");
+      await expect(page.locator("#authOpen")).toHaveText("Sign in");
+      await expect(accountAvatar(page)).toHaveCount(0);
       await expect
         .poll(async () => (await clerkClient.users.getUserList({ userId: [created.id] })).data.length)
         .toBe(0);

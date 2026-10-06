@@ -15,7 +15,24 @@ On `main` (PR #4, merged 2026-09-29): the API with its read and write operations
 | Database | Postgres 17 | `coursebook-db` |
 | Contract | [contract/openapi.json](../contract/openapi.json), generated from the API's route definitions; clients generate their code from it | not deployed; also served at `/v1/openapi.json` |
 
-[render.yaml](../render.yaml) is the source of truth. Staging uses free plans; the cutover moves the database, then the API, to paid plans.
+[render.yaml](../render.yaml) is the source of truth for the infrastructure. Staging uses free plans; the cutover moves the database, then the API, to paid plans.
+
+### Production configuration
+
+Every production environment variable lives in Doppler, which syncs it to the Render service ([decision](../.planning/decisions/2026-10-05-doppler-is-the-single-source-of-truth-for-render-environment-variables.md)). `render.yaml` declares none, and a Blueprint sync keeps variables it omits. The API validates its variables at startup ([env.ts](../apps/api/src/services/env.ts)) and refuses to start without a required one. `VITE_*` values are compiled into the web bundle, so changing one needs a web rebuild; changing an API variable needs an API deploy. Confirm a change is live rather than assuming the sync deployed it.
+
+| Service | Variable | What Doppler must hold |
+| --- | --- | --- |
+| API | `DATABASE_URL` | `coursebook-db`'s *internal* connection string. Update it in Doppler before the API redeploys whenever the database is recreated, restored into a new instance or its credentials change |
+| API | `CLERK_SECRET_KEY` | Clerk production instance secret key; the only secret besides the database URL |
+| API | `CLERK_PUBLISHABLE_KEY` | Clerk production publishable key (`pk_live_…`, encodes `clerk.coursebook.golf`); public |
+| API | `CLERK_JWT_KEY` | The production instance's JWT public key (PEM; Clerk API keys, "Show JWT public key"), so tokens verify without a network call after a restart. Optional; without it the API fetches Clerk's keys |
+| API | `WEB_ORIGINS` | `https://coursebook.golf,https://www.coursebook.golf,https://coursebook-golf-web.onrender.com`: exact origins, comma-separated, no trailing slash; used for CORS and the token `azp` check |
+| API | `PUBLIC_WEB_URL` | `https://coursebook.golf` (privacy and account-deletion links) |
+| API | `MIN_IOS_VERSION`, `MIN_ANDROID_VERSION`, `OPENGOLF_API_URL`, `OPENGOLF_CSV_URL`, `PORT` | Unset; the defaults in `env.ts` apply (Render sets `PORT`) |
+| Web | `VITE_API_URL` | `https://api.coursebook.golf` |
+| Web | `VITE_CLERK_PUBLISHABLE_KEY` | Same `pk_live_…` key as the API. Public: every `VITE_*` value ships in the browser bundle, so never a secret |
+| Web | `NODE_VERSION` | `24`: the build uses corepack, which ships with Node 24 but not 25+ |
 
 ## Responsibilities
 
@@ -129,7 +146,7 @@ Clerk dashboard configuration the code assumes:
 - API keys: the JWT public key goes into the API's `CLERK_JWT_KEY`.
 - Production instance: DNS records on coursebook.golf, the project's own Google OAuth client, and later Sign in with Apple for the iOS app (App Store rule 4.8).
 
-The web account dialog ([AuthDialog.tsx](../apps/web/app/features/auth/AuthDialog.tsx)) keeps the legacy modal chrome and ids and renders Clerk's `SignIn`/`SignUp` with hash routing; `/sign-in/*` and `/sign-up/*` exist for OAuth callbacks and direct links. `ClerkProvider` sits in the root `Layout`, not `App`, because route `clientLoader`s await `getToken()` before `App` renders.
+The web account dialog ([AuthDialog.tsx](../apps/web/app/features/auth/AuthDialog.tsx)) keeps the legacy modal chrome and ids and renders Clerk's `SignIn` with hash routing and `withSignUp`, Clerk's sign-in-or-up flow: an email or Google account with no member behind it creates one, and Clerk asks for the missing username in the same dialog. Google returns to the page the dialog was opened on with Clerk's step in the hash (`#/create/sso-callback` for a new account), so the layout opens the dialog when a page loads with a `#/` hash and clears the hash when it closes ([clerk-flow.ts](../apps/web/app/features/auth/clerk-flow.ts)). `/sign-in/*` (also `withSignUp`) and `/sign-up/*` serve direct links and Clerk's own redirects; `ClerkProvider`'s `signInUrl`/`signUpUrl` point Clerk at them instead of its hosted pages. One step still falls back to the instance's configured sign-up page: `#/create/continue` loaded with no sign-up in progress. `ClerkProvider` sits in the root `Layout`, not `App`, because route `clientLoader`s await `getToken()` before `App` renders.
 
 ## Contract and clients
 

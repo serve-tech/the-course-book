@@ -85,7 +85,7 @@ try {
   await page.goto(WEB + "/");
   await clerk.signIn({ page, emailAddress: email });
   await page.goto(WEB + "/");
-  await expect(page.locator("#authLabel")).toHaveText(username, { timeout: 120_000 });
+  await expect(page.locator("#authbar a")).toHaveAttribute("href", "/u/" + username, { timeout: 120_000 });
 
   // Pebble Beach is in the seeded catalog; Pinehurst's first hit is not.
   for (const query of ["Pebble Beach", "Pinehurst"]) {
@@ -117,7 +117,7 @@ try {
   await page.getByRole("link", { name: "Account", exact: true }).click();
   await page.locator("#deleteAccount").click();
   await page.locator("#confirmDeleteAccount").click();
-  await expect(page.locator("#authLabel")).toHaveText("Not signed in", { timeout: 30_000 });
+  await expect(page.locator("#authOpen")).toHaveText("Sign in", { timeout: 30_000 });
   await expect
     .poll(async () => (await clerkClient.users.getUserList({ userId: [user.id] })).data.length, { timeout: 30_000 })
     .toBe(0);
