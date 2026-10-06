@@ -25,7 +25,6 @@
 .brandLink:focus-visible { outline: 2px solid var(--gold); outline-offset: 4px; border-radius: 8px; }
 .brandLink :global(.mark) { width: 34px; height: 34px; }
 .brandLink b { font: 600 20px "Playfair Display", Georgia, serif; letter-spacing: -0.4px; }
-.brandLink b span { color: var(--gold); }
 
 .links {
   display: flex;

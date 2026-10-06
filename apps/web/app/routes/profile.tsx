@@ -13,7 +13,7 @@ import { RouteError } from "../shared/ui/RouteError";
 import { useShell } from "../shared/ui/shell";
 
 export const meta: Route.MetaFunction = ({ loaderData: loaded }) => [
-  { title: (loaded?.signedIn ? displayName(loaded.profile.member) : "Profile") + " · coursebook.golf" },
+  { title: (loaded?.signedIn ? displayName(loaded.profile.member) : "Profile") + " · The Course Book" },
 ];
 
 /** Shown for a member the viewer may not see; the API does not say which case it is. */

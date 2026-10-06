@@ -189,7 +189,7 @@ function FeedRow({ item, now }: { item: FeedItem; now: Date }) {
 export function Welcome({ onSignIn }: { onSignIn: () => void }) {
   return (
     <div className={feedStyles.welcome}>
-      <span className={feedStyles.eyebrow}>coursebook.golf</span>
+      <span className={feedStyles.eyebrow}>The Course Book</span>
       <h1 className={feedStyles.welcomeTitle}>
         Every course you&apos;ve played, <em>ranked.</em>
       </h1>

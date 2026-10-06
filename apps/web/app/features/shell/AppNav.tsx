@@ -31,13 +31,11 @@ interface NavProps {
 export function TopBar({ member, incomingRequests, onSignIn, onSignOut, onNavigate }: NavProps) {
   return (
     <header className={styles.topbar}>
-      <Link to="/" className={styles.brandLink} onClick={onNavigate} aria-label="coursebook.golf home">
+      <Link to="/" className={styles.brandLink} onClick={onNavigate} aria-label="The Course Book home">
         <span className="mark bookmark" aria-hidden="true">
           <BrandMark />
         </span>
-        <b>
-          coursebook<span>.golf</span>
-        </b>
+        <b>The Course Book</b>
       </Link>
       <nav className={styles.links} aria-label="Main">
         <NavLink end to="/" className={cx(styles.link)} onClick={onNavigate}>

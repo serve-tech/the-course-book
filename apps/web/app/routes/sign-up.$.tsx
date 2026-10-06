@@ -2,7 +2,7 @@ import { SignUp } from "@clerk/react-router";
 import styles from "../features/auth/auth.module.css";
 import type { Route } from "./+types/sign-up.$";
 
-export const meta: Route.MetaFunction = () => [{ title: "Create account · coursebook.golf" }];
+export const meta: Route.MetaFunction = () => [{ title: "Create account · The Course Book" }];
 
 /** Full-page sign-up used by OAuth callbacks and direct links; the dialog is the usual entry. */
 export default function SignUpPage() {
