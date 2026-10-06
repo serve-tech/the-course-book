@@ -1,5 +1,4 @@
-import type { Database } from "../db/client";
-import { normalizeName, type Course } from "@coursebook/domain/catalog/course";
+import type { Course } from "@coursebook/domain/catalog/course";
 import { resolveSearchResults } from "../domain/course-search";
 import {
   extractCoursePage,
@@ -8,8 +7,6 @@ import {
   type RawCourse,
 } from "../domain/opengolf";
 import type { SearchResult } from "@coursebook/domain/catalog/search-results";
-import { allCourses } from "./catalog";
-import { searchEnv } from "./env";
 
 /**
  * Course discovery: OpenGolfAPI's REST search with its published CSV dataset
@@ -145,26 +142,3 @@ export function createCourseSearch(deps: SearchDependencies): CourseSearch {
     },
   };
 }
-
-let service: ReturnType<typeof createCourseSearch> | undefined;
-
-/** Process-wide search bound to the environment and the catalog snapshot. */
-export function searchCourses(
-  db: Database,
-  query: string,
-  signal?: AbortSignal,
-): Promise<SearchResult[]> {
-  service ??= createCourseSearch({
-    catalog: () => allCourses(db),
-    apiUrl: searchEnv().OPENGOLF_API_URL,
-    csvUrl: searchEnv().OPENGOLF_CSV_URL,
-  });
-  return service.search(query, signal);
-}
-
-/** Exposed for tests that need a fresh service after changing dependencies. */
-export function resetCourseSearch(): void {
-  service = undefined;
-}
-
-export { normalizeName };

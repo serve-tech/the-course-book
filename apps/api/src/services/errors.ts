@@ -1,10 +1,10 @@
 /**
  * Expected failures raised by server modules.
  *
- * Services throw `AppError` instead of framework responses so they can serve
- * any transport. The transport layer (today the React Router routes, later
- * the JSON API) maps `status` to the response status and exposes `code` so
- * clients can branch without parsing messages.
+ * Services throw `AppError` instead of framework responses so they stay
+ * independent of the transport. The API's error handler (`http/errors.ts`)
+ * maps `status` to the response status and exposes `code` so clients can
+ * branch without parsing messages.
  */
 
 /**
