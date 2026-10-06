@@ -144,7 +144,7 @@ Clerk dashboard configuration the code assumes:
 - API keys: the JWT public key goes into the API's `CLERK_JWT_KEY`.
 - Production instance: DNS records on coursebook.golf, the project's own Google OAuth client, and later Sign in with Apple for the iOS app (App Store rule 4.8).
 
-The web account dialog ([AuthDialog.tsx](../apps/web/app/features/auth/AuthDialog.tsx)) keeps the legacy modal chrome and ids and renders Clerk's `SignIn`/`SignUp` with hash routing; `/sign-in/*` and `/sign-up/*` exist for OAuth callbacks and direct links. `ClerkProvider` sits in the root `Layout`, not `App`, because route `clientLoader`s await `getToken()` before `App` renders.
+The web account dialog ([AuthDialog.tsx](../apps/web/app/features/auth/AuthDialog.tsx)) keeps the legacy modal chrome and ids and renders Clerk's `SignIn` with hash routing and `withSignUp`, Clerk's sign-in-or-up flow: an email or Google account with no member behind it creates one, and Clerk asks for the missing username in the same dialog. Google returns to the page the dialog was opened on with Clerk's step in the hash (`#/create/sso-callback` for a new account), so the layout opens the dialog when a page loads with a `#/` hash and clears the hash when it closes ([clerk-flow.ts](../apps/web/app/features/auth/clerk-flow.ts)). `/sign-in/*` (also `withSignUp`) and `/sign-up/*` serve direct links and Clerk's own redirects; `ClerkProvider`'s `signInUrl`/`signUpUrl` point Clerk at them instead of its hosted pages. One step still falls back to the instance's configured sign-up page: `#/create/continue` loaded with no sign-up in progress. `ClerkProvider` sits in the root `Layout`, not `App`, because route `clientLoader`s await `getToken()` before `App` renders.
 
 ## Contract and clients
 

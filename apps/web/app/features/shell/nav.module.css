@@ -95,7 +95,9 @@
 .log:hover { background: #d4b97c; }
 .log:focus-visible { outline: 2px solid var(--cream); outline-offset: 2px; }
 .account { display: flex; align-items: center; gap: 10px; }
-.accountName { color: #cfd3cb; font-size: 13px; max-width: 16ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.accountAvatar { display: flex; }
+.accountAvatar a:hover { border-color: var(--gold); }
+.accountAvatar a:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 .accountButton {
   height: 34px;
   padding: 0 13px;
@@ -133,7 +135,7 @@
   .topbar { height: 56px; gap: 12px; padding: 0 16px; padding-top: env(safe-area-inset-top, 0px); }
   .brandLink b { font-size: 18px; }
   .brandLink :global(.mark) { width: 30px; height: 30px; }
-  .links, .log, .accountName { display: none; }
+  .links, .log, .accountAvatar { display: none; }
   .main { padding: 20px 16px 40px; }
   /* Room for the fixed tab bar below everything, the footer's links included. */
   .shell { padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }

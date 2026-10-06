@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, Outlet, useLocation, useRevalidator, type ShouldRevalidateFunctionArgs } from "react-router";
 import type { Route } from "./+types/layout";
 import { AuthDialog } from "../features/auth/AuthDialog";
+import { isClerkFlowHash } from "../features/auth/clerk-flow";
 import { api, ApiError, unwrap } from "../lib/api";
 import { useServerWaking } from "../lib/api/server-status";
 import { detectState } from "../shared/lib/geolocation";
@@ -80,15 +81,23 @@ export default function Layout({ loaderData }: Route.ComponentProps) {
     lastUser.current = userId;
   }, [userId, revalidator]);
   // The sign-in dialog belongs to the page it was opened on. When Clerk
-  // navigates elsewhere (its "Sign up" link goes to /sign-up), the dialog
-  // closes instead of covering the new page; state is adjusted during render,
-  // not in an effect.
-  const { pathname } = useLocation();
-  const [authOpenOn, setAuthOpenOn] = useState<string | null>(null);
+  // navigates elsewhere (home, once signed in), the dialog closes instead of
+  // covering the new page; state is adjusted during render, not in an effect.
+  // Google returns to the page the dialog was opened on with Clerk's step in
+  // the hash; a new account comes back to `#/create/sso-callback` and still
+  // has to choose a username, so the page opens with the dialog to finish.
+  const { pathname, hash } = useLocation();
+  const [authOpenOn, setAuthOpenOn] = useState<string | null>(() => (isClerkFlowHash(hash) ? pathname : null));
   if (authOpenOn !== null && authOpenOn !== pathname) setAuthOpenOn(null);
   const authOpen = authOpenOn === pathname;
   const openAuthDialog = () => {
     setAuthOpenOn(pathname);
+  };
+  const closeAuthDialog = () => {
+    setAuthOpenOn(null);
+    // A Clerk step left in the URL would reopen the dialog on reload.
+    if (isClerkFlowHash(window.location.hash))
+      window.history.replaceState(window.history.state, "", window.location.pathname + window.location.search);
   };
   const [storedState, setStoredState] = usePreference(SELECTED_STATE_KEY);
   const selectedState = storedState.toUpperCase();
@@ -177,13 +186,7 @@ export default function Layout({ loaderData }: Route.ComponentProps) {
 
       <TabBar member={user} incomingRequests={requests} onSignIn={openAuthDialog} onNavigate={navigate} />
 
-      {authOpen && !user && (
-        <AuthDialog
-          onClose={() => {
-            setAuthOpenOn(null);
-          }}
-        />
-      )}
+      {authOpen && !user && <AuthDialog onClose={closeAuthDialog} />}
 
       <div className={"toast" + (toast.message ? " show" : "") + (toast.followUp ? " has-action" : "")} id="toast" role="status">
         {toast.message}

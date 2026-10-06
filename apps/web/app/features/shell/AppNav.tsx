@@ -1,5 +1,7 @@
 import { Link, NavLink } from "react-router";
 import { BrandMark } from "../../shared/ui/Brand";
+import { Avatar } from "../social/Avatar";
+import { AvatarSize } from "../social/sizes";
 import { logPath, profilePath } from "../social/paths";
 import { cx } from "../../shared/lib/cx";
 import styles from "./nav.module.css";
@@ -7,6 +9,8 @@ import styles from "./nav.module.css";
 /** The signed-in member as the navigation needs them; null when signed out. */
 export interface NavMember {
   username: string;
+  /** Gives the avatar's initials and accessible name. */
+  displayName: string;
 }
 
 interface NavProps {
@@ -20,7 +24,9 @@ interface NavProps {
 
 /**
  * The top bar: brand, destinations (Home, Courses, Friends, Profile), Log a
- * round and the account. On phones the destinations move to `TabBar`.
+ * round and the account: the member's avatar, linking to their profile, and
+ * Sign out, or only Sign in when signed out. On phones the destinations move
+ * to `TabBar`, which also carries Profile, so the avatar is hidden there.
  */
 export function TopBar({ member, incomingRequests, onSignIn, onSignOut, onNavigate }: NavProps) {
   return (
@@ -65,9 +71,11 @@ export function TopBar({ member, incomingRequests, onSignIn, onSignOut, onNaviga
           </Link>
         )}
         <div className={styles.account} id="authbar">
-          <span className={styles.accountName} id="authLabel">
-            {member ? member.username : "Not signed in"}
-          </span>
+          {member && (
+            <span className={styles.accountAvatar}>
+              <Avatar member={member} size={AvatarSize.Medium} link />
+            </span>
+          )}
           <button type="button" className={styles.accountButton} id="authOpen" onClick={member ? onSignOut : onSignIn}>
             {member ? "Sign out" : "Sign in"}
           </button>
