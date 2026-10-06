@@ -10,6 +10,8 @@ export interface VerifiedSession {
 
 /** Reasons the API adds to Clerk's own when it rejects a token. */
 export enum SessionRejection {
+  /** The Authorization header is not `Bearer <token>`; Clerk is not called. */
+  NotBearer = "not-bearer",
   /** Clerk verified the token, but its session is pending or names no user. */
   NoActiveSession = "no-active-session",
   /** The token's `azp` is not one of the web origins (`isAuthorizedParty`). */

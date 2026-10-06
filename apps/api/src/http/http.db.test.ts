@@ -126,6 +126,33 @@ describe("authentication", () => {
     expect(warning).not.toContain("golfer_1");
   });
 
+  it.each(["Basic dXNlcjpwYXNz", "bearer header.payload.signature", "header.payload.signature"])(
+    "rejects Authorization: %s without calling Clerk",
+    async (header) => {
+      let calls = 0;
+      // Accepts anything, so a call would turn the expected 401 into a 200.
+      const t = createTestApp(db, {
+        verifySession: () => {
+          calls += 1;
+          return Promise.resolve({ ok: true, session: { clerkId: "user_1", claims: { username: "golfer_1" } } });
+        },
+      });
+      const result = await t.get("/v1/me", { authorization: header });
+      expectError(result, 401, "unauthenticated");
+      expect(calls).toBe(0);
+      expect(t.warnings).toEqual([
+        { message: "Session token rejected", detail: { requestId: result.headers.get("x-request-id"), reason: "not-bearer" } },
+      ]);
+    },
+  );
+
+  it("rejects a valid token sent without the Bearer scheme, which Clerk alone would accept", async () => {
+    const t = createTestApp(db);
+    const token = t.tokens.issue({ sub: "user_1", username: "golfer_1" });
+    expect((await t.get("/v1/me", { authorization: "Bearer " + token })).status).toBe(200);
+    expectError(await t.get("/v1/me", { authorization: token }), 401, "unauthenticated");
+  });
+
   it("accepts web tokens from the web origin and native tokens without azp", async () => {
     const t = createTestApp(db);
     expect((await t.get("/v1/me", t.bearer("user_1", "golfer_1", { azp: WEB_ORIGIN }))).status).toBe(200);
