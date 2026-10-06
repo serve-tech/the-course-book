@@ -4,7 +4,8 @@ import { bodyLimit } from "hono/body-limit";
 import { compress } from "hono/compress";
 import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
-import { requestId } from "hono/request-id";
+import { secureHeaders } from "hono/secure-headers";
+import { randomUUID } from "node:crypto";
 import type { AccountDirectory } from "./auth/accounts";
 import { sessionMiddleware } from "./auth/middleware";
 import type { SessionVerifier } from "./auth/session";
@@ -76,6 +77,38 @@ export const consoleLogger: Logger = {
   },
 };
 
+/**
+ * Give every request an id generated here, sent back as `X-Request-Id`.
+ *
+ * Hono's `requestId()` adopts a client's `X-Request-Id` when it looks valid,
+ * which lets a client pick the id its request is logged under, for example
+ * one copied from another member's error report. The client's header is
+ * ignored.
+ */
+const serverRequestId: MiddlewareHandler<AppEnv> = async (c, next) => {
+  const id = randomUUID();
+  c.set("requestId", id);
+  c.header("X-Request-Id", id);
+  await next();
+};
+
+/**
+ * Security headers for a JSON API (OWASP REST Security Cheat Sheet): nothing
+ * in a response may load, run or be framed, and browsers must not sniff
+ * types or downgrade to HTTP. Hono's other defaults (Referrer-Policy
+ * no-referrer, no X-Powered-By, …) stay.
+ *
+ * `Cross-Origin-Resource-Policy` is `cross-origin` rather than Hono's
+ * `same-origin`: the web app reads the API from another origin, and CORS
+ * decides who may read a response. CORP only governs no-cors loads (images,
+ * scripts), which carry no bearer token and so can only reach public data.
+ */
+const securityHeaders = secureHeaders({
+  contentSecurityPolicy: { defaultSrc: ["'none'"], frameAncestors: ["'none'"] },
+  xFrameOptions: "DENY",
+  crossOriginResourcePolicy: "cross-origin",
+});
+
 /** Personal responses must never be stored by a shared cache. */
 const noStore: MiddlewareHandler<AppEnv> = async (c, next) => {
   await next();
@@ -85,9 +118,9 @@ const noStore: MiddlewareHandler<AppEnv> = async (c, next) => {
 /**
  * Build the API application.
  *
- * Middleware order matters: request id and logging wrap everything; CORS
- * answers preflights before authentication; the body limit and session
- * checks apply to `/v1` only. `/healthz` stays outside `/v1`, unlogged, for
+ * Middleware order matters: request id, logging and security headers wrap
+ * everything; CORS answers preflights before authentication; the body limit
+ * and session checks apply to `/v1` only. `/healthz` stays outside `/v1`, unlogged, for
  * Render's frequent probes.
  */
 export function createApp(deps: AppDependencies): OpenAPIHono<AppEnv> {
@@ -97,7 +130,7 @@ export function createApp(deps: AppDependencies): OpenAPIHono<AppEnv> {
   };
   const app = new OpenAPIHono<AppEnv>({ defaultHook: validationHook });
 
-  app.use("*", requestId());
+  app.use("*", serverRequestId);
   app.use("*", async (c, next) => {
     const started = performance.now();
     await next();
@@ -110,6 +143,7 @@ export function createApp(deps: AppDependencies): OpenAPIHono<AppEnv> {
       ms: Math.round(performance.now() - started),
     });
   });
+  app.use("*", securityHeaders);
   app.use(
     "*",
     cors({
