@@ -50,7 +50,7 @@ Every failure returns:
 | `GET /v1/me/courses/{courseId}/rounds` | `listMyCourseRounds` | member | Rounds at a course, newest first |
 | `POST /v1/me/courses/{courseId}/rounds` | `logRounds` | member | Log rounds at a catalog course; returns their `roundIds`, so Undo is `deleteRound` for each (the last one takes the course off the list) |
 | `DELETE /v1/me/rounds/{roundId}` | `deleteRound` | member | Delete one round; the last one removes the course |
-| `GET /v1/course-search?q=` | `searchCourses` | member | Up to ten hits; catalog hits carry `courseId` |
+| `GET /v1/course-search?q=&page=&source=` | `searchCourses` | member | Stored courses by default; `source=external` explicitly discovers more. Alphabetical pages of ten hits (`page` defaults to 1), with `page`, `pageSize` and `total`; catalog hits carry `courseId` |
 | `GET /v1/members?cursor=&limit=` | `listMembers` | member | The member's friends, paged by username (limit 1–200, default 50) |
 | `GET /v1/members/{username}` | `getMemberList` | member | The member's own list or a friend's, with `onMyList` flags; anyone else is 404 `member_not_found` |
 | `GET /v1/member-search?q=` | `searchMembers` | member | Up to 20 other members whose username contains `q` (3–64 characters), prefix matches first, each with the viewer's `relationship`; `no-store` |

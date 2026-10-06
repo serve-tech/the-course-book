@@ -387,12 +387,58 @@ test.describe("signed in", () => {
     await expect(page.locator("#mylist .roundslink").first()).toBeDisabled();
   });
 
+  test("catalog search finds Oakland University and pages alphabetically on desktop and mobile", async ({ page }, testInfo) => {
+    const { owner } = members();
+    await signInAs(page, owner);
+    await openRanking(page, owner);
+    await openLog(page);
+    await page.locator("#modalsearch").fill("Oakland");
+    await page.locator(".result").filter({ hasText: "Oakland University: Katke-Cousins" }).click();
+    await expect(page.locator("#selectedCourseCard")).toContainText("Oakland University: Katke-Cousins");
+    await page.locator("#backToSearch").click();
+    await page.locator("#modalsearch").fill("Pagination Catalog");
+    await expect(page.locator("#results .result strong")).toHaveText(Array.from({ length: 10 }, (_, index) => `Pagination Catalog ${String(index + 1).padStart(2, "0")}`));
+    await expect(page.getByRole("button", { name: "Previous", exact: true })).toBeDisabled();
+    await page.getByRole("button", { name: "Next", exact: true }).click();
+    await expect(page.locator("#results .result strong")).toHaveText(["Pagination Catalog 11", "Pagination Catalog 12", "Pagination Catalog 13"]);
+    await page.screenshot({ path: testInfo.outputPath("course-search-page-two.png"), fullPage: true });
+    await expect(page.getByRole("button", { name: "Next", exact: true })).toBeDisabled();
+    await page.getByRole("button", { name: "Previous", exact: true }).click();
+    await expect(page.locator("#results .result")).toHaveCount(10);
+    await page.getByRole("button", { name: "Next", exact: true }).click();
+    await page.locator(".result").filter({ hasText: "Pagination Catalog 13" }).click();
+    await page.locator("#playedOn").fill("2026-05-01");
+    await page.locator("#confirmLog").click();
+    await expect(page.locator("#modal")).toHaveCount(0);
+    expect(await roundDates(db, owner.id, "bbbbbbbb-0000-4000-8000-000000000013")).toEqual(["2026-05-01"]);
+    expect(await listOrder(db, owner.id)).toEqual([fixtureCourses.beta.id, fixtureCourses.alpha.id, "bbbbbbbb-0000-4000-8000-000000000013"]);
+  });
+
+  test("external discovery is explicit and can log a result from its second page", async ({ page }) => {
+    const { owner } = members();
+    await signInAs(page, owner);
+    await openRanking(page, owner);
+    await openLog(page);
+    await page.locator("#modalsearch").fill("External Pagination");
+    await expect(page.getByText("No courses found in our catalog. Try Search more courses.")).toBeVisible();
+    await page.getByRole("button", { name: "Search more courses" }).click();
+    await expect(page.locator("#results .result strong")).toHaveText(Array.from({ length: 10 }, (_, index) => `External Pagination ${String(index + 1).padStart(2, "0")}`));
+    await page.getByRole("button", { name: "Next", exact: true }).click();
+    await expect(page.locator("#results .result strong")).toHaveText(["External Pagination 11", "External Pagination 12", "External Pagination 13"]);
+    await page.locator(".result").filter({ hasText: "External Pagination 13" }).click();
+    await page.locator("#confirmLog").click();
+    await expect(page.locator("#modal")).toHaveCount(0);
+    await expect(row(page, "External Pagination 13").locator(".count")).toContainText("1×");
+    expect(await courseByName(db, "External Pagination 13")).toMatchObject({ state: "MI", country: "USA", isCustom: false, createdBy: owner.id });
+  });
+
   test("course search uses the dataset fallback when the REST API is unavailable", async ({ page }) => {
     const { owner } = members();
     await signInAs(page, owner);
     await openRanking(page, owner);
     await openLog(page);
     await page.locator("#modalsearch").fill("Fallback Test");
+    await page.getByRole("button", { name: "Search more courses" }).click();
     await page.locator(".result").filter({ hasText: "Fallback Test Links" }).click();
     await page.locator("#timesPlayed").fill("2");
     await page.locator("#confirmLog").click();

@@ -1,5 +1,10 @@
 import type { Course } from "./course";
 
+export enum CourseSearchSource {
+  Catalog = "catalog",
+  External = "external",
+}
+
 /**
  * A course search hit: the catalog identity plus the richest display metadata.
  *

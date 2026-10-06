@@ -58,7 +58,7 @@ Mock external services, not the domain or service logic whose behavior the test 
 
 | Area changed | Relevant assertions |
 | --- | --- |
-| Course matching/search | Canonical identity survives richer labels, aliases and inconsistent geography; catalog hits carry `courseId`; catalog rows never appear as search results; CSV fallback and `search_unavailable` |
+| Course matching/search | Canonical identity survives richer labels, aliases and inconsistent geography; catalog hits carry `courseId`; catalog/default search works without discovery (including custom courses and Oakland University: Katke-Cousins); alphabetical pages have no gaps/overlap; explicit external discovery, CSV fallback and `search_unavailable` |
 | Round logging/count/history | Count equals round rows; existing rank untouched; oldest rounds removed first on count reduction (newest history kept); last-round delete removes membership; returned lists match the database |
 | Personal ordering/filtering | Move renumbers the full list; hidden memberships survive filtered moves; geographic filters remain read-only; ranks stay contiguous under concurrent moves |
 | Authorization | Writes affect only the token's member; lists are visible only to their member and accepted friends (strangers and pending requests get 404); secured operations 401 before validation; web tokens need an allowed `azp`; deleted accounts cannot write or be re-provisioned; no emails anywhere |
