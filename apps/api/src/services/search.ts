@@ -48,12 +48,18 @@ export function createCourseSearch(deps: SearchDependencies): CourseSearch {
   let dataset: RawCourse[] | null = null;
   let loading: Promise<RawCourse[]> | null = null;
 
+  /*
+   * The download is shared by every search waiting for it, so only its own
+   * timeout may cancel it: tied to the first caller's request, one member's
+   * cancelled search failed everyone else's. Each caller stops waiting when
+   * its own request is cancelled; the download carries on for the others.
+   */
   const loadDataset = (signal: AbortSignal): Promise<RawCourse[]> => {
     if (dataset) return Promise.resolve(dataset);
     loading ??= fetcher(deps.csvUrl, {
       headers: { Accept: "text/csv" },
       cache: "no-store",
-      signal: AbortSignal.any([signal, AbortSignal.timeout(CSV_TIMEOUT_MS)]),
+      signal: AbortSignal.timeout(CSV_TIMEOUT_MS),
     })
       .then(async (response) => {
         if (!response.ok)
@@ -66,7 +72,7 @@ export function createCourseSearch(deps: SearchDependencies): CourseSearch {
         loading = null;
         throw error;
       });
-    return loading;
+    return untilAborted(loading, signal);
   };
 
   const endpoint = async (text: string, signal: AbortSignal): Promise<RawCourse[]> => {
@@ -141,4 +147,40 @@ export function createCourseSearch(deps: SearchDependencies): CourseSearch {
       return resolveSearchResults(courses, catalog);
     },
   };
+}
+
+/**
+ * Wait for `work`, or stop waiting when `signal` aborts.
+ *
+ * Args:
+ *     work: A promise others may share; it is neither cancelled nor changed.
+ *     signal: The caller's own signal.
+ *
+ * Returns:
+ *     What `work` resolves to.
+ *
+ * Raises:
+ *     An Error whose cause is the abort reason when the signal aborts first
+ *     or already had (`search` then throws the reason itself); otherwise
+ *     whatever `work` rejects with.
+ *
+ * Note:
+ *     `work` is always raced, even for an aborted signal, so a later
+ *     rejection of the shared promise is handled rather than unhandled
+ *     (which would end the process).
+ */
+async function untilAborted<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
+  let stop: () => void = () => undefined;
+  const aborted = new Promise<never>((_resolve, reject) => {
+    stop = () => {
+      reject(new Error("Stopped waiting for the dataset: the search was cancelled.", { cause: signal.reason }));
+    };
+  });
+  signal.addEventListener("abort", stop, { once: true });
+  if (signal.aborted) stop();
+  try {
+    return await Promise.race([work, aborted]);
+  } finally {
+    signal.removeEventListener("abort", stop);
+  }
 }

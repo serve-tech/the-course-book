@@ -30,6 +30,8 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+const urlOf = (input: Parameters<typeof fetch>[0]) => (typeof input === "string" ? input : input instanceof URL ? input.href : input.url);
+
 describe("course search", () => {
   it("resolves API hits to catalog courses and keeps the catalog out of empty results", async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(Response.json([apiCourse]));
@@ -114,6 +116,37 @@ describe("course search", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     await expect(createCourseSearch(deps(fetcher)).search("Alpha", controller.signal)).rejects.toMatchObject({ name: "AbortError" });
     expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps loading the shared dataset for other searches when one of them is cancelled", async () => {
+    const csv = "id,name,city,state,country\nalpha,Alpha Links,Detroit,MI,USA\n";
+    let deliver: (response: Response) => void = () => undefined;
+    // Like fetch, the download fails when its signal aborts.
+    const fetcher = vi.fn<typeof fetch>((input, init) =>
+      urlOf(input).endsWith(".csv")
+        ? new Promise<Response>((resolve, reject) => {
+            deliver = resolve;
+            init?.signal?.addEventListener("abort", () => {
+              reject(new Error("The download was aborted."));
+            });
+          })
+        : Promise.resolve(new Response(null, { status: 503 })),
+    );
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const service = createCourseSearch(deps(fetcher));
+    const member = new AbortController();
+    const cancelled = service.search("Alpha", member.signal);
+    const waiting = service.search("Alpha");
+    // Both searches fell back to the dataset and wait for the one download.
+    await vi.waitFor(() => {
+      expect(warn).toHaveBeenCalledTimes(2);
+    });
+
+    member.abort("Client connection prematurely closed.");
+    await expect(cancelled).rejects.toBe("Client connection prematurely closed.");
+    deliver(new Response(csv));
+    expect((await waiting).map((result) => result.course.name)).toEqual(["Alpha Links"]);
+    expect(fetcher.mock.calls.filter(([input]) => urlOf(input).endsWith(".csv"))).toHaveLength(1);
   });
 
   it("reads beyond 50 upstream matches before alphabetizing", async () => {
