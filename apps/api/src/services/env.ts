@@ -35,9 +35,14 @@ const searchSchema = z.object({
     ),
 });
 
+// Zod runs the refinement even when `url()` failed, so it must not throw on
+// a value that is not a URL.
 const origin = z
   .url()
-  .refine((value) => new URL(value).origin === value, "Use a bare origin such as https://coursebook.golf, without a path or trailing slash.");
+  .refine(
+    (value) => URL.canParse(value) && new URL(value).origin === value,
+    "Use a bare origin such as https://coursebook.golf, without a path or trailing slash.",
+  );
 
 /** Comma-separated exact web origins, split and trimmed; empty parts are dropped. */
 const originList = z
@@ -57,6 +62,17 @@ const apiSchema = z.object({
   MIN_ANDROID_VERSION: z.string().regex(/^\d+\.\d+\.\d+$/).default("0.0.0"),
 });
 
+/**
+ * Production needs at least one web origin. Without one, CORS refuses the
+ * web app and every web token fails the `azp` check, so the API would start
+ * and answer 401 to every signed-in request.
+ */
+const productionApiSchema = apiSchema.extend({
+  WEB_ORIGINS: originList.pipe(
+    z.array(origin).min(1, "Set WEB_ORIGINS to the web app's origins, e.g. https://coursebook.golf; production needs at least one."),
+  ),
+});
+
 function memo<T>(parse: () => T): () => T {
   let value: T | undefined;
   return () => (value ??= parse());
@@ -70,17 +86,6 @@ export const clerkEnv = memo(() => clerkSchema.parse(process.env));
 
 /** External course discovery endpoints. */
 export const searchEnv = memo(() => searchSchema.parse(process.env));
-
-/**
- * Production needs at least one web origin. Without one, CORS refuses the
- * web app and every web token fails the `azp` check, so the API would start
- * and answer 401 to every signed-in request.
- */
-const productionApiSchema = apiSchema.extend({
-  WEB_ORIGINS: originList.pipe(
-    z.array(origin).min(1, "Set WEB_ORIGINS to the web app's origins, e.g. https://coursebook.golf; production needs at least one."),
-  ),
-});
 
 /**
  * Parse API server settings from an environment-like object.

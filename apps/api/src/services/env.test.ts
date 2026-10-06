@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ZodError } from "zod";
 import { parseApiEnv } from "./env";
 
 describe("API environment", () => {
@@ -38,10 +39,19 @@ describe("API environment", () => {
   it.each([
     ["a trailing slash", { WEB_ORIGINS: "https://coursebook.golf/" }],
     ["a path", { WEB_ORIGINS: "https://coursebook.golf/app" }],
+    ["a web origin that is not a URL", { WEB_ORIGINS: "coursebook.golf" }],
+    ["a public web URL that is not a URL", { PUBLIC_WEB_URL: "coursebook.golf" }],
     ["a malformed version", { MIN_IOS_VERSION: "1.0" }],
     ["a JWT key that is not a PEM public key", { CLERK_JWT_KEY: "abc" }],
     ["a port out of range", { PORT: "70000" }],
-  ])("rejects %s", (_label, source) => {
-    expect(() => parseApiEnv(source)).toThrow();
+  ])("rejects %s with a readable validation error", (_label, source) => {
+    expect(() => parseApiEnv(source)).toThrow(ZodError);
   });
+
+  it.each(["https://coursebook.golf/", "https://coursebook.golf/app", "coursebook.golf"])(
+    "rejects the malformed web origin %s in production too",
+    (value) => {
+      expect(() => parseApiEnv({ NODE_ENV: "production", WEB_ORIGINS: value })).toThrow(/WEB_ORIGINS/);
+    },
+  );
 });
