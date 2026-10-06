@@ -502,7 +502,8 @@ export const deleteMe = createRoute({
   summary: "Delete the member's account",
   description:
     "Deletes the member's list and rounds, removes their name and email, and deletes the sign-in account. Courses " +
-    "they added stay in the shared catalog. Safe to retry: after a 502, call it again with the same token.",
+    "they added stay in the shared catalog. Safe to retry: after a 502, call it again with the same token. Works even " +
+    "for an account that other operations refuse with 403 `username_invalid` or 409 `username_taken`.",
   security: MEMBER,
   responses: {
     204: { description: "The account is deleted; sign the member out." },

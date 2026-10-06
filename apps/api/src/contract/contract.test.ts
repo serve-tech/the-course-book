@@ -22,6 +22,7 @@ interface Operation {
   tags?: string[];
   security?: Record<string, string[]>[];
   parameters?: { name: string; in: string }[];
+  responses?: Record<string, unknown>;
 }
 interface SchemaObject {
   properties?: Record<string, unknown>;
@@ -91,6 +92,20 @@ describe("published contract", () => {
         required: Object.keys(schema.properties ?? {}).sort(),
       });
     }
+  });
+
+  it("documents the account failures of every secured operation that provisions the member", () => {
+    // deleteMe never provisions; every other secured operation calls requireUser.
+    const provisioning = operations.filter(
+      ({ operation }) => (operation.security?.length ?? 0) > 0 && operation.operationId !== "deleteMe",
+    );
+    expect(provisioning.length).toBeGreaterThan(0);
+    const missing = provisioning.flatMap(({ operation }) =>
+      ["401", "403", "409"]
+        .filter((status) => !(status in (operation.responses ?? {})))
+        .map((status) => (operation.operationId ?? "?") + " " + status),
+    );
+    expect(missing).toEqual([]);
   });
 
   it("rejects every secured operation without a token", async () => {

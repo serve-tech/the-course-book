@@ -5,7 +5,7 @@ The authoritative description is [contract/openapi.json](../contract/openapi.jso
 ## Basics
 
 - **Base URL:** the `coursebook-golf-api` Render service, `https://coursebook-golf-api.onrender.com` (`https://api.coursebook.golf` after cutover).
-- **Authentication:** `Authorization: Bearer <Clerk session token>` on member operations. Omit the header on public operations. Cookies are ignored.
+- **Authentication:** `Authorization: Bearer <Clerk session token>` on member operations, exactly in that form: the scheme spelled `Bearer`, one space, then the token. Any other Authorization value (another scheme, a lowercase `bearer`, a bare token) is 401 `unauthenticated`, as is a token that does not verify, even on public operations. Omit the header on public operations. Cookies are ignored.
 - **Bodies:** JSON with `Content-Type: application/json`, at most 32 KB. Optional request fields may be missing or `null`.
 - **Responses:** every documented field is always present; absent values are `null`. Changes to your list return the whole updated list (`courses`), so clients replace their copy.
 - **Dates:** `playedOn` is `YYYY-MM-DD` in the member's time zone; send it, because the server's date is UTC.
@@ -32,7 +32,7 @@ Every failure returns:
 | 502 | `account_deletion_incomplete` (retry `DELETE /v1/me`) |
 | 503 | `search_unavailable` |
 
-`message` is written for members; `requestId` matches the server log and the `X-Request-Id` header.
+`message` is written for members; `requestId` matches the server log and the `X-Request-Id` header. The API generates every request id; an `X-Request-Id` sent by the client is ignored.
 
 ## Operations
 
@@ -41,7 +41,7 @@ Every failure returns:
 | `GET /v1/client-config` | `getClientConfig` | public | Minimum app versions, privacy and account-deletion URLs |
 | `GET /v1/rankings` | `listRankings` | public | Every published entry; `ETag` and `If-None-Match` (304), cacheable for an hour |
 | `GET /v1/me` | `getMe` | member | Username and display name |
-| `DELETE /v1/me` | `deleteMe` | member | Deletes the account; 204. Retry after a 502 |
+| `DELETE /v1/me` | `deleteMe` | member | Deletes the account; 204. Retry after a 502. Works even for an account other operations refuse with 403 `username_invalid` or 409 `username_taken` |
 | `GET /v1/me/courses` | `listMyCourses` | member | The list in personal rank order with play counts |
 | `PUT /v1/me/courses/{courseId}` | `addToList` | member | Add a catalog course; logs one round if it has none; idempotent |
 | `POST /v1/me/courses` | `addCourse` | member | Add a course by details (`source` `search` or `manual`), at `rank`, with `quantity` rounds; returns their `roundIds` |
