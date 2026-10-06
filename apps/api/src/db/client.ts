@@ -2,7 +2,11 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import pg from "pg";
 import * as schema from "./schema";
 
-/** Limits that apply to the API server's request pool and nothing else. */
+/**
+ * Limits for the API server's request pool. The names are pg's pool options
+ * (`statement_timeout` is passed to Postgres as is), because the object is
+ * spread into `pg.Pool`'s config.
+ */
 export interface PoolTimeouts {
   /** How long to wait for a connection, new or freed from a full pool, in milliseconds. */
   connectionTimeoutMillis: number;

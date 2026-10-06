@@ -63,6 +63,23 @@ describe("user provisioning", () => {
     expect(await db.select({ id: users.id }).from(users)).toEqual([{ id: "user_1" }]);
   });
 
+  it("answers 409 when a member renames themselves to a username another row still holds, until that row changes", async () => {
+    await provisionUser(db, "user_1", identity);
+    await provisionUser(db, "user_2", { ...identity, username: "golfer_2", email: "second@example.com" });
+    // user_1 renamed themselves in Clerk; their row keeps golfer_1 until their next request.
+    const rename = { ...identity, username: "golfer_1", email: "second@example.com" };
+    await expect(provisionUser(db, "user_2", rename)).rejects.toMatchObject({ status: 409, code: ErrorCode.UsernameTaken });
+    await provisionUser(db, "user_1", { ...identity, username: "golfer_renamed" });
+    expect(await provisionUser(db, "user_2", rename)).toMatchObject({ id: "user_2", username: "golfer_1" });
+  });
+
+  it("reports a deleted account as deleted even when its username is now someone else's", async () => {
+    await provisionUser(db, "user_1", identity);
+    await provisionUser(db, "user_2", { ...identity, username: "golfer_2" });
+    await db.update(users).set({ deletedAt: new Date() }).where(eq(users.id, "user_2"));
+    await expect(provisionUser(db, "user_2", identity)).rejects.toMatchObject({ status: 401, code: ErrorCode.AccountDeleted });
+  });
+
   it("lets a member keep their own username in another case", async () => {
     await provisionUser(db, "user_1", identity);
     expect(await provisionUser(db, "user_1", { ...identity, username: "Golfer_1" })).toMatchObject({ username: "Golfer_1" });
