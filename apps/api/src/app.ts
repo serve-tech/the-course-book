@@ -13,6 +13,7 @@ import type { ClientConfig } from "./contract/schemas";
 import type { Database } from "./db/client";
 import type { AppEnv } from "./http/env";
 import { errorHandler, notFoundHandler, validationHook } from "./http/errors";
+import { loggableError, type LoggedError } from "./http/loggable-error";
 import { registerAccountRoutes } from "./routes/account";
 import { registerCatalogRoutes } from "./routes/catalog";
 import { registerClientRoutes } from "./routes/clients";
@@ -34,9 +35,16 @@ export interface RequestLog {
   ms: number;
 }
 
+/**
+ * Where the API writes its logs.
+ *
+ * `error` takes a `LoggedError`, never the thrown value, so a query's
+ * parameters or a Postgres error's row values cannot reach the log
+ * (`loggableError`).
+ */
 export interface Logger {
   request(entry: RequestLog): void;
-  error(message: string, detail: unknown): void;
+  error(message: string, error: LoggedError): void;
 }
 
 /** Everything the API needs from the outside; tests pass fakes for Clerk and search. */
@@ -53,12 +61,13 @@ export interface AppDependencies {
   logger?: Logger;
 }
 
-const consoleLogger: Logger = {
+/** One JSON line per entry, for Render's log stream. */
+export const consoleLogger: Logger = {
   request: (entry) => {
     console.log(JSON.stringify(entry));
   },
-  error: (message, detail) => {
-    console.error(message, detail);
+  error: (message, error) => {
+    console.error(JSON.stringify({ level: "error", message, error }));
   },
 };
 
@@ -78,6 +87,9 @@ const noStore: MiddlewareHandler<AppEnv> = async (c, next) => {
  */
 export function createApp(deps: AppDependencies): OpenAPIHono<AppEnv> {
   const logger = deps.logger ?? consoleLogger;
+  const logError = (message: string, error: unknown) => {
+    logger.error(message, loggableError(error));
+  };
   const app = new OpenAPIHono<AppEnv>({ defaultHook: validationHook });
 
   app.use("*", requestId());
@@ -122,7 +134,7 @@ export function createApp(deps: AppDependencies): OpenAPIHono<AppEnv> {
       await checkDatabase(deps.db);
       return c.json({ ok: true });
     } catch (error) {
-      logger.error("Health check failed", error);
+      logError("Health check failed", error);
       return c.json({ ok: false }, 503);
     }
   });
@@ -145,10 +157,6 @@ export function createApp(deps: AppDependencies): OpenAPIHono<AppEnv> {
   app.doc("/v1/openapi.json", documentConfig);
 
   app.notFound(notFoundHandler);
-  app.onError(
-    errorHandler((message, detail) => {
-      logger.error(message, detail);
-    }),
-  );
+  app.onError(errorHandler(logError));
   return app;
 }

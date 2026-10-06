@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { ApiErrorSchema } from "../contract/schemas";
+import { createDatabase } from "../db/client";
 import { users } from "../db/schema";
 import { createTestApp, WEB_ORIGIN } from "../test/app";
 import { resetMemberData, testDatabase } from "../test/db";
@@ -31,6 +32,21 @@ describe("health", () => {
     expect(result).toMatchObject({ status: 200, body: { ok: true } });
     expect(t.requests).toHaveLength(0);
   });
+
+  it("answers 503 when the database is unreachable and logs the cause", async () => {
+    // Port 1 on loopback refuses connections immediately.
+    const unreachable = createDatabase("postgres://coursebook:coursebook@127.0.0.1:1/coursebook_test");
+    try {
+      const t = createTestApp(unreachable.db);
+      expect(await t.get("/healthz")).toMatchObject({ status: 503, body: { ok: false } });
+      expect(t.errors).toHaveLength(1);
+      // The logger gets the log-safe description, not the thrown error.
+      expect(t.errors[0]).not.toBeInstanceOf(Error);
+      expect(JSON.stringify(t.errors[0])).toContain("ECONNREFUSED");
+    } finally {
+      await unreachable.pool.end();
+    }
+  });
 });
 
 describe("error envelope", () => {
@@ -54,6 +70,23 @@ describe("error envelope", () => {
     const error = expectError(await t.get("/v1/me", t.bearer("user_1", "golfer_1")), 500, "internal");
     expect(error.message).not.toContain("boom");
     expect(t.errors).toEqual([expect.objectContaining({ message: "boom" })]);
+  });
+
+  it("logs a failed query's SQL and constraint, never its parameters or the row's values", async () => {
+    await db.insert(users).values({ id: "user_1", username: "golfer_1", displayName: "Golfer" });
+    // A real driver failure whose parameters include an email address.
+    const insertAgain = async () => {
+      await db.insert(users).values({ id: "user_1", username: "golfer_2", displayName: "Again", email: "private@example.com" });
+      throw new Error("the insert should have failed");
+    };
+    const t = createTestApp(db, { provisioner: { resolve: insertAgain, forget: () => undefined } });
+    expectError(await t.get("/v1/me", t.bearer("user_1", "golfer_1")), 500, "internal");
+    expect(t.errors).toHaveLength(1);
+    const logged = JSON.stringify(t.errors);
+    expect(logged).not.toContain("private@example.com");
+    expect(logged).not.toContain("golfer_2");
+    expect(t.errors[0]).toMatchObject({ message: "Failed query", cause: { code: "23505", constraint: "users_pkey" } });
+    expect(t.errors[0]?.query).toContain('insert into "users"');
   });
 });
 

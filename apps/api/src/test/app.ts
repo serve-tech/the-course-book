@@ -1,6 +1,7 @@
 import type { SearchResult } from "@coursebook/domain/catalog/search-results";
 import { createApp, type AppDependencies, type Logger, type RequestLog } from "../app";
 import { createClerkSessionVerifier } from "../auth/session";
+import type { LoggedError } from "../http/loggable-error";
 import type { Database } from "../db/client";
 import { createProvisioner, provisionUser } from "../services/provisioning";
 import { createTestTokens, TEST_PUBLISHABLE_KEY, TEST_SECRET_KEY } from "./tokens";
@@ -23,13 +24,13 @@ export const TEST_CLIENT_CONFIG = {
 export function createTestApp(db: Database, overrides: Partial<AppDependencies> = {}) {
   const tokens = createTestTokens();
   const requests: RequestLog[] = [];
-  const errors: unknown[] = [];
+  const errors: LoggedError[] = [];
   let searchResults: SearchResult[] | Error = [];
   const deletedAccounts: string[] = [];
   let accountDeletionFailure: Error | null = null;
   const logger: Logger = {
     request: (entry) => requests.push(entry),
-    error: (_message, detail) => errors.push(detail),
+    error: (_message, error) => errors.push(error),
   };
   const app = createApp({
     db,

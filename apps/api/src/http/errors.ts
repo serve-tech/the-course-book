@@ -63,7 +63,9 @@ const exceptionMessages: Partial<Record<ContentfulStatusCode, string>> = {
  *     log: Receives server-side failures with the request id: unexpected
  *         errors, and `AppError`s with a 5xx status, whose `cause` (e.g. the
  *         Clerk error behind `account_deletion_incomplete`) exists only here.
- *         Client errors (4xx) are expected traffic and are not logged.
+ *         Client errors (4xx) are expected traffic and are not logged. It
+ *         gets the thrown value; `createApp` passes it through
+ *         `loggableError` before it reaches the logger.
  */
 export function errorHandler(log: (message: string, detail: unknown) => void): ErrorHandler<AppEnv> {
   return (error, c) => {
