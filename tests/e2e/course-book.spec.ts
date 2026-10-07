@@ -246,7 +246,9 @@ test.describe("signed in", () => {
     await expect(page).toHaveURL(new RegExp(`/u/${friend.username}/ranking$`));
     const rows = page.locator("#ranking > li[data-course]");
     await expect(rows).toHaveCount(2);
-    await page.getByRole("button", { name: "Both played" }).click();
+    await expect(page.getByRole("button", { name: "All (2)", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Only " + friend.displayName + " (1)", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Both played (1)", exact: true }).click();
     await expect(rows).toHaveCount(1);
     await expect(row(page, "Test Alpha Links")).toContainText("You #2");
   });
