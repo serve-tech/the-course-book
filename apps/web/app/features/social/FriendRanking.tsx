@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { MemberListRow } from "@coursebook/domain/friends/types";
+import { countLabel } from "../../shared/lib/count-label";
 import { CourseTile } from "./CourseTile";
 import { RankingFilter, filterRanking } from "./ranking-filter";
 import { TileSize } from "./sizes";
@@ -18,7 +19,7 @@ export function FriendRanking({ rows, name }: { rows: readonly MemberListRow[]; 
   const [filter, setFilter] = useState(RankingFilter.All);
   const visible = filterRanking(rows, filter);
   const options: readonly [RankingFilter, string][] = [
-    [RankingFilter.All, "All " + String(rows.length)],
+    [RankingFilter.All, countLabel("All", rows.length)],
     [RankingFilter.Both, "Both played"],
     [RankingFilter.OnlyThem, "Only " + name],
   ];

@@ -311,7 +311,7 @@ test.describe("signed in", () => {
     const list = page.locator("#memberTopList");
     await expect(list.locator('[data-course="Shinnecock Hills Golf Club"]')).toHaveAttribute("data-played", "true");
     await expect(list.locator('[data-course="Pine Valley Golf Club"]')).toContainText("You");
-    await page.getByRole("button", { name: /^Only / }).click();
+    await page.getByRole("button", { name: "Only " + friend.displayName + " (1)", exact: true }).click();
     await expect(list.locator(":scope > li")).toHaveCount(1);
     await expect(list.locator(":scope > li")).toHaveAttribute("data-course", "Shinnecock Hills Golf Club");
 
