@@ -1,6 +1,6 @@
 import { courseSchema } from "@coursebook/domain/catalog/course";
 import { describe, expect, it } from "vitest";
-import { RankingFilter, emptyRankingMessage, filterRanking } from "./ranking-filter";
+import { RankingFilter, emptyRankingMessage, filterRanking, rankingFilterOptions } from "./ranking-filter";
 
 const row = (id: string, onMyList: boolean) => ({
   course: courseSchema.parse({ id, name: id, location: "" }),
@@ -19,6 +19,24 @@ describe("filterRanking", () => {
     [RankingFilter.OnlyThem, ["b"]],
   ])("keeps %s rows", (filter, ids) => {
     expect(filterRanking(rows, filter).map((r) => r.course.id)).toEqual(ids);
+  });
+});
+
+describe("rankingFilterOptions", () => {
+  it("counts every filter", () => {
+    expect(rankingFilterOptions([row("a", true), row("b", false), row("c", true)], "Sam")).toEqual([
+      [RankingFilter.All, "All (3)"],
+      [RankingFilter.Both, "Both played (2)"],
+      [RankingFilter.OnlyThem, "Only Sam (1)"],
+    ]);
+  });
+
+  it("counts zero when nothing is left", () => {
+    expect(rankingFilterOptions([], "Sam")).toEqual([
+      [RankingFilter.All, "All (0)"],
+      [RankingFilter.Both, "Both played (0)"],
+      [RankingFilter.OnlyThem, "Only Sam (0)"],
+    ]);
   });
 });
 

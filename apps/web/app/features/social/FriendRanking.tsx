@@ -1,12 +1,11 @@
 import { useState } from "react";
 import { RegionFilter } from "@coursebook/domain/catalog/course";
 import type { MemberListRow } from "@coursebook/domain/friends/types";
-import { countLabel } from "../../shared/lib/count-label";
 import { rankingRows, roundsLabel } from "../journal/ranking";
 import { RankingFilters } from "../journal/RankingFilters";
 import { CourseRow, type PlayedMark } from "../top-lists/CourseRow";
 import styles from "../top-lists/top-lists.module.css";
-import { RankingFilter, emptyRankingMessage, filterRanking } from "./ranking-filter";
+import { RankingFilter, emptyRankingMessage, filterRanking, rankingFilterOptions } from "./ranking-filter";
 
 /**
  * A friend's ranking, read-only, laid out like the viewer's own Ranking and
@@ -38,11 +37,7 @@ export function FriendRanking({
   const [query, setQuery] = useState("");
   const inRegion = rankingRows(rows, { region, state: selectedState, query: "" });
   const visible = filterRanking(rankingRows(rows, { region, state: selectedState, query }), filter);
-  const options: readonly [RankingFilter, string][] = [
-    [RankingFilter.All, countLabel("All", inRegion.length)],
-    [RankingFilter.Both, "Both played"],
-    [RankingFilter.OnlyThem, "Only " + name],
-  ];
+  const options = rankingFilterOptions(inRegion, name);
 
   if (!rows.length) return <div className={styles.empty}>Nothing ranked yet. Their ranking fills in as they log rounds.</div>;
   return (

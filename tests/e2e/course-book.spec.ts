@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { createClerkClient } from "@clerk/backend";
 import { users } from "@coursebook/api/db/schema";
 import { FriendshipStatus } from "@coursebook/api/domain/friendship";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { eq } from "drizzle-orm";
 import { clerk } from "@clerk/testing/playwright";
 import { authAvailable, clerkAvailable, signInAs } from "./auth";
@@ -57,6 +57,21 @@ const rankingOrder = (page: Page) =>
 
 /** Click a course's name on the member's own Ranking, which opens its details (the mini tile's copy of the name is hidden). */
 const openDetails = (page: Page, name: string) => row(page, name).getByText(name, { exact: true }).filter({ visible: true }).click();
+
+/**
+ * The vertical center of an element's own text, measured on the text rather
+ * than the element's box: a stretched box can be centered while its text sits
+ * at the top.
+ */
+const textCenter = (locator: Locator) =>
+  locator.evaluate((element) => {
+    const text = [...element.childNodes].find((node) => node.nodeType === Node.TEXT_NODE && node.textContent?.trim());
+    if (!text) throw new Error("The element has no text of its own");
+    const range = document.createRange();
+    range.selectNodeContents(text);
+    const box = range.getBoundingClientRect();
+    return box.top + box.height / 2;
+  });
 
 /** The member's own Ranking tab on their profile. */
 async function openRanking(page: Page, member: TestMember): Promise<void> {
@@ -237,6 +252,7 @@ test.describe("signed in", () => {
 
   test("a friend's profile shows their ranking next to the viewer's", async ({ page }) => {
     const { owner, friend } = members();
+    await addRounds(db, friend, fixtureCourses.alpha.id, ["2026-03-01"]);
     await signInAs(page, owner);
     await friendsLink(page).click();
     await page.locator(`[data-friend="${friend.username}"]`).click();
@@ -246,9 +262,18 @@ test.describe("signed in", () => {
     await expect(page).toHaveURL(new RegExp(`/u/${friend.username}/ranking$`));
     const rows = page.locator("#ranking > li[data-course]");
     await expect(rows).toHaveCount(2);
-    await page.getByRole("button", { name: "Both played" }).click();
+    await expect(page.getByRole("button", { name: "All (2)", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Only " + friend.displayName + " (1)", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Both played (1)", exact: true }).click();
     await expect(rows).toHaveCount(1);
-    await expect(row(page, "Test Alpha Links")).toContainText("You #2");
+    const alpha = row(page, "Test Alpha Links");
+    await expect(alpha).toContainText("You #2");
+    // The rounds note and the You tick sit on one line, centered on each other.
+    const [note, tick] = await Promise.all([
+      textCenter(alpha.getByText("2 rounds", { exact: true })),
+      textCenter(alpha.getByText("You #2", { exact: true })),
+    ]);
+    expect(Math.abs(note - tick)).toBeLessThanOrEqual(1);
   });
 
   test("course rows save Want to play and log a dated round", async ({ page }) => {

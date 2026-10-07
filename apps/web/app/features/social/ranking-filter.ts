@@ -1,4 +1,5 @@
 import type { MemberListRow } from "@coursebook/domain/friends/types";
+import { countLabel } from "../../shared/lib/count-label";
 
 /** Which of a friend's courses to show. */
 export enum RankingFilter {
@@ -12,6 +13,23 @@ export function filterRanking(rows: readonly MemberListRow[], filter: RankingFil
   if (filter === RankingFilter.Both) return rows.filter((row) => row.onMyList);
   if (filter === RankingFilter.OnlyThem) return rows.filter((row) => !row.onMyList);
   return [...rows];
+}
+
+/**
+ * The filter buttons on a friend's ranking, each with how many courses it
+ * keeps, e.g. "Both played (3)". Counts cover the region's rows and ignore
+ * the search, as the Courses page's do.
+ *
+ * @param rows - The friend's rows in the current region.
+ * @param name - The friend's display name, for "Only {name}".
+ * @returns Each filter with its button label, in display order.
+ */
+export function rankingFilterOptions(rows: readonly MemberListRow[], name: string): [RankingFilter, string][] {
+  return [
+    [RankingFilter.All, countLabel("All", rows.length)],
+    [RankingFilter.Both, countLabel("Both played", filterRanking(rows, RankingFilter.Both).length)],
+    [RankingFilter.OnlyThem, countLabel("Only " + name, filterRanking(rows, RankingFilter.OnlyThem).length)],
+  ];
 }
 
 /**
