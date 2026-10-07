@@ -1,79 +1,104 @@
 import { useState } from "react";
+import { RegionFilter } from "@coursebook/domain/catalog/course";
 import type { MemberListRow } from "@coursebook/domain/friends/types";
-import { CourseTile } from "./CourseTile";
-import { RankingFilter, filterRanking } from "./ranking-filter";
-import { TileSize } from "./sizes";
-import profileStyles from "./profile.module.css";
-import styles from "./social.module.css";
+import { countLabel } from "../../shared/lib/count-label";
+import { rankingRows, roundsLabel } from "../journal/ranking";
+import { RankingFilters } from "../journal/RankingFilters";
+import { CourseRow, type PlayedMark } from "../top-lists/CourseRow";
+import styles from "../top-lists/top-lists.module.css";
+import { RankingFilter, emptyRankingMessage, filterRanking } from "./ranking-filter";
 
 /**
- * A friend's ranking, read-only, next to the viewer's own rank for each
- * course. There is no "Add to my list" here on purpose: that button logged
- * a round dated today (issue #16); Played it and Want to play replace it.
+ * A friend's ranking, read-only, laid out like the viewer's own Ranking and
+ * the Courses page: region tabs, filters for the courses both have played
+ * or only the friend has, a search, and the viewer's own rank on each row.
+ * There is no "Add to my list" here on purpose: that button logged a round
+ * dated today (issue #16); Played it and Want to play replace it.
  *
  * @param rows - The friend's ranking in order.
  * @param name - The friend's display name.
+ * @param selectedState - The state for Best in State, shared with the Courses page.
+ * @param onState - Chooses that state.
  */
-export function FriendRanking({ rows, name }: { rows: readonly MemberListRow[]; name: string }) {
+export function FriendRanking({
+  rows,
+  name,
+  selectedState,
+  onState,
+  onSearchFocus,
+}: {
+  rows: readonly MemberListRow[];
+  name: string;
+  selectedState: string;
+  onState: (code: string) => void;
+  onSearchFocus: (focused: boolean) => void;
+}) {
+  const [region, setRegion] = useState(RegionFilter.All);
   const [filter, setFilter] = useState(RankingFilter.All);
-  const visible = filterRanking(rows, filter);
+  const [query, setQuery] = useState("");
+  const inRegion = rankingRows(rows, { region, state: selectedState, query: "" });
+  const visible = filterRanking(rankingRows(rows, { region, state: selectedState, query }), filter);
   const options: readonly [RankingFilter, string][] = [
-    [RankingFilter.All, "All " + String(rows.length)],
+    [RankingFilter.All, countLabel("All", inRegion.length)],
     [RankingFilter.Both, "Both played"],
     [RankingFilter.OnlyThem, "Only " + name],
   ];
-  if (!rows.length)
-    return (
-      <div className={styles.emptyNote}>
-        <strong>Nothing ranked yet</strong>
-        Their ranking fills in as they log rounds.
-      </div>
-    );
+
+  if (!rows.length) return <div className={styles.empty}>Nothing ranked yet. Their ranking fills in as they log rounds.</div>;
   return (
-    <div id="friendRanking">
-      <div className={profileStyles.filters} role="group" aria-label="Show courses">
-        {options.map(([value, label]) => (
-          <button
-            key={value}
-            type="button"
-            className={profileStyles.filter}
-            aria-pressed={filter === value}
-            onClick={() => {
-              setFilter(value);
-            }}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-      {!visible.length ? (
-        <div className={styles.emptyNote}>
-          {filter === RankingFilter.Both ? "You haven't played any of these yet." : "You've played every course on their list."}
+    <section className={styles.page} aria-label={name + "'s ranking"}>
+      <RankingFilters
+        region={region}
+        state={selectedState}
+        query={query}
+        onRegion={(value) => {
+          setRegion(value);
+          onSearchFocus(false);
+        }}
+        onState={onState}
+        onQuery={setQuery}
+        onSearchFocus={onSearchFocus}
+      >
+        <div className={styles.filters} role="group" aria-label="Show courses">
+          {options.map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              className={styles.filter}
+              aria-pressed={filter === value}
+              onClick={() => {
+                setFilter(value);
+              }}
+            >
+              {label}
+            </button>
+          ))}
         </div>
+      </RankingFilters>
+
+      {region === RegionFilter.State && !selectedState ? (
+        <div className={styles.empty}>Pick a state to see the courses they've played there.</div>
+      ) : !visible.length ? (
+        <div className={styles.empty}>{emptyRankingMessage(filter, query.trim() !== "")}</div>
       ) : (
-        visible.map((row) => (
-          <div key={row.course.id} className={profileStyles.rankRow} data-course={row.course.name}>
-            <span className={profileStyles.rankNumber}>{row.rank}</span>
-            <CourseTile course={row.course} size={TileSize.Mini} />
-            <div>
-              <span className={profileStyles.entryName}>{row.course.name}</span>
-              <div className={profileStyles.rankPlace}>
-                {row.course.location}
-                {row.played > 1 && <> · {row.played} rounds</>}
-              </div>
-            </div>
-            <span className={profileStyles.you}>
-              {row.myRank !== null ? (
-                <>
-                  You <b>#{row.myRank}</b>
-                </>
-              ) : (
-                "Not played"
-              )}
-            </span>
-          </div>
-        ))
+        <ol id="ranking" className={styles.list} aria-label={name + "'s ranking"}>
+          {visible.map((row) => (
+            <CourseRow
+              key={row.course.id}
+              course={row.course}
+              rank={row.rank}
+              current={null}
+              marks={yourMark(row)}
+              note={row.played > 1 ? roundsLabel(row.played) : undefined}
+            />
+          ))}
+        </ol>
       )}
-    </div>
+    </section>
   );
+}
+
+/** The viewer's own rank as a tick, when the course is on their ranking too. */
+function yourMark(row: MemberListRow): PlayedMark[] {
+  return row.myRank === null ? [] : [{ label: "You #" + String(row.myRank), you: true }];
 }

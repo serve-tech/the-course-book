@@ -3,16 +3,17 @@ import { useEffect } from "react";
 import { useSearchParams } from "react-router";
 import type { Route } from "./+types/profile.ranking";
 import { useProfileData } from "./profile";
-import { JournalPage } from "../features/journal/JournalPage";
+import { MyRanking } from "../features/journal/MyRanking";
 import { displayName } from "../features/social/paths";
 import { FriendRanking } from "../features/social/FriendRanking";
 import { RouteError } from "../shared/ui/RouteError";
 import { useShell } from "../shared/ui/shell";
 
 /**
- * The Ranking tab. On the viewer's own profile it is My List, with drag to
- * rank, the details dialog and logging; `?log=1` (the Log a round buttons)
+ * The Ranking tab. On the viewer's own profile it is their ranking, with drag
+ * to rank, the details dialog and logging; `?log=1` (the Log a round buttons)
  * opens the Log dialog. On a friend's profile it is their ranking, read-only.
+ * Both share the Courses page's layout.
  */
 export default function ProfileRanking() {
   const { profile, list } = useProfileData();
@@ -33,11 +34,18 @@ export default function ProfileRanking() {
   }, [openLog, setParams]);
 
   if (profile.relationship !== ProfileRelationship.Self)
-    return <FriendRanking rows={list.rows} name={displayName(profile.member)} />;
+    return (
+      <FriendRanking
+        rows={list.rows}
+        name={displayName(profile.member)}
+        selectedState={shell.selectedState}
+        onState={shell.onState}
+        onSearchFocus={shell.searchFocus}
+      />
+    );
   return (
-    <JournalPage
+    <MyRanking
       rows={list.rows.map((row) => ({ course: row.course, rank: row.rank, played: row.played }))}
-      signedIn
       openLog={openLog}
       selectedState={shell.selectedState}
       onState={shell.onState}

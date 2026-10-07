@@ -3,6 +3,7 @@ import type { Course } from "@coursebook/domain/catalog/course";
 import { stateName } from "@coursebook/domain/catalog/geography";
 import { topListTitle } from "@coursebook/domain/social/top-lists";
 import type { TopListCourse, TopListStanding } from "@coursebook/domain/social/types";
+import { countLabel } from "../../shared/lib/count-label";
 import type { Notify } from "../../shared/ui/shell";
 import { StateSelect } from "../../shared/ui/StateSelect";
 import { LogRoundDialog } from "../rounds/LogRoundDialog";
@@ -97,9 +98,9 @@ export function TopListsPage({
   );
   const played = Object.fromEntries(entries.map((entry) => [entry.course.id, entry.played]));
   const filters: readonly [Show, string][] = [
-    [Show.All, "All " + String(entries.length)],
-    [Show.Played, "Played " + String(done)],
-    [Show.NotPlayed, "Not played " + String(entries.length - done)],
+    [Show.All, countLabel("All", entries.length)],
+    [Show.Played, countLabel("Played", done)],
+    [Show.NotPlayed, countLabel("Not played", entries.length - done)],
   ];
   const others = standing ? standing.friends.length - LEADERS : 0;
 
