@@ -155,7 +155,8 @@
 .leader b { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--cream); }
 
 /* Who played it. */
-.marks { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; }
+/* Centered, not stretched: a stretched note keeps its text at the top, above the pills' centered text. */
+.marks { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 4px; }
 .mark {
   display: inline-flex;
   align-items: center;
