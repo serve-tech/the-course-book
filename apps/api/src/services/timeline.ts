@@ -1,11 +1,12 @@
 import { inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Course } from "@coursebook/domain/catalog/course";
-import type { TimelineRound } from "@coursebook/domain/social/types";
+import type { TimelineMonthCount, TimelineRound } from "@coursebook/domain/social/types";
 import type { Database, Executor } from "../db/client";
 import { courses } from "../db/schema";
 import { courseView } from "../domain/course-view";
 import { CURSOR_TIMESTAMP_FORMAT, cursorTimestamp } from "../domain/cursor";
+import { monthWindow, type MonthWindow } from "../domain/timeline-months";
 import { rankedViews } from "./catalog";
 import { visibleMember, type VisibleMember } from "./friends";
 
@@ -34,6 +35,11 @@ export type TimelineCursor = z.infer<typeof timelineCursorSchema>;
 export interface TimelinePage {
   member: VisibleMember;
   rounds: TimelineRound[];
+  /**
+   * Round counts for every month with a round on this page, over all the
+   * member's rounds: newest month first, undated (`month` null) last.
+   */
+  months: TimelineMonthCount[];
   /** Key of the page's last round when more rounds follow; null on the last page. */
   next: TimelineCursor | null;
 }
@@ -68,8 +74,14 @@ function afterCursor(after: TimelineCursor | null) {
  *         page); `limit` is the page size.
  *
  * Returns:
- *     The page, or null when the member is unknown or not the viewer's
- *     friend (indistinguishable on purpose).
+ *     The page with the full round counts of the months it touches, or
+ *     null when the member is unknown or not the viewer's friend
+ *     (indistinguishable on purpose).
+ *
+ * Note:
+ *     The rounds and the counts are separate reads, so a round logged
+ *     between them can make one count differ from the page by one until the
+ *     next load.
  */
 export async function memberTimeline(
   db: Database,
@@ -88,16 +100,44 @@ export async function memberTimeline(
     limit ${page.limit + 1}
   `);
   const shown = rows.slice(0, page.limit);
-  const enriched = await timelineRounds(db, shown.map((row) => row.id));
+  const [enriched, months] = await Promise.all([
+    timelineRounds(db, shown.map((row) => row.id)),
+    monthCounts(db, member.id, monthWindow(shown.map((row) => row.played_on))),
+  ]);
   const last = shown.at(-1);
   return {
     member,
     rounds: shown.flatMap((row) => enriched.get(row.id) ?? []),
+    months,
     next:
       rows.length > page.limit && last
         ? { undated: last.played_on === null, playedOn: last.played_on, createdAt: last.created_key, id: last.id }
         : null,
   };
+}
+
+interface MonthRow extends Record<string, unknown> {
+  month: string | null;
+  rounds: number;
+}
+
+/**
+ * A member's round counts per month inside a window: one range scan of
+ * `rounds_user_played_idx`, plus their undated rounds when the window
+ * includes them. Newest month first, undated last.
+ */
+async function monthCounts(db: Executor, userId: string, window: MonthWindow): Promise<TimelineMonthCount[]> {
+  if (!window.dated && !window.undated) return [];
+  const dated = window.dated ? sql`(r.played_at >= ${window.dated.from}::date and r.played_at < ${window.dated.until}::date)` : sql`false`;
+  const undated = window.undated ? sql`r.played_at is null` : sql`false`;
+  const { rows } = await db.execute<MonthRow>(sql`
+    select to_char(r.played_at, 'YYYY-MM') as month, count(*)::int as rounds
+    from rounds r
+    where r.user_id = ${userId} and (${dated} or ${undated})
+    group by 1
+    order by 1 desc nulls last
+  `);
+  return rows.map((row) => ({ month: row.month, rounds: row.rounds }));
 }
 
 interface RoundRow extends Record<string, unknown> {
