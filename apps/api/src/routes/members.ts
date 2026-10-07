@@ -2,7 +2,7 @@ import type { OpenAPIHono } from "@hono/zod-openapi";
 import type { ZodType } from "zod";
 import type { AppDependencies } from "../app";
 import { requireUser } from "../auth/middleware";
-import { toMemberList, toProfile, toTimelineRound } from "../contract/mappers";
+import { toMemberList, toProfile, toTimelineMonth, toTimelineRound } from "../contract/mappers";
 import {
   befriendMember,
   getMemberList,
@@ -76,7 +76,14 @@ export function registerMemberRoutes(app: OpenAPIHono<AppEnv>, deps: AppDependen
       limit: limit ?? DEFAULT_TIMELINE_PAGE,
     });
     if (!page) throw notVisible();
-    return c.json({ rounds: page.rounds.map(toTimelineRound), nextCursor: page.next ? encodeCursor(page.next) : null }, 200);
+    return c.json(
+      {
+        rounds: page.rounds.map(toTimelineRound),
+        nextCursor: page.next ? encodeCursor(page.next) : null,
+        months: page.months.map(toTimelineMonth),
+      },
+      200,
+    );
   });
 
   app.openapi(guarded(searchMembers), async (c) => {

@@ -54,6 +54,7 @@ Every failure returns:
 | `GET /v1/course-search?q=&page=&source=` | `searchCourses` | member | Stored courses by default; `source=external` explicitly discovers more. Alphabetical pages of ten hits (`page` defaults to 1), with `page`, `pageSize` and `total`; catalog hits carry `courseId` |
 | `GET /v1/members?cursor=&limit=` | `listMembers` | member | The member's friends, paged by username (limit 1–200, default 50) |
 | `GET /v1/members/{username}` | `getMemberList` | member | The member's own list or a friend's, with `onMyList` flags; anyone else is 404 `member_not_found` |
+| `GET /v1/members/{username}/rounds?cursor=&limit=` | `listMemberRounds` | member | The member's own or a friend's timeline, newest played first (limit 1–100, default 30), with `months`: the full round count of every month on the page, so a month split across pages shows its total from the first page; anyone else is 404 `member_not_found` |
 | `GET /v1/member-search?q=` | `searchMembers` | member | Up to 20 other members whose username contains `q` (3–64 characters), prefix matches first, each with the viewer's `relationship`; `no-store` |
 | `GET /v1/me/friend-requests` | `listFriendRequests` | member | Pending requests: `incoming` (they asked) and `outgoing` (the viewer asked) |
 | `PUT /v1/me/friends/{username}` | `befriendMember` | member | Send a request, or accept theirs; returns the resulting `relationship`; idempotent. 400 for the viewer's own username |

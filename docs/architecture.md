@@ -120,7 +120,7 @@ The seed migration (`0001_seed_catalog.sql`) carries the retired project's publi
     - stats: courses on the list, rounds, rounds dated in the current UTC year, friends;
     - Top Four: personal ranks 1–4;
     - for a friend, a comparison over shared courses (matched like `onMyList`): the share of concordant pairs from three shared courses, and the largest split by percentile position (`compareRankings` in `packages/domain`).
-  - **Timeline** (`listMemberRounds`): dates and courses only. Order is `played_at DESC NULLS LAST, created_at DESC, id DESC`. `visit` counts the member's rounds at a course in played order, undated first.
+  - **Timeline** (`listMemberRounds`): dates and courses only. Order is `played_at DESC NULLS LAST, created_at DESC, id DESC`. `visit` counts the member's rounds at a course in played order, undated first. Pages are keyset (cursor), not offset, so deleting a round never shifts the next page. Each page carries `months`, the member's full round count for every month with a round on the page (`domain/timeline-months.ts` bounds one range scan of `rounds_user_played_idx`), so the web's month headers are right before a split month's other rounds load.
   - **Feed** (`getFeed`): friends' rounds by when they were logged. Rounds logged more than 14 days after they were played (or undated) collapse into one `backfill` item per friend and UTC day. It is derived on read; there is no event table.
   - **Paging:** cursors are opaque keyset keys (`domain/cursor.ts`) that carry timestamps as Postgres text with microseconds, never member ids.
   - **`MemberCourse`** carries the member's `played`, `lastPlayedOn` and the viewer's `myRank`.

@@ -729,6 +729,8 @@ export interface components {
             rounds: components["schemas"]["TimelineRound"][];
             /** @description Pass as `cursor` for the next page; null on the last page. */
             nextCursor: string | null;
+            /** @description Full round counts for every month with a round on this page, so a month split across pages shows its total from the first page. Newest month first; undated last. */
+            months: components["schemas"]["TimelineMonth"][];
         };
         TimelineRound: {
             /** Format: uuid */
@@ -743,6 +745,15 @@ export interface components {
             visit: number;
             /** @description The member's current personal rank for this course. */
             rank: number;
+        };
+        TimelineMonth: {
+            /**
+             * @description Year and month as YYYY-MM; null for the member's rounds without a date.
+             * @example 2026-09
+             */
+            month: string | null;
+            /** @description Every round the member logged in that month, including rounds on other pages. */
+            rounds: number;
         };
         MemberSearchResults: {
             /** @description At most 20, usernames starting with the query first. */

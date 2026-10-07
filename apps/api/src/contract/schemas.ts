@@ -192,10 +192,26 @@ export const TimelineRoundSchema = z
   })
   .openapi("TimelineRound");
 
+export const TimelineMonthSchema = z
+  .object({
+    month: z
+      .string()
+      .regex(/^\d{4}-(0[1-9]|1[0-2])$/)
+      .nullable()
+      .openapi({ description: "Year and month as YYYY-MM; null for the member's rounds without a date.", example: "2026-09" }),
+    rounds: z.number().int().min(1).openapi({ description: "Every round the member logged in that month, including rounds on other pages." }),
+  })
+  .openapi("TimelineMonth");
+
 export const TimelineSchema = z
   .object({
     rounds: z.array(TimelineRoundSchema).openapi({ description: "Newest played first; undated rounds last." }),
     nextCursor,
+    months: z.array(TimelineMonthSchema).openapi({
+      description:
+        "Full round counts for every month with a round on this page, so a month split across pages shows its total from the first page. " +
+        "Newest month first; undated last.",
+    }),
   })
   .openapi("Timeline");
 

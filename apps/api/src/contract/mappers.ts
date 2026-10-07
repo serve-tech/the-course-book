@@ -1,7 +1,7 @@
 import type { Course, RankedCourse } from "@coursebook/domain/catalog/course";
 import type { SearchResult } from "@coursebook/domain/catalog/search-results";
 import type { MemberList, MemberListRow } from "@coursebook/domain/friends/types";
-import type { FeedItem, Profile, TimelineRound, TopListDetail, TopListStanding, WantToPlayEntry } from "@coursebook/domain/social/types";
+import type { FeedItem, Profile, TimelineMonthCount, TimelineRound, TopListDetail, TopListStanding, WantToPlayEntry } from "@coursebook/domain/social/types";
 import type { ListEntry, RoundEntry } from "@coursebook/domain/journal/types";
 import { UNKNOWN_LOCATION } from "../domain/course-view";
 import type {
@@ -102,6 +102,10 @@ export function toTimelineRound(round: TimelineRound) {
     visit: round.visit,
     rank: round.rank,
   };
+}
+
+export function toTimelineMonth(count: TimelineMonthCount) {
+  return { month: count.month, rounds: count.rounds };
 }
 
 export function toProfile(profile: Profile) {
