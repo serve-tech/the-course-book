@@ -15,6 +15,20 @@ interface Drag {
   after: boolean;
   width: number;
 }
+/**
+ * Pointer drag to reorder the Ranking. Rows mark themselves with
+ * `data-drag-id` (the course id; the drop target is the row under the
+ * pointer) and call `start` from `onPointerDown`. A mouse or pen drags from
+ * anywhere on a row; touch only from an element marked `data-drag-handle`,
+ * so swiping a row still scrolls the page. A drag begins after 8 px of
+ * movement, scrolls near the viewport edges, and calls `onMove` on release
+ * over another row; `suppressClick` stays true until the click that ends a
+ * drag has passed, so it does not open the row.
+ *
+ * @param enabled - Whether drags may start (false on read-only views and while a move saves).
+ * @param onMove - Called with the dragged id, the target id, and whether to drop after the target.
+ * @returns The drag in progress (null when none), `start`, and `suppressClick`.
+ */
 export function useCourseDrag(
   enabled: boolean,
   onMove: (id: string, target: string, after: boolean) => void,
@@ -48,14 +62,14 @@ export function useCourseDrag(
       suppressClick.current = true;
       const target = document
         .elementFromPoint(event.clientX, event.clientY)
-        ?.closest<HTMLElement>(".rankrow[data-id]");
+        ?.closest<HTMLElement>("[data-drag-id]");
       const bounds = target?.getBoundingClientRect();
       const next = {
         ...state,
         active,
         x: event.clientX,
         y: event.clientY,
-        target: target?.dataset["id"] ?? state.target,
+        target: target?.dataset["dragId"] ?? state.target,
         after: bounds
           ? event.clientY > bounds.top + bounds.height / 2
           : state.after,
@@ -97,7 +111,7 @@ export function useCourseDrag(
     const target = event.target;
     if (!(target instanceof Element) || target.closest("button,input,a"))
       return;
-    if (event.pointerType === "touch" && !target.closest(".handle")) return;
+    if (event.pointerType === "touch" && !target.closest("[data-drag-handle]")) return;
     const bounds = event.currentTarget.getBoundingClientRect();
     current.current = {
       id,

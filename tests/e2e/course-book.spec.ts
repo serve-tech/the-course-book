@@ -47,13 +47,20 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-const row = (page: Page, name: string) =>
-  page.locator("#mylist .rankrow").filter({ has: page.getByText(name, { exact: true }) });
+/** A course's row on the Ranking tab, the member's own or a friend's. */
+const row = (page: Page, name: string) => page.locator(`#ranking > li[data-course="${name}"]`);
 
-/** The member's own Ranking tab (My List) on their profile. */
+/** Course names on the Ranking tab, top to bottom. */
+const rankingOrder = (page: Page) =>
+  page.locator("#ranking > li[data-course]").evaluateAll((rows) => rows.map((item) => item.getAttribute("data-course")));
+
+/** Click a course's name on the member's own Ranking, which opens its details (the mini tile's copy of the name is hidden). */
+const openDetails = (page: Page, name: string) => row(page, name).getByText(name, { exact: true }).filter({ visible: true }).click();
+
+/** The member's own Ranking tab on their profile. */
 async function openRanking(page: Page, member: TestMember): Promise<void> {
   await page.goto(`/u/${member.username}/ranking`);
-  await expect(page.locator("#mine")).toBeVisible();
+  await expect(page.getByRole("tablist", { name: "Ranking regions" })).toBeVisible();
 }
 
 /** Open the Log dialog with the profile's Log a round button. */
@@ -170,8 +177,8 @@ test.describe("signed in", () => {
     await signInAs(page, owner);
     await expectSignedInAs(page, owner.username);
     await openRanking(page, owner);
-    await expect(page.locator("#myCourseCount")).toHaveText("2");
-    await expect(page.locator("#mylist .course")).toHaveText(["Test Beta Links", "Test Alpha Links"]);
+    await expect(page.locator("#rankingCount")).toHaveText("2 courses");
+    await expect.poll(() => rankingOrder(page)).toEqual(["Test Beta Links", "Test Alpha Links"]);
 
     await openLog(page);
     await page.locator("#modalsearch").fill("Test Alpha");
@@ -179,12 +186,12 @@ test.describe("signed in", () => {
     await page.locator("#timesPlayed").fill("2");
     await page.locator("#confirmLog").click();
     await expect(page.locator("#modal")).toHaveCount(0);
-    await expect(row(page, "Test Alpha Links").locator(".count")).toContainText("3×");
-    await expect(page.locator("#mylist .course")).toHaveText(["Test Beta Links", "Test Alpha Links"]);
+    await expect(row(page, "Test Alpha Links")).toContainText("3 rounds");
+    await expect.poll(() => rankingOrder(page)).toEqual(["Test Beta Links", "Test Alpha Links"]);
     expect(await listOrder(db, owner.id)).toEqual([fixtureCourses.beta.id, fixtureCourses.alpha.id]);
 
     await page.reload();
-    await expect(page.locator("#mylist .course")).toHaveText(["Test Beta Links", "Test Alpha Links"]);
+    await expect.poll(() => rankingOrder(page)).toEqual(["Test Beta Links", "Test Alpha Links"]);
     await accountMenuButton(page).click();
     await page.getByRole("menuitem", { name: "Sign out" }).click();
     await expect(welcome(page)).toBeVisible();
@@ -194,23 +201,23 @@ test.describe("signed in", () => {
     const { owner } = members();
     await signInAs(page, owner);
     await openRanking(page, owner);
-    await expect(page.locator("#myCourseCount")).toHaveText("2");
-    await page.locator("#mylist .course").filter({ hasText: "Test Alpha Links" }).click();
+    await expect(page.locator("#rankingCount")).toHaveText("2 courses");
+    await openDetails(page, "Test Alpha Links");
     await page.locator("#moveTop").click();
-    await expect(page.locator("#mylist .course").first()).toHaveText("Test Alpha Links");
+    await expect.poll(() => rankingOrder(page)).toEqual(["Test Alpha Links", "Test Beta Links"]);
     await expect.poll(() => listOrder(db, owner.id)).toEqual([fixtureCourses.alpha.id, fixtureCourses.beta.id]);
 
-    await page.locator("#mylist .course").first().click();
+    await openDetails(page, "Test Alpha Links");
     await page.locator("#editTimesPlayed").click();
     await expect(page.locator(".counteditinput")).toBeVisible();
     await page.locator(".cancelcount").click();
 
-    await page.locator("#mylist .roundslink").first().click();
+    await page.getByRole("button", { name: "Your rounds at Test Alpha Links" }).click();
     await expect(page.locator(".roundhistory-row")).toHaveCount(1);
     page.once("dialog", (dialog) => void dialog.accept());
     await page.locator(".delete-round").click();
     await expect(page.locator("#roundmodal")).toHaveCount(0);
-    await expect(page.locator("#myCourseCount")).toHaveText("1");
+    await expect(page.locator("#rankingCount")).toHaveText("1 course");
   });
 
   test("manual US course stores its state and logs one round", async ({ page }) => {
@@ -223,7 +230,7 @@ test.describe("signed in", () => {
     await page.locator("#newstate").selectOption("MI");
     await page.locator("#save").click();
     await expect(page.locator("#addmodal")).toHaveCount(0);
-    await expect(page.locator("#myCourseCount")).toHaveText("3");
+    await expect(page.locator("#rankingCount")).toHaveText("3 courses");
     expect(await courseByName(db, "New Test Club")).toMatchObject({ state: "MI", country: "USA", isCustom: true, createdBy: owner.id });
   });
 
@@ -236,11 +243,11 @@ test.describe("signed in", () => {
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     await page.getByRole("link", { name: "Ranking", exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`/u/${friend.username}/ranking$`));
-    const ranking = page.locator("#friendRanking");
-    await expect(ranking.locator("[data-course]")).toHaveCount(2);
+    const rows = page.locator("#ranking > li[data-course]");
+    await expect(rows).toHaveCount(2);
     await page.getByRole("button", { name: "Both played" }).click();
-    await expect(ranking.locator("[data-course]")).toHaveCount(1);
-    await expect(ranking.locator('[data-course="Test Alpha Links"]')).toContainText("You #2");
+    await expect(rows).toHaveCount(1);
+    await expect(row(page, "Test Alpha Links")).toContainText("You #2");
   });
 
   test("course rows save Want to play and log a dated round", async ({ page }) => {
@@ -362,11 +369,12 @@ test.describe("signed in", () => {
     await addHiddenCourse(db, owner);
     await signInAs(page, owner);
     await openRanking(page, owner);
-    await expect(page.locator("#myCourseCount")).toHaveText("3");
-    await expect(page.locator("#mylist .course")).toHaveText(["Test Beta Links", "Test Alpha Links", "Hidden Course"]);
-    await page.locator("#mysearch").fill("Test");
-    await page.locator("#mysearch").blur();
-    const source = row(page, "Test Alpha Links").locator(".handle");
+    await expect(page.locator("#rankingCount")).toHaveText("3 courses");
+    await expect.poll(() => rankingOrder(page)).toEqual(["Test Beta Links", "Test Alpha Links", "Hidden Course"]);
+    const search = page.getByRole("searchbox", { name: "Search this ranking" });
+    await search.fill("Test");
+    await search.blur();
+    const source = row(page, "Test Alpha Links").locator("[data-drag-handle]");
     const target = row(page, "Test Beta Links");
     await source.scrollIntoViewIfNeeded();
     const from = await source.boundingBox(),
@@ -375,21 +383,29 @@ test.describe("signed in", () => {
     const pointer = { pointerId: 1, pointerType: "touch", button: 0, buttons: 1 };
     await source.dispatchEvent("pointerdown", { ...pointer, clientX: from.x + 5, clientY: from.y + 5 });
     await page.locator("body").dispatchEvent("pointermove", { ...pointer, clientX: to.x + 20, clientY: to.y + 10 });
-    await expect(page.locator(".drag-ghost")).toBeVisible();
+    await expect(page.locator("[data-drag-ghost]")).toBeVisible();
     await page.locator("body").dispatchEvent("pointerup", { ...pointer, buttons: 0, clientX: to.x + 20, clientY: to.y + 10 });
-    await page.locator("#mysearch").fill("");
-    await page.locator("#mysearch").blur();
+    await search.fill("");
+    await search.blur();
     const reordered = ["Test Alpha Links", "Test Beta Links", "Hidden Course"];
-    await expect(page.locator("#mylist .course")).toHaveText(reordered);
+    await expect.poll(() => rankingOrder(page)).toEqual(reordered);
     await expect.poll(() => listOrder(db, owner.id)).toEqual([
       fixtureCourses.alpha.id,
       fixtureCourses.beta.id,
       "aaaaaaaa-0000-4000-8000-000000000004",
     ]);
     await page.reload();
-    await expect(page.locator("#mylist .course")).toHaveText(reordered);
-    await page.locator("#mylistFilter").getByRole("button", { name: "US", exact: true }).click();
-    await expect(page.locator("#mylist .roundslink").first()).toBeDisabled();
+    await expect.poll(() => rankingOrder(page)).toEqual(reordered);
+
+    // Region tabs are read-only, and only the state tab shows the state picker.
+    const statePicker = page.getByRole("combobox", { name: "State for Best in State" });
+    await expect(statePicker).toHaveCount(0);
+    await page.getByRole("tab", { name: "USA", exact: true }).click();
+    await expect(page.locator("#ranking > li[data-course]").first()).toHaveAttribute("aria-disabled", "true");
+    await expect(page.getByRole("button", { name: /^Your rounds at / })).toHaveCount(0);
+    await expect(statePicker).toHaveCount(0);
+    await page.getByRole("tab", { name: "Best in Michigan" }).click();
+    await expect(statePicker).toHaveValue("MI");
   });
 
   test("catalog search finds Oakland University and pages alphabetically on desktop and mobile", async ({ page }, testInfo) => {
@@ -433,7 +449,7 @@ test.describe("signed in", () => {
     await page.locator(".result").filter({ hasText: "External Pagination 13" }).click();
     await page.locator("#confirmLog").click();
     await expect(page.locator("#modal")).toHaveCount(0);
-    await expect(row(page, "External Pagination 13").locator(".count")).toContainText("1×");
+    await expect(row(page, "External Pagination 13")).toContainText("1 round");
     expect(await courseByName(db, "External Pagination 13")).toMatchObject({ state: "MI", country: "USA", isCustom: false, createdBy: owner.id });
   });
 
@@ -448,7 +464,7 @@ test.describe("signed in", () => {
     await page.locator("#timesPlayed").fill("2");
     await page.locator("#confirmLog").click();
     await expect(page.locator("#modal")).toHaveCount(0);
-    await expect(row(page, "Fallback Test Links").locator(".count")).toContainText("2×");
+    await expect(row(page, "Fallback Test Links")).toContainText("2 rounds");
   });
 });
 
