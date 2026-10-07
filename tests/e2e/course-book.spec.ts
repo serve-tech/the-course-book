@@ -9,6 +9,7 @@ import { authAvailable, clerkAvailable, signInAs } from "./auth";
 import {
   addHiddenCourse,
   addPlayed,
+  addRounds,
   catalogCourse,
   connect,
   courseByName,
@@ -298,6 +299,21 @@ test.describe("signed in", () => {
     await page.getByRole("button", { name: "Delete your round at Test Beta Links on 2026-02-01" }).click();
     await expect(page.locator('[data-round="Test Beta Links"]')).toHaveCount(0);
     expect(await listOrder(db, owner.id)).toEqual([fixtureCourses.alpha.id]);
+  });
+
+  test("the timeline shows a month's full count before all its rounds load", async ({ page }) => {
+    const { owner } = members();
+    const march = Array.from({ length: 30 }, (_, day) => `2026-03-${String(day + 1).padStart(2, "0")}`);
+    await addRounds(db, owner, fixtureCourses.alpha.id, march);
+    await signInAs(page, owner);
+    await page.goto(`/u/${owner.username}`);
+    const month = page.locator('[data-month="2026-03"]');
+    await expect(month.getByRole("heading", { name: /^March 2026/ })).toContainText("30 rounds");
+    // The first page cut March off, yet its header already counts every round.
+    expect(await month.locator("[data-round]").count()).toBeLessThan(30);
+    await page.getByRole("button", { name: "Show more rounds" }).click();
+    await expect(month.locator("[data-round]")).toHaveCount(30);
+    await expect(month.getByRole("heading", { name: /^March 2026/ })).toContainText("30 rounds");
   });
 
   test("a friend's Top list shows which courses they played and you haven't", async ({ page }) => {

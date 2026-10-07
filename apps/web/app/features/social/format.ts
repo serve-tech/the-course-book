@@ -1,5 +1,5 @@
 import type { Course } from "@coursebook/domain/catalog/course";
-import { FeedItemType, type FeedItem, type TimelineRound } from "@coursebook/domain/social/types";
+import { FeedItemType, type FeedItem, type TimelineMonthCount, type TimelineRound } from "@coursebook/domain/social/types";
 
 /**
  * Pure presentation rules for profiles, timelines and the feed: how dates,
@@ -57,26 +57,38 @@ export function relativeDay(at: string, now: Date): string {
   return shortDate(local, now);
 }
 
+/** The month key of rounds without a date. */
+const UNDATED = "undated";
+
 /** A month of the timeline; `key` is "YYYY-MM", or "undated" for rounds without a date. */
 export interface TimelineMonth {
   key: string;
   label: string;
+  /** The month's rounds loaded so far. */
   rounds: TimelineRound[];
+  /** Every round the member logged that month, including ones on pages not loaded yet. */
+  total: number;
 }
 
 /**
  * Group timeline rounds by month in the order given (the API sends newest
  * first, undated last). Consecutive rounds of one month share a group.
+ *
+ * @param rounds - The rounds loaded so far, in timeline order.
+ * @param counts - The month counts from every page loaded. The API sends one
+ *   for each month on a page, so a month cut off by a page shows its full
+ *   total; a month without one falls back to the rounds loaded.
  */
-export function groupByMonth(rounds: readonly TimelineRound[]): TimelineMonth[] {
-  const groups: TimelineMonth[] = [];
+export function groupByMonth(rounds: readonly TimelineRound[], counts: readonly TimelineMonthCount[]): TimelineMonth[] {
+  const totals = new Map(counts.map((count) => [count.month ?? UNDATED, count.rounds]));
+  const groups: Omit<TimelineMonth, "total">[] = [];
   for (const round of rounds) {
-    const key = round.playedOn ? round.playedOn.slice(0, 7) : "undated";
+    const key = round.playedOn ? round.playedOn.slice(0, 7) : UNDATED;
     const last = groups.at(-1);
     if (last?.key === key) last.rounds.push(round);
     else groups.push({ key, label: round.playedOn ? monthLabel(round.playedOn) : "Date not recorded", rounds: [round] });
   }
-  return groups;
+  return groups.map((group) => ({ ...group, total: totals.get(group.key) ?? group.rounds.length }));
 }
 
 /** Day of the month for a timeline row, or an en dash for an undated round. */
