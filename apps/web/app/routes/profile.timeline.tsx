@@ -13,21 +13,21 @@ import profileStyles from "../features/social/profile.module.css";
 import styles from "../features/social/social.module.css";
 import { nationalProgress } from "../features/social/stats";
 import { api, unwrap } from "../lib/api";
-import { fromTimelineRound } from "../lib/api/mappers";
+import { fromTimelineMonth, fromTimelineRound } from "../lib/api/mappers";
 import { replyMessage, useJournalFetcher } from "../features/journal/use-journal-fetcher";
 import { RouteError } from "../shared/ui/RouteError";
 import { useShell } from "../shared/ui/shell";
 
 const FIRST_PAGE = 20;
 
-/** The first page of the member's timeline. */
+/** The first page of the member's timeline, with the full counts of the months on it. */
 export async function clientLoader({ params }: Route.ClientLoaderArgs) {
-  if (!(await getToken())) return { rounds: [], nextCursor: null };
+  if (!(await getToken())) return { rounds: [], nextCursor: null, months: [] };
   try {
     const page = unwrap(
       await api.GET("/v1/members/{username}/rounds", { params: { path: { username: params.username }, query: { limit: FIRST_PAGE } } }),
     );
-    return { rounds: page.rounds.map(fromTimelineRound), nextCursor: page.nextCursor };
+    return { rounds: page.rounds.map(fromTimelineRound), nextCursor: page.nextCursor, months: page.months.map(fromTimelineMonth) };
   } catch (error) {
     throw profileUnavailable(error);
   }

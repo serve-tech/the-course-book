@@ -183,6 +183,16 @@ export async function addPlayed(db: ReturnType<typeof connect>["db"], member: Te
   await db.insert(rounds).values({ userId: member.id, courseId, playedAt: "2026-06-01" });
 }
 
+/** Log rounds on the given dates at a course already on the member's list. */
+export async function addRounds(
+  db: ReturnType<typeof connect>["db"],
+  member: TestMember,
+  courseId: string,
+  dates: readonly string[],
+): Promise<void> {
+  await db.insert(rounds).values(dates.map((playedAt) => ({ userId: member.id, courseId, playedAt })));
+}
+
 /** Course ids on a member's Want to play list. */
 export async function wantedIds(db: ReturnType<typeof connect>["db"], userId: string): Promise<string[]> {
   const rows = await db.select({ courseId: wantToPlay.courseId }).from(wantToPlay).where(eq(wantToPlay.userId, userId));

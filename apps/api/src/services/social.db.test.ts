@@ -170,6 +170,58 @@ describe("memberTimeline", () => {
     }
   });
 
+  it("counts every round in each month a page touches, including rounds on other pages", async () => {
+    await befriend("user_a", "user_b");
+    await rank("user_a", ["usa1", "usa2", "usa3"]);
+    await rank("user_b", ["usa1"]);
+    await round("user_a", "usa1", "2026-10-02");
+    await round("user_a", "usa1", "2026-09-20");
+    await round("user_a", "usa2", "2026-09-10");
+    await round("user_a", "usa3", "2026-09-01");
+    await round("user_a", "usa2", "2026-07-04");
+    // Another member's round in a counted month must not count. (Undated
+    // rounds cannot be stored until played_at becomes nullable; monthWindow's
+    // tests cover them.)
+    await round("user_b", "usa1", "2026-09-15");
+
+    const pages = async (limit: number) => {
+      const months = [];
+      let after: TimelineCursor | null = null;
+      for (let guard = 0; guard < 10; guard++) {
+        const page = await memberTimeline(db, "user_b", "alpha", { after, limit });
+        if (!page) throw new Error("friend's timeline missing");
+        months.push(page.months);
+        after = page.next;
+        if (!after) break;
+      }
+      return months;
+    };
+
+    expect(await pages(2)).toEqual([
+      [
+        { month: "2026-10", rounds: 1 },
+        { month: "2026-09", rounds: 3 },
+      ],
+      [{ month: "2026-09", rounds: 3 }],
+      [{ month: "2026-07", rounds: 1 }],
+    ]);
+    // A page spanning August, which has no rounds, lists only months that do.
+    expect(await pages(3)).toEqual([
+      [
+        { month: "2026-10", rounds: 1 },
+        { month: "2026-09", rounds: 3 },
+      ],
+      [
+        { month: "2026-09", rounds: 3 },
+        { month: "2026-07", rounds: 1 },
+      ],
+    ]);
+  });
+
+  it("has no month counts for an empty timeline", async () => {
+    expect((await memberTimeline(db, "user_a", "alpha", { after: null, limit: 10 }))?.months).toEqual([]);
+  });
+
   it("is not available for someone who is not a friend", async () => {
     expect(await memberTimeline(db, "user_a", "charlie", { after: null, limit: 10 })).toBeNull();
   });
