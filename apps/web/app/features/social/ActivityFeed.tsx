@@ -19,15 +19,14 @@ const PAGE_SIZE = 30;
 const STRIP = 4;
 
 /**
- * Home for a signed-in member: what their friends played lately, then the
+ * Activity for a signed-in member: what their friends played lately, then the
  * feed. Key it by the first page (`feedKey`) so a new first page starts
  * "Show more" over.
  *
  * @param first - The first page from the loader.
  * @param hasFriends - Whether the member has any friends (chooses the empty state).
- * @param me - The member's username, for their own links.
  */
-export function HomeFeed({ first, hasFriends, me }: { first: FeedFirstPage; hasFriends: boolean; me: string }) {
+export function ActivityFeed({ first, hasFriends }: { first: FeedFirstPage; hasFriends: boolean }) {
   const [more, setMore] = useState<{ items: FeedItem[]; cursor: string | null } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -67,7 +66,7 @@ export function HomeFeed({ first, hasFriends, me }: { first: FeedFirstPage; hasF
   return (
     <>
       <div className={feedStyles.head}>
-        <span className={feedStyles.eyebrow}>Home</span>
+        <span className={feedStyles.eyebrow}>Activity</span>
         <h1 className={feedStyles.title}>Where your friends are playing</h1>
       </div>
       <div className={feedStyles.columns}>
@@ -127,7 +126,7 @@ export function HomeFeed({ first, hasFriends, me }: { first: FeedFirstPage; hasF
           <div className={feedStyles.cta}>
             <b>Played somewhere?</b>
             <p>Log it and it lands on your timeline and in your friends&apos; feeds.</p>
-            <Link className={[styles.button, styles.buttonSolid].join(" ")} to={logPath(me)}>
+            <Link className={[styles.button, styles.buttonSolid].join(" ")} to={logPath()}>
               + Log a round
             </Link>
           </div>
@@ -182,42 +181,5 @@ function FeedRow({ item, now }: { item: FeedItem; now: Date }) {
         <PersonalRank rank={round.rank} owner={name} />
       </div>
     </article>
-  );
-}
-
-/** Home for visitors who are not signed in. */
-export function Welcome({ onSignIn }: { onSignIn: () => void }) {
-  return (
-    <div className={feedStyles.welcome}>
-      <span className={feedStyles.eyebrow}>The Course Book</span>
-      <h1 className={feedStyles.welcomeTitle}>
-        Every course you&apos;ve played, <em>ranked.</em>
-      </h1>
-      <p className={feedStyles.lede}>
-        Log your rounds, rank the courses you love, work through the Top 100 lists and see where your friends are playing.
-      </p>
-      <div className={feedStyles.welcomeActions}>
-        <button type="button" className={[styles.button, styles.buttonSolid].join(" ")} onClick={onSignIn}>
-          Sign in
-        </button>
-        <Link className={[styles.button, styles.buttonGhost].join(" ")} to="/courses">
-          Browse the Top 100
-        </Link>
-      </div>
-      <div className={feedStyles.features}>
-        <div className={feedStyles.feature}>
-          <b>Your ranking</b>
-          <p>Drag your courses into order. Your top four lead your profile.</p>
-        </div>
-        <div className={feedStyles.feature}>
-          <b>Top lists</b>
-          <p>Tick off the World, USA, Public and state Top 100s.</p>
-        </div>
-        <div className={feedStyles.feature}>
-          <b>Friends</b>
-          <p>See where friends played and how your rankings compare.</p>
-        </div>
-      </div>
-    </div>
   );
 }

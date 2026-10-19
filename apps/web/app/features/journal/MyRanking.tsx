@@ -31,8 +31,7 @@ enum Dialog {
  * there are overall ranks, and a drop would land among courses the tab
  * hides. Search keeps editing, because a move renumbers the full list.
  *
- * It is the Ranking tab of the member's own profile, whose header holds
- * Log a round; `openLog` opens the Log dialog when it turns true (the Log a
+ * Home and the member's own profile both use this editor; `openLog` opens the Log dialog when it turns true (the Log a
  * round buttons link to `?log=1`).
  *
  * @param rows - The member's ranking in rank order.
@@ -138,7 +137,10 @@ export function MyRanking({
       )}
 
       {!courses.length ? (
-        <div className={styles.empty}>Your ranking is empty. Log your first round to start ranking courses.</div>
+        <div className={styles.empty}>
+          <p>Your ranking is empty. Log your first round to start ranking courses.</p>
+          <button type="button" className={styles.filter} onClick={() => { setDialog(Dialog.Log); }}>Log your first round</button>
+        </div>
       ) : stateMissing ? (
         <div className={styles.empty}>Pick a state to see the courses you've played there.</div>
       ) : !visible.length ? (

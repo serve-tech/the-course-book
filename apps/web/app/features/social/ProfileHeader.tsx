@@ -41,7 +41,7 @@ export function ProfileHeader({ profile, notify }: { profile: Profile; notify: (
           </div>
           <div className={profileStyles.heroActions}>
             {self ? (
-              <Link className={[styles.button, styles.buttonSolid].join(" ")} to={logPath(profile.member.username)}>
+              <Link className={[styles.button, styles.buttonSolid].join(" ")} to={logPath()}>
                 + Log a round
               </Link>
             ) : (
