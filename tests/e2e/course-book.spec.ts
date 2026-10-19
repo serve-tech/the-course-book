@@ -7,6 +7,8 @@ import { eq } from "drizzle-orm";
 import { clerk } from "@clerk/testing/playwright";
 import { isLayoutPreviewEnabled, LAYOUT_PREFERENCE_KEY, LayoutMode } from "../../apps/web/app/features/shell/layout-preview";
 import { authAvailable, clerkAvailable, signInAs } from "./auth";
+import { stubPosthog } from "./posthog";
+import { Metric, NavigationKind } from "../../apps/web/app/lib/telemetry/metrics";
 import {
   addHiddenCourse,
   addPlayed,
@@ -43,7 +45,8 @@ test.afterAll(async () => {
   await pool.end();
 });
 
-test.beforeEach(async ({ page }) => {
+test.beforeEach(async ({ page, context }) => {
+  await stubPosthog(context);
   await page.addInitScript(() => {
     localStorage.setItem("theCourseBookLocationPromptVersion", "v2");
     localStorage.setItem("theCourseBookSelectedState", "MI");
@@ -193,6 +196,60 @@ test.describe("signed in", () => {
       await page.getByRole("button", { name: "Try the new layout" }).click();
       await expect(page.getByRole("button", { name: "Use classic layout" })).toBeEnabled();
     }
+  });
+
+  test("performance telemetry measures auth, delayed API responses and visible navigation without personal URLs", async ({ page }) => {
+    test.setTimeout(60_000);
+    const collected = await stubPosthog(page);
+    // PostHog excludes automated browsers. Exercise the normal-browser capture path.
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, "webdriver", { get: () => false });
+      Object.defineProperty(navigator, "userAgentData", { get: () => undefined });
+    });
+    const { owner } = members();
+    await signInAs(page, owner);
+    await expectSignedInAs(page, owner.username);
+    await page.route(/\/v1\/top-lists(?:\?|$)/, async (route) => {
+      const response = await route.fetch();
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      await route.fulfill({ response });
+    });
+    await page.getByRole("link", { name: "Courses", exact: true }).filter({ visible: true }).first().click();
+    await expect.poll(() => collected.measurements().some((event) => event.metric === Metric.Navigation && event.route === "/courses" && event.navigation_kind === NavigationKind.Navigation), { timeout: 15_000 }).toBe(true);
+    const apiEvent = collected.measurements().find((event) => event.metric === Metric.Api && event.endpoint === "/v1/top-lists");
+    expect(apiEvent?.duration_ms).toBeGreaterThanOrEqual(150);
+    expect(apiEvent?.request_id).toMatch(/^[0-9a-f-]{36}$/);
+    expect(apiEvent?.server_ms).toBeGreaterThanOrEqual(0);
+    expect(collected.measurements().some((event) => event.metric === Metric.Auth)).toBe(true);
+    expect(collected.measurements().some((event) => event.metric === Metric.Clerk)).toBe(true);
+    expect(collected.measurements().some((event) => event.metric === Metric.Navigation && event.navigation_kind === NavigationKind.Initial)).toBe(true);
+    expect(collected.measurements().find((event) => event.metric === Metric.Loader && event.route_id === "routes/top-100")?.duration_ms).toBeGreaterThanOrEqual(150);
+    expect(collected.measurements().find((event) => event.metric === Metric.Navigation && event.route === "/courses")?.duration_ms).toBeGreaterThanOrEqual(150);
+    const readyCount = () => collected.measurements().filter((event) => event.metric === Metric.Navigation && event.navigation_kind === NavigationKind.Navigation).length;
+    const beforeBack = readyCount();
+    await page.goBack();
+    await expect.poll(readyCount, { timeout: 15_000 }).toBeGreaterThan(beforeBack);
+    const beforeForward = readyCount();
+    await page.goForward();
+    await expect.poll(readyCount, { timeout: 15_000 }).toBeGreaterThan(beforeForward);
+    await openRanking(page, owner);
+    await expect.poll(() => collected.measurements().some((event) => event.route === "/u/:username/ranking"), { timeout: 15_000 }).toBe(true);
+    const payload = JSON.stringify(collected.bodies);
+    expect(payload).not.toContain(owner.username);
+    expect(payload).not.toContain(owner.email);
+    expect(payload).not.toContain("Bearer ");
+    expect(payload).not.toContain("$current_url");
+    expect(payload).not.toContain("$referrer");
+    expect(payload).toContain("phc_e2e");
+  });
+
+  test("navigation works when PostHog is unavailable", async ({ page }) => {
+    await page.route(/^https:\/\/[^/]*posthog\.com\//, (route) => route.abort());
+    const { owner } = members();
+    await signInAs(page, owner);
+    await expectSignedInAs(page, owner.username);
+    await openRanking(page, owner);
+    await expect(page.locator("#rankingCount")).toHaveText("2 courses");
   });
 
   test("sign-in shows the stored order and logging preserves it", async ({ page }) => {

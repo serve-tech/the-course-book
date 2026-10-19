@@ -1,4 +1,4 @@
-import { getToken } from "@clerk/react-router";
+import { getToken } from "../lib/auth-token";
 import type { TopListCourse, TopListStanding } from "@coursebook/domain/social/types";
 import { useNavigate } from "react-router";
 import type { Route } from "./+types/top-100";

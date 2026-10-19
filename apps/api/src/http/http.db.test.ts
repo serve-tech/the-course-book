@@ -228,6 +228,29 @@ describe("CORS", () => {
   });
 });
 
+describe("performance timings", () => {
+  it.each(["/v1/me", "/v1/me/courses", "/v1/nothing-here"])("correlates %s with logs and exposes numeric timings cross-origin", async (path) => {
+    const t = createTestApp(db);
+    const response = await t.get(path, { ...t.bearer("user_timing", "timing_user"), origin: WEB_ORIGIN });
+    const entry = t.requests[0];
+    expect(entry?.requestId).toBe(response.headers.get("x-request-id"));
+    for (const value of [entry?.ms, entry?.authMs, entry?.provisionMs, entry?.uptimeMs]) expect(value).toBeTypeOf("number");
+    expect(response.headers.get("server-timing")).toBe(`app;dur=${String(entry?.ms)}, auth;dur=${String(entry?.authMs)}, provision;dur=${String(entry?.provisionMs)}`);
+    expect(response.headers.get("access-control-expose-headers")).toContain("Server-Timing");
+    expect(response.headers.get("server-timing")).not.toContain("timing_user");
+  });
+
+  it("keeps timings on authentication and provisioning failures", async () => {
+    const t = createTestApp(db, { provisioner: { resolve: () => Promise.reject(new Error("failure")), forget: () => undefined } });
+    const unauthorized = await t.get("/v1/me", { authorization: "Bearer invalid" });
+    expect(unauthorized.status).toBe(401);
+    expect(unauthorized.headers.get("server-timing")).toMatch(/^app;dur=\d+, auth;dur=\d+, provision;dur=0$/);
+    const failure = await t.get("/v1/me", t.bearer("user_timing", "timing_user"));
+    expect(failure.status).toBe(500);
+    expect(failure.headers.get("server-timing")).toMatch(/^app;dur=\d+, auth;dur=\d+, provision;dur=\d+$/);
+  });
+});
+
 describe("security headers", () => {
   const expected = {
     "content-security-policy": "default-src 'none'; frame-ancestors 'none'",

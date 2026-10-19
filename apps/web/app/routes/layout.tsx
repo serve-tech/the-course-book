@@ -1,4 +1,5 @@
-import { getToken, useAuth, useClerk } from "@clerk/react-router";
+import { useAuth, useClerk } from "@clerk/react-router";
+import { getToken } from "../lib/auth-token";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, Outlet, useLocation, useRevalidator, type ShouldRevalidateFunctionArgs } from "react-router";
 import type { Route } from "./+types/layout";
@@ -228,7 +229,7 @@ export default function Layout({ loaderData }: Route.ComponentProps) {
 
       {waking && !toast.message && (
         <div className="toast show" id="wakingNotice" role="status">
-          Waking the server… this can take up to a minute.
+          Still loading… the server or your connection may be taking longer than usual.
         </div>
       )}
 

@@ -56,6 +56,8 @@ The redesigned signed-in browser journeys opt in through the visible preview con
 
 Mock external services, not the domain or service logic whose behavior the test claims to verify.
 
+Performance tests cover token waits, API/header timings, navigation readiness and PostHog payload filtering. The browser build uses a dummy PostHog key; every browser context intercepts its external endpoints. The telemetry journey bypasses automated-browser detection only in the test browser, then checks real compressed SDK payloads, delayed API/navigation durations and Back/Forward navigation. See [performance monitoring](performance.md). Run Vitest's database suites and Playwright sequentially: both use the local test database.
+
 ## Regressions to consider by change
 
 | Area changed | Relevant assertions |

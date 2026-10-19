@@ -9,6 +9,7 @@ import {
 } from "react-router";
 import type { Route } from "./+types/root";
 import legacyStylesheet from "./shared/styles/legacy.css?url";
+import { AuthMetrics, NavigationMetrics } from "./lib/telemetry/PerformanceMetrics";
 
 export const links: Route.LinksFunction = () => [
   { rel: "stylesheet", href: legacyStylesheet },
@@ -42,6 +43,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             sign-in and sign-up URLs keep Clerk's own redirects in the app;
             without them Clerk falls back to its hosted pages. */}
         <ClerkProvider publishableKey={import.meta.env.VITE_CLERK_PUBLISHABLE_KEY} signInUrl="/sign-in" signUpUrl="/sign-up">
+          <AuthMetrics />
           {children}
         </ClerkProvider>
         <ScrollRestoration />
@@ -52,7 +54,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
-  return <Outlet />;
+  return <><NavigationMetrics /><Outlet /></>;
 }
 
 /** Shown while the first route data loads in the browser. */

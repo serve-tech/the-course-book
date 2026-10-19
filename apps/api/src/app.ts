@@ -34,6 +34,9 @@ export interface RequestLog {
   path: string;
   status: number;
   ms: number;
+  authMs: number;
+  provisionMs: number;
+  uptimeMs: number;
 }
 
 /**
@@ -138,12 +141,19 @@ export function createApp(deps: AppDependencies): OpenAPIHono<AppEnv> {
     const started = performance.now();
     await next();
     if (c.req.path === "/healthz") return;
+    const ms = Math.round(performance.now() - started);
+    const authMs = c.get("authMs") ?? 0;
+    const provisionMs = c.get("provisionMs") ?? 0;
+    c.header("Server-Timing", `app;dur=${String(ms)}, auth;dur=${String(authMs)}, provision;dur=${String(provisionMs)}`);
     logger.request({
       requestId: c.get("requestId"),
       method: c.req.method,
       path: c.req.path,
       status: c.res.status,
-      ms: Math.round(performance.now() - started),
+      ms,
+      authMs,
+      provisionMs,
+      uptimeMs: Math.round(process.uptime() * 1000),
     });
   });
   app.use("*", securityHeaders);
@@ -153,7 +163,7 @@ export function createApp(deps: AppDependencies): OpenAPIHono<AppEnv> {
       origin: (origin) => (deps.webOrigins.includes(origin) ? origin : null),
       allowMethods: ["GET", "POST", "PUT", "DELETE"],
       allowHeaders: ["Authorization", "Content-Type"],
-      exposeHeaders: ["ETag", "X-Request-Id"],
+      exposeHeaders: ["ETag", "X-Request-Id", "Server-Timing"],
       maxAge: 7200,
     }),
   );

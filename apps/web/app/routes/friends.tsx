@@ -1,4 +1,4 @@
-import { getToken } from "@clerk/react-router";
+import { getToken } from "../lib/auth-token";
 import type { FriendRequests, PublicMember } from "@coursebook/domain/friends/types";
 import { z } from "zod";
 import type { Route } from "./+types/friends";

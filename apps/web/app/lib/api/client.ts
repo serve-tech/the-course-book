@@ -1,5 +1,6 @@
 import createClient, { type Middleware } from "openapi-fetch";
 import type { components, paths } from "./schema";
+import { duration, failureOutcome, Metric, Outcome, serverDurations, type Measurement } from "../telemetry/metrics";
 
 /**
  * Typed client for the coursebook.golf API, generated from
@@ -66,8 +67,8 @@ export function expectOk(result: { error?: unknown; response: Response }): void 
 
 /**
  * Counts requests pending longer than `delayMs` and reports when that
- * changes between none and some; drives the "waking the server" notice
- * (a free Render instance takes about a minute to wake).
+ * changes between none and some; drives the slow-request notice. A delay
+ * alone cannot distinguish a cold start from a slow connection or handler.
  */
 export function createSlowTracker(delayMs: number, onChange: (slow: boolean) => void) {
   let slowCount = 0;
@@ -107,20 +108,42 @@ export interface ApiClientOptions {
   timeoutMs?: number;
   /** Sends a prepared request; injected in tests. */
   fetch?: (request: Request) => Promise<Response>;
+  /** Optional observer; failures must never affect API requests. */
+  onMeasurement?: (measurement: Measurement) => void;
 }
 
 export function createApiClient(options: ApiClientOptions) {
   const tracker = createSlowTracker(options.slowAfterMs ?? 3_000, options.onSlow ?? (() => undefined));
   const send = options.fetch ?? ((input: Request) => globalThis.fetch(input));
   const timeoutMs = options.timeoutMs ?? 90_000;
+  const endpoints = new WeakMap<Request, string>();
+  const report = (measurement: Measurement) => {
+    try { options.onMeasurement?.(measurement); }
+    catch { console.warn("Could not record API performance."); }
+  };
   const client = createClient<paths>({
     baseUrl: options.baseUrl,
     credentials: "omit",
     fetch: async (request: Request) => {
       const settle = tracker.start();
+      const started = performance.now();
+      const endpoint = endpoints.get(request);
+      const operation = endpoint ? { endpoint } : {};
       try {
         const signal = AbortSignal.any([request.signal, AbortSignal.timeout(timeoutMs)]);
-        return await send(new Request(request, { signal }));
+        const response = await send(new Request(request, { signal }));
+        const requestId = response.headers.get("x-request-id");
+        report({
+          metric: Metric.Api, duration_ms: duration(started, performance.now()),
+          outcome: response.ok ? Outcome.Success : Outcome.Error,
+          ...operation, method: request.method, status: response.status,
+          ...(requestId ? { request_id: requestId } : {}),
+          ...serverDurations(response.headers.get("server-timing")),
+        });
+        return response;
+      } catch (error) {
+        report({ metric: Metric.Api, duration_ms: duration(started, performance.now()), outcome: failureOutcome(error), ...operation, method: request.method });
+        throw error;
       } finally {
         settle();
       }
@@ -128,10 +151,20 @@ export function createApiClient(options: ApiClientOptions) {
   });
   const bearer: Middleware = {
     async onRequest({ request, schemaPath }) {
+      endpoints.set(request, schemaPath);
       if (PUBLIC_PATHS.has(schemaPath)) return request;
-      const token = await options.getToken();
-      if (token) request.headers.set("Authorization", "Bearer " + token);
-      return request;
+      const started = performance.now();
+      let outcome = Outcome.Success;
+      try {
+        const token = await options.getToken();
+        if (token) request.headers.set("Authorization", "Bearer " + token);
+        return request;
+      } catch (error) {
+        outcome = failureOutcome(error);
+        throw error;
+      } finally {
+        report({ metric: Metric.Auth, duration_ms: duration(started, performance.now()), outcome, source: "api", endpoint: schemaPath });
+      }
     },
   };
   client.use(bearer);

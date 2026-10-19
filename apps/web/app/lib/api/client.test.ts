@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError, createApiClient, createSlowTracker, unwrap } from "./client";
+import { Metric, Outcome, type Measurement } from "../telemetry/metrics";
 
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
@@ -49,6 +50,58 @@ describe("API client", () => {
     const { client } = recordingClient(() => new Response("Bad gateway", { status: 502 }));
     const result = await client.GET("/v1/me");
     expect(() => unwrap(result)).toThrow(expect.objectContaining({ status: 502, code: "http_502" }));
+  });
+});
+
+describe("API measurements", () => {
+  it("separates auth and response-header waits and correlates server timings, without parameters or tokens", async () => {
+    const measurements: Measurement[] = [];
+    let now = 10;
+    vi.spyOn(performance, "now").mockImplementation(() => now);
+    const client = createApiClient({
+      baseUrl: "https://api.example",
+      getToken: () => { now += 50; return Promise.resolve("secret-token"); },
+      fetch: () => {
+        now += 200;
+        return Promise.resolve(new Response("{}", { headers: {
+          "content-type": "application/json", "x-request-id": "11111111-1111-4111-8111-111111111111",
+          "server-timing": "app;dur=150, auth;dur=40, provision;dur=10",
+        } }));
+      },
+      onMeasurement: (measurement) => { measurements.push(measurement); },
+    });
+    await client.GET("/v1/members/{username}", { params: { path: { username: "private-name" } } });
+    expect(measurements).toEqual([
+      { metric: Metric.Auth, source: "api", duration_ms: 50, outcome: Outcome.Success, endpoint: "/v1/members/{username}" },
+      { metric: Metric.Api, duration_ms: 200, outcome: Outcome.Success, endpoint: "/v1/members/{username}", method: "GET", status: 200, request_id: "11111111-1111-4111-8111-111111111111", server_ms: 150, server_auth_ms: 40, server_provision_ms: 10 },
+    ]);
+    expect(JSON.stringify(measurements)).not.toMatch(/private-name|secret-token/);
+  });
+
+  it.each([new Error("network"), new DOMException("cancelled", "AbortError"), new DOMException("timeout", "TimeoutError")])("preserves a transport failure and reports its category (%s)", async (error) => {
+    const observe = vi.fn();
+    const client = createApiClient({ baseUrl: "https://api.example", getToken: () => Promise.resolve(null), fetch: () => Promise.reject(error), onMeasurement: observe });
+    await expect(client.GET("/v1/rankings")).rejects.toBe(error);
+    expect(observe).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ metric: Metric.Api, outcome: error.name === "AbortError" ? Outcome.Cancelled : error.name === "TimeoutError" ? Outcome.Timeout : Outcome.Error }));
+  });
+
+  it("reports HTTP failures and keeps successful data usable when the observer throws", async () => {
+    const warning = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const observer = vi.fn(() => { throw new Error("monitor down"); });
+    const client = createApiClient({ baseUrl: "https://api.example", getToken: () => Promise.resolve(null), fetch: () => Promise.resolve(json(503, {})), onMeasurement: observer });
+    expect((await client.GET("/v1/rankings")).response.status).toBe(503);
+    expect(observer).toHaveBeenCalledWith(expect.objectContaining({ status: 503, outcome: Outcome.Error }));
+    expect(warning).toHaveBeenCalled();
+  });
+
+  it("records token failures without making a request", async () => {
+    const error = new Error("clerk failed");
+    const send = vi.fn();
+    const observe = vi.fn();
+    const client = createApiClient({ baseUrl: "https://api.example", getToken: () => Promise.reject(error), fetch: send, onMeasurement: observe });
+    await expect(client.GET("/v1/me")).rejects.toBe(error);
+    expect(send).not.toHaveBeenCalled();
+    expect(observe).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ metric: Metric.Auth, outcome: Outcome.Error }));
   });
 });
 

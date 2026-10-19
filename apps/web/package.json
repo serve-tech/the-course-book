@@ -17,6 +17,7 @@
     "@react-router/node": "8.4.0",
     "isbot": "^5",
     "openapi-fetch": "0.17.0",
+    "posthog-js": "1.438.12",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-router": "8.4.0",
