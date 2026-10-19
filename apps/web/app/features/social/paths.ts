@@ -5,7 +5,7 @@ export function profilePath(username: string, tab?: string): string {
   return "/u/" + encodeURIComponent(username) + (tab ? "/" + tab : "");
 }
 
-/** Where "Log a round" goes: the member's Ranking tab with the Log dialog open. */
+/** Where "Log a round" goes: the member’s Ranking tab with the Log dialog open. */
 export function logPath(username: string): string {
   return profilePath(username, "ranking") + "?log=1";
 }

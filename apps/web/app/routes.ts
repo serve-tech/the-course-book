@@ -8,6 +8,7 @@ import {
 export default [
   layout("routes/layout.tsx", [
     index("routes/home.tsx"),
+    route("activity", "routes/activity.tsx"),
     route("courses", "routes/top-100.tsx"),
     route("top-100", "routes/top-100-redirect.tsx"),
     route("u/:username", "routes/profile.tsx", [

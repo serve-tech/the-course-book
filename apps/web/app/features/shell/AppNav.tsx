@@ -1,7 +1,8 @@
 import { Link, NavLink } from "react-router";
 import { BrandMark } from "../../shared/ui/Brand";
 import { AccountMenu } from "./AccountMenu";
-import { logPath, profilePath } from "../social/paths";
+import type { LayoutMode } from "./layout-preview";
+import { mainDestinations } from "./navigation";
 import { cx } from "../../shared/lib/cx";
 import styles from "./nav.module.css";
 
@@ -13,6 +14,7 @@ export interface NavMember {
 }
 
 interface NavProps {
+  layout: LayoutMode;
   member: NavMember | null;
   /** Pending friend requests to the member, shown as a badge on Friends. */
   incomingRequests: number;
@@ -21,52 +23,52 @@ interface NavProps {
   onNavigate: () => void;
 }
 
-/**
- * The top bar: brand, destinations (Home, Courses, Friends, Profile) and the
- * account: the member's avatar, which opens the account menu (Profile,
- * Account, Sign out), or Sign in when signed out. Logging a round lives on
- * the pages (Ranking, course rows) and the phone tab bar, not here. On phones
- * the destinations move to `TabBar`.
- */
-export function TopBar({ member, incomingRequests, onSignIn, onSignOut, onNavigate }: NavProps) {
+/** Classic and preview share the shell; only their destinations change. */
+export function TopBar({
+  layout,
+  member,
+  incomingRequests,
+  onSignIn,
+  onSignOut,
+  onNavigate,
+}: NavProps) {
   return (
     <header className={styles.topbar}>
-      <Link to="/" className={styles.brandLink} onClick={onNavigate} aria-label="The Course Book home">
+      <Link
+        to="/"
+        className={styles.brandLink}
+        onClick={onNavigate}
+        aria-label="The Course Book home"
+      >
         <span className="mark bookmark" aria-hidden="true">
           <BrandMark />
         </span>
         <b>The Course Book</b>
       </Link>
       <nav className={styles.links} aria-label="Main">
-        <NavLink end to="/" className={cx(styles.link)} onClick={onNavigate}>
-          Home
-        </NavLink>
-        <NavLink to="/courses" className={cx(styles.link)} onClick={onNavigate}>
-          Courses
-        </NavLink>
-        <NavLink to="/friends" className={cx(styles.link)} onClick={onNavigate}>
-          Friends
-          {incomingRequests > 0 && (
-            <span className={styles.badge} aria-label={String(incomingRequests) + " friend requests"}>
-              {incomingRequests}
-            </span>
-          )}
-        </NavLink>
-        {member ? (
-          <NavLink to={profilePath(member.username)} className={cx(styles.link)} onClick={onNavigate}>
-            Profile
-          </NavLink>
-        ) : (
-          <button type="button" className={styles.link} onClick={onSignIn}>
-            Profile
-          </button>
-        )}
+        <Destinations
+          layout={layout}
+          member={member}
+          incomingRequests={incomingRequests}
+          onSignIn={onSignIn}
+          onNavigate={onNavigate}
+          mobile={false}
+        />
       </nav>
       <div className={styles.right} id="authbar">
         {member ? (
-          <AccountMenu member={member} onSignOut={onSignOut} onNavigate={onNavigate} />
+          <AccountMenu
+            member={member}
+            onSignOut={onSignOut}
+            onNavigate={onNavigate}
+          />
         ) : (
-          <button type="button" className={styles.accountButton} id="authOpen" onClick={onSignIn}>
+          <button
+            type="button"
+            className={styles.accountButton}
+            id="authOpen"
+            onClick={onSignIn}
+          >
             Sign in
           </button>
         )}
@@ -75,67 +77,96 @@ export function TopBar({ member, incomingRequests, onSignIn, onSignOut, onNaviga
   );
 }
 
-/** Bottom tabs on phones: Home, Courses, Log, Friends, Profile. */
-export function TabBar({ member, incomingRequests, onSignIn, onNavigate }: Omit<NavProps, "onSignOut">) {
+/** Classic keeps its central Log action; the preview exposes ranking and lists directly. */
+export function TabBar({
+  layout,
+  member,
+  incomingRequests,
+  onSignIn,
+  onNavigate,
+}: Omit<NavProps, "onSignOut">) {
   return (
     <nav className={styles.tabbar} aria-label="Main">
-      <NavLink end to="/" className={cx(styles.tab)} onClick={onNavigate}>
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M3 11 12 4l9 7v9h-6v-6H9v6H3z" />
-        </svg>
-        Home
-      </NavLink>
-      <NavLink to="/courses" className={cx(styles.tab)} onClick={onNavigate}>
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M6 21V3" />
-          <path d="M6 4h11l-2.5 4L17 12H6" />
-        </svg>
-        Courses
-      </NavLink>
-      {member ? (
-        <Link to={logPath(member.username)} className={styles.tab} onClick={onNavigate} aria-label="Log a round">
-          <span className={styles.plus}>
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M12 5v14M5 12h14" />
-            </svg>
-          </span>
-        </Link>
-      ) : (
-        <button type="button" className={styles.tab} onClick={onSignIn} aria-label="Log a round">
-          <span className={styles.plus}>
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M12 5v14M5 12h14" />
-            </svg>
-          </span>
-        </button>
-      )}
-      <NavLink to="/friends" className={cx(styles.tab)} onClick={onNavigate}>
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <circle cx="9" cy="8" r="3.5" />
-          <path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5" />
-          <path d="M16 4.8a3.5 3.5 0 0 1 0 6.4M18 14.8c2 .8 3.2 2.5 3.6 5.2" />
-        </svg>
-        Friends
-        {incomingRequests > 0 && <span className={[styles.badge, styles.tabBadge].join(" ")}>{incomingRequests}</span>}
-      </NavLink>
-      {member ? (
-        <NavLink to={profilePath(member.username)} className={cx(styles.tab)} onClick={onNavigate}>
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="12" cy="8" r="4" />
-            <path d="M4 21c1-4 4-6 8-6s7 2 8 6" />
-          </svg>
-          Profile
-        </NavLink>
-      ) : (
-        <button type="button" className={styles.tab} onClick={onSignIn}>
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="12" cy="8" r="4" />
-            <path d="M4 21c1-4 4-6 8-6s7 2 8 6" />
-          </svg>
-          Profile
-        </button>
-      )}
+      <Destinations
+        layout={layout}
+        member={member}
+        incomingRequests={incomingRequests}
+        onSignIn={onSignIn}
+        onNavigate={onNavigate}
+        mobile
+      />
     </nav>
   );
 }
 
+function Destinations({
+  layout,
+  member,
+  incomingRequests,
+  onSignIn,
+  onNavigate,
+  mobile,
+}: Omit<NavProps, "onSignOut"> & { mobile: boolean }) {
+  return mainDestinations(layout, member?.username ?? null, mobile).map(
+    ({ label, to, icon, log }) => {
+      const content = log ? (
+        <span className={styles.plus}>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d={icon} />
+          </svg>
+        </span>
+      ) : (
+        <>
+          {mobile && (
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d={icon} />
+            </svg>
+          )}
+          {label}
+          {to === "/friends" && incomingRequests > 0 && (
+            <span
+              className={cx(styles.badge, mobile && styles.tabBadge)}
+              aria-label={String(incomingRequests) + " friend requests"}
+            >
+              {incomingRequests}
+            </span>
+          )}
+        </>
+      );
+      const className = cx(mobile ? styles.tab : styles.link);
+      if (to && log)
+        return (
+          <Link
+            key={label}
+            to={to}
+            className={className}
+            onClick={onNavigate}
+            aria-label={label}
+          >
+            {content}
+          </Link>
+        );
+      return to ? (
+        <NavLink
+          key={label}
+          end={to === "/"}
+          to={to}
+          className={className}
+          onClick={onNavigate}
+        >
+          {content}
+        </NavLink>
+      ) : (
+        <button
+          key={label}
+          type="button"
+          aria-label={log ? label : undefined}
+          className={className}
+          onClick={onSignIn}
+        >
+          {content}
+        </button>
+      );
+    },
+  );
+}
