@@ -2,7 +2,7 @@ import { Link } from "react-router";
 import type { ListEntry } from "@coursebook/domain/journal/types";
 import { OwnRanking } from "../journal/OwnRanking";
 import { coursesLabel } from "../journal/ranking";
-import { logPath, profilePath } from "../social/paths";
+import { profilePath } from "../social/paths";
 import { cx } from "../../shared/lib/cx";
 import socialStyles from "../social/social.module.css";
 import styles from "./home.module.css";
@@ -30,7 +30,7 @@ export function RankingHome({
           </p>
         </div>
         <Link
-          to={logPath()}
+          to="/?log=1"
           className={cx(socialStyles.button, socialStyles.buttonSolid)}
         >
           + Log a round

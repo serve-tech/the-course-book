@@ -11,6 +11,9 @@ import { errorMessage } from "../shared/lib/errors";
 import { preferences, SELECTED_STATE_KEY } from "../shared/lib/storage";
 import { usePreference } from "../shared/lib/use-preference";
 import { TabBar, TopBar } from "../features/shell/AppNav";
+import { LayoutPreview } from "../features/shell/LayoutPreview";
+import { readLayoutPreference } from "../features/shell/layout-preference";
+import { LAYOUT_PREFERENCE_KEY } from "../features/shell/layout-preview";
 import navStyles from "../features/shell/nav.module.css";
 import { cx } from "../shared/lib/cx";
 import type { Notify, Shell, ToastAction } from "../shared/ui/shell";
@@ -42,13 +45,14 @@ async function incomingRequests(): Promise<number> {
  * every page.
  */
 export async function clientLoader() {
-  if (!(await getToken())) return { user: null, problem: null, requests: 0 };
+  const layout = readLayoutPreference();
+  if (!(await getToken())) return { user: null, problem: null, requests: 0, layout };
   try {
     const [user, requests] = await Promise.all([api.GET("/v1/me").then(unwrap), incomingRequests()]);
-    return { user, problem: null, requests };
+    return { user, problem: null, requests, layout };
   } catch (error) {
     if (error instanceof ApiError && (error.status === 401 || error.status === 403))
-      return { user: null, problem: error.message, requests: 0 };
+      return { user: null, problem: error.message, requests: 0, layout };
     throw error;
   }
 }
@@ -66,12 +70,13 @@ export function shouldRevalidate({ formAction, defaultShouldRevalidate }: Should
  * client render the same markup.
  */
 export default function Layout({ loaderData }: Route.ComponentProps) {
-  const { user, problem, requests } = loaderData;
+  const { user, problem, requests, layout } = loaderData;
   const clerk = useClerk();
   const { userId } = useAuth();
   const revalidator = useRevalidator();
   const waking = useServerWaking();
   const lastUser = useRef<string | null | undefined>(undefined);
+  const checkedInitialLayout = useRef(false);
 
   // Signing in or out in the Clerk dialog changes the session without a
   // navigation; reload every route's data when the Clerk user changes.
@@ -80,6 +85,20 @@ export default function Layout({ loaderData }: Route.ComponentProps) {
     if (lastUser.current !== undefined && lastUser.current !== userId) void revalidator.revalidate();
     lastUser.current = userId;
   }, [userId, revalidator]);
+  // Another tab changing the preference reloads both navigation and route content.
+  useEffect(() => {
+    const changed = (event: StorageEvent) => {
+      if (event.key === null || event.key === LAYOUT_PREFERENCE_KEY) void revalidator.revalidate();
+    };
+    window.addEventListener("storage", changed);
+    // A tab can change the choice while this tab's initial loaders are still
+    // running, before it has a listener. Reconcile that missed event once.
+    if (!checkedInitialLayout.current) {
+      checkedInitialLayout.current = true;
+      if (readLayoutPreference() !== layout) void revalidator.revalidate();
+    }
+    return () => { window.removeEventListener("storage", changed); };
+  }, [layout, revalidator]);
   // The sign-in dialog belongs to the page it was opened on. When Clerk
   // navigates elsewhere (home, once signed in), the dialog closes instead of
   // covering the new page; state is adjusted during render, not in an effect.
@@ -173,7 +192,8 @@ export default function Layout({ loaderData }: Route.ComponentProps) {
 
   return (
     <div className={cx("app", navStyles.shell)}>
-      <TopBar member={user} incomingRequests={requests} onSignIn={openAuthDialog} onSignOut={signOut} onNavigate={navigate} />
+      <TopBar layout={layout} member={user} incomingRequests={requests} onSignIn={openAuthDialog} onSignOut={signOut} onNavigate={navigate} />
+      <LayoutPreview layout={layout} />
       {problem && (
         <p className="error-text" id="authProblem" role="alert">
           {problem}
@@ -184,7 +204,7 @@ export default function Layout({ loaderData }: Route.ComponentProps) {
         <Outlet context={shell} />
       </main>
 
-      <TabBar member={user} incomingRequests={requests} onSignIn={openAuthDialog} onNavigate={navigate} />
+      <TabBar layout={layout} member={user} incomingRequests={requests} onSignIn={openAuthDialog} onNavigate={navigate} />
 
       {authOpen && !user && <AuthDialog onClose={closeAuthDialog} />}
 

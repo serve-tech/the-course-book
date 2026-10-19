@@ -5,6 +5,7 @@ import { FriendshipStatus } from "@coursebook/api/domain/friendship";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { eq } from "drizzle-orm";
 import { clerk } from "@clerk/testing/playwright";
+import { isLayoutPreviewEnabled, LAYOUT_PREFERENCE_KEY, LayoutMode } from "../../apps/web/app/features/shell/layout-preview";
 import { authAvailable, clerkAvailable, signInAs } from "./auth";
 import {
   addHiddenCourse,
@@ -36,6 +37,7 @@ const members = (): { owner: TestMember; friend: TestMember } => {
 };
 
 const { db, pool } = connect();
+const previewEnabled = isLayoutPreviewEnabled();
 
 test.afterAll(async () => {
   await pool.end();
@@ -183,16 +185,22 @@ test("anonymous navigation, dialogs and mobile layout remain usable", async ({ p
 test.describe("signed in", () => {
   test.skip(!authAvailable, "Clerk development instance keys or test users are not configured");
 
-  test.beforeEach(async () => {
+  test.beforeEach(async ({ page }) => {
     const { owner, friend } = members();
     await resetScenario(db, owner, friend);
+    await page.goto("/");
+    if (previewEnabled) {
+      await page.getByRole("button", { name: "Try the new layout" }).click();
+      await expect(page.getByRole("button", { name: "Use classic layout" })).toBeEnabled();
+    }
   });
 
   test("sign-in shows the stored order and logging preserves it", async ({ page }) => {
     const { owner } = members();
     await signInAs(page, owner);
     await expectSignedInAs(page, owner.username);
-    await expect(page.getByRole("heading", { name: "Your courses, ranked." })).toBeVisible();
+    if (previewEnabled) await expect(page.getByRole("heading", { name: "Your courses, ranked." })).toBeVisible();
+    else await openRanking(page, owner);
     await expect(page.locator("#rankingCount")).toHaveText("2 courses");
     await expect.poll(() => rankingOrder(page)).toEqual(["Test Beta Links", "Test Alpha Links"]);
 
@@ -214,13 +222,14 @@ test.describe("signed in", () => {
   });
 
   test("Home makes lists, published rankings and friends activity one tap away", async ({ page }, testInfo) => {
+    test.skip(!previewEnabled, "The layout preview is disabled in this build");
     const { owner, friend } = members();
     await signInAs(page, owner);
     await expect(page.getByRole("heading", { name: "Your courses, ranked." })).toBeVisible();
     await expect(page.getByRole("link", { name: "My ranking", exact: true })).toHaveAttribute("aria-current", "page");
     await expect(page.locator("#ranking > li[data-course]")).toHaveCount(2);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-    await page.screenshot({ path: testInfo.outputPath("ranking-home.png"), fullPage: true });
+    await page.screenshot({ path: testInfo.outputPath("ranking-home.png"), fullPage: true, scale: "css" });
 
     await page.getByRole("link", { name: "My lists", exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`/u/${owner.username}/lists$`));
@@ -439,6 +448,7 @@ test.describe("signed in", () => {
     const { owner } = members();
     await addHiddenCourse(db, owner);
     await signInAs(page, owner);
+    if (!previewEnabled) await openRanking(page, owner);
     await expect(page.locator("#rankingCount")).toHaveText("3 courses");
     await expect.poll(() => rankingOrder(page)).toEqual(["Test Beta Links", "Test Alpha Links", "Hidden Course"]);
     const search = page.getByRole("searchbox", { name: "Search this ranking" });
@@ -536,6 +546,156 @@ test.describe("signed in", () => {
     await expect(page.locator("#modal")).toHaveCount(0);
     await expect(row(page, "Fallback Test Links")).toContainText("2 rounds");
   });
+});
+
+/** Coordinate real network responses without depending on timing delays. */
+function signal() {
+  let resolve: () => void = () => { throw new Error("signal not initialized"); };
+  const promise = new Promise<void>((complete) => { resolve = complete; });
+  return { promise, resolve };
+}
+
+test.describe("layout preview", () => {
+  test.skip(!previewEnabled, "The layout preview is disabled in this build");
+  test.skip(
+    !authAvailable,
+    "Clerk development instance keys or test users are not configured",
+  );
+  test.beforeEach(async () => {
+    const { owner, friend } = members();
+    await resetScenario(db, owner, friend);
+  });
+
+  test("Classic is the default, and members can switch both ways without losing their edits", async ({
+    page,
+  }, testInfo) => {
+    const { owner } = members();
+    await signInAs(page, owner);
+    await expect(
+      page.getByRole("heading", { name: "Where your friends are playing" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Profile", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "My lists", exact: true }),
+    ).toHaveCount(0);
+    await page.screenshot({
+      path: testInfo.outputPath("classic-home.png"),
+      fullPage: true,
+      scale: "css",
+    });
+
+    // Classic still logs into the same ranking through the profile route.
+    await openLog(page);
+    await page.locator("#modalsearch").fill("Test Alpha");
+    await page
+      .locator(".result")
+      .filter({ hasText: "Test Alpha Links" })
+      .click();
+    await page.locator("#confirmLog").click();
+    await expect(page.locator("#modal")).toHaveCount(0);
+    await expect(row(page, "Test Alpha Links")).toContainText("2 rounds");
+    await page.getByRole("link", { name: "Home", exact: true }).click();
+
+    await page.getByRole("button", { name: "Try the new layout" }).click();
+    await expect(
+      page.getByRole("heading", { name: "Your courses, ranked." }),
+    ).toBeVisible();
+    await expect(row(page, "Test Alpha Links")).toContainText("2 rounds");
+    await page.reload();
+    await expect(
+      page.getByRole("link", { name: "My ranking", exact: true }),
+    ).toBeVisible();
+    await openDetails(page, "Test Alpha Links");
+    await page.locator("#moveTop").click();
+    await expect
+      .poll(() => rankingOrder(page))
+      .toEqual(["Test Alpha Links", "Test Beta Links"]);
+
+    await page.getByRole("button", { name: "Use classic layout" }).click();
+    await expect(
+      page.getByRole("heading", { name: "Where your friends are playing" }),
+    ).toBeVisible();
+    await page.reload();
+    await expect(
+      page.getByRole("link", { name: "Profile", exact: true }),
+    ).toBeVisible();
+    await openRanking(page, owner);
+    await expect
+      .poll(() => rankingOrder(page))
+      .toEqual(["Test Alpha Links", "Test Beta Links"]);
+    await expect(row(page, "Test Alpha Links")).toContainText("2 rounds");
+    expect(await listOrder(db, owner.id)).toEqual([
+      fixtureCourses.alpha.id,
+      fixtureCourses.beta.id,
+    ]);
+    await page.goto("/?log=1");
+    await expect(page.locator("#modal")).toBeVisible();
+    await expect(page).toHaveURL(new RegExp(`/u/${owner.username}/ranking$`));
+  });
+
+  test("layout changes stay consistent across tabs, including one still loading", async ({
+    page,
+    context,
+  }) => {
+    const { owner } = members();
+    await signInAs(page, owner);
+    const second = await context.newPage();
+    const requested = signal();
+    const release = signal();
+    // Hold a real API response so the initial shell cannot mount its listener
+    // until after the first tab changes the preference.
+    await second.route(
+      "**/v1/me",
+      async (route) => {
+        const response = await route.fetch();
+        requested.resolve();
+        await release.promise;
+        await route.fulfill({ response });
+      },
+      { times: 1 },
+    );
+    const opening = second.goto("/");
+    await requested.promise;
+    await page.getByRole("button", { name: "Try the new layout" }).click();
+    await expect(
+      page.getByRole("heading", { name: "Your courses, ranked." }),
+    ).toBeVisible();
+    release.resolve();
+    await opening;
+    await expect(
+      second.getByRole("heading", { name: "Your courses, ranked." }),
+    ).toBeVisible();
+    await expect(
+      second.getByRole("link", { name: "My ranking", exact: true }),
+    ).toBeVisible();
+    await second.getByRole("button", { name: "Use classic layout" }).click();
+    await expect(
+      page.getByRole("heading", { name: "Where your friends are playing" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Home", exact: true }),
+    ).toBeVisible();
+    await second.close();
+  });
+});
+
+test("disabled preview keeps Classic even with a saved opt-in", async ({ page }) => {
+  test.skip(previewEnabled, "The layout preview is enabled in this build");
+  test.skip(!authAvailable, "Clerk development instance keys or test users are not configured");
+  const { owner, friend } = members();
+  await resetScenario(db, owner, friend);
+  await page.addInitScript(({ key, value }) => { localStorage.setItem(key, value); }, {
+    key: LAYOUT_PREFERENCE_KEY,
+    value: LayoutMode.CourseFirst,
+  });
+  await signInAs(page, owner);
+  await expect(page.getByRole("heading", { name: "Where your friends are playing" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Home", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Profile", exact: true })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Layout preview" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "My lists", exact: true })).toHaveCount(0);
 });
 
 test.describe("account deletion", () => {

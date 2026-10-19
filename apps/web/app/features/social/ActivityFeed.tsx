@@ -26,7 +26,7 @@ const STRIP = 4;
  * @param first - The first page from the loader.
  * @param hasFriends - Whether the member has any friends (chooses the empty state).
  */
-export function ActivityFeed({ first, hasFriends }: { first: FeedFirstPage; hasFriends: boolean }) {
+export function ActivityFeed({ first, hasFriends, me, home = false }: { first: FeedFirstPage; hasFriends: boolean; me: string; home?: boolean }) {
   const [more, setMore] = useState<{ items: FeedItem[]; cursor: string | null } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -66,7 +66,7 @@ export function ActivityFeed({ first, hasFriends }: { first: FeedFirstPage; hasF
   return (
     <>
       <div className={feedStyles.head}>
-        <span className={feedStyles.eyebrow}>Activity</span>
+        <span className={feedStyles.eyebrow}>{home ? "Home" : "Activity"}</span>
         <h1 className={feedStyles.title}>Where your friends are playing</h1>
       </div>
       <div className={feedStyles.columns}>
@@ -126,7 +126,7 @@ export function ActivityFeed({ first, hasFriends }: { first: FeedFirstPage; hasF
           <div className={feedStyles.cta}>
             <b>Played somewhere?</b>
             <p>Log it and it lands on your timeline and in your friends&apos; feeds.</p>
-            <Link className={[styles.button, styles.buttonSolid].join(" ")} to={logPath()}>
+            <Link className={[styles.button, styles.buttonSolid].join(" ")} to={logPath(me)}>
               + Log a round
             </Link>
           </div>

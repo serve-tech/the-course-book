@@ -8,6 +8,7 @@ import {
 } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { LayoutMode } from "./layout-preview";
 import { TabBar, TopBar, type NavMember } from "./AppNav";
 
 vi.mock("@clerk/react-router", () => ({ useUser: () => ({ user: null }) }));
@@ -22,7 +23,11 @@ describe.each([
   { name: "desktop", Bar: TopBar },
   { name: "mobile", Bar: TabBar },
 ])("$name navigation", ({ Bar }) => {
-  function openNav(user: NavMember | null = member, path = "/") {
+  function openNav(
+    user: NavMember | null = member,
+    path = "/",
+    layout = LayoutMode.CourseFirst,
+  ) {
     const onSignIn = vi.fn();
     const router = createMemoryRouter(
       [
@@ -30,6 +35,7 @@ describe.each([
           path: "*",
           element: (
             <Bar
+              layout={layout}
               member={user}
               incomingRequests={2}
               onSignIn={onSignIn}
@@ -48,6 +54,26 @@ describe.each([
       onSignIn,
     };
   }
+
+  it("preserves Classic Home and Profile navigation", () => {
+    const { nav } = openNav(member, "/", LayoutMode.Classic);
+    expect(nav.getByRole("link", { name: "Home" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(nav.getByRole("link", { name: "Profile" })).toHaveAttribute(
+      "href",
+      "/u/golfer",
+    );
+    expect(
+      nav.queryByRole("link", { name: "My lists" }),
+    ).not.toBeInTheDocument();
+    if (Bar === TabBar)
+      expect(nav.getByRole("link", { name: "Log a round" })).toHaveAttribute(
+        "href",
+        "/u/golfer/ranking?log=1",
+      );
+  });
 
   it("puts the ranking and lists first, with direct access to activity and friends", () => {
     const { nav } = openNav();

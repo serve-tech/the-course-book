@@ -1,7 +1,8 @@
 import { Link, NavLink } from "react-router";
 import { BrandMark } from "../../shared/ui/Brand";
 import { AccountMenu } from "./AccountMenu";
-import { profilePath } from "../social/paths";
+import type { LayoutMode } from "./layout-preview";
+import { mainDestinations } from "./navigation";
 import { cx } from "../../shared/lib/cx";
 import styles from "./nav.module.css";
 
@@ -13,6 +14,7 @@ export interface NavMember {
 }
 
 interface NavProps {
+  layout: LayoutMode;
   member: NavMember | null;
   /** Pending friend requests to the member, shown as a badge on Friends. */
   incomingRequests: number;
@@ -21,8 +23,9 @@ interface NavProps {
   onNavigate: () => void;
 }
 
-/** The main destinations are courses and lists; Profile stays in the account menu. */
+/** Classic and preview share the shell; only their destinations change. */
 export function TopBar({
+  layout,
   member,
   incomingRequests,
   onSignIn,
@@ -44,6 +47,7 @@ export function TopBar({
       </Link>
       <nav className={styles.links} aria-label="Main">
         <Destinations
+          layout={layout}
           member={member}
           incomingRequests={incomingRequests}
           onSignIn={onSignIn}
@@ -73,8 +77,9 @@ export function TopBar({
   );
 }
 
-/** The same destinations on phones, in the same order as desktop. */
+/** Classic keeps its central Log action; the preview exposes ranking and lists directly. */
 export function TabBar({
+  layout,
   member,
   incomingRequests,
   onSignIn,
@@ -83,6 +88,7 @@ export function TabBar({
   return (
     <nav className={styles.tabbar} aria-label="Main">
       <Destinations
+        layout={layout}
         member={member}
         incomingRequests={incomingRequests}
         onSignIn={onSignIn}
@@ -94,70 +100,73 @@ export function TabBar({
 }
 
 function Destinations({
+  layout,
   member,
   incomingRequests,
   onSignIn,
   onNavigate,
   mobile,
 }: Omit<NavProps, "onSignOut"> & { mobile: boolean }) {
-  const destinations = [
-    {
-      label: member ? "My ranking" : "Home",
-      to: "/",
-      icon: "M4 6h2m4 0h10M4 12h2m4 0h10M4 18h2m4 0h10",
-    },
-    {
-      label: "My lists",
-      to: member ? profilePath(member.username, "lists") : null,
-      icon: "M6 3h12v18l-6-4-6 4z",
-    },
-    { label: "Courses", to: "/courses", icon: "M6 21V3m0 1h11l-2.5 4L17 12H6" },
-    { label: "Activity", to: "/activity", icon: "M3 12h4l3-8 4 16 3-8h4" },
-    {
-      label: "Friends",
-      to: "/friends",
-      icon: "M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5M16 4.8a3.5 3.5 0 0 1 0 6.4M18 14.8c2 .8 3.2 2.5 3.6 5.2",
-    },
-  ];
-  return destinations.map(({ label, to, icon }) => {
-    const content = (
-      <>
-        {mobile && (
+  return mainDestinations(layout, member?.username ?? null, mobile).map(
+    ({ label, to, icon, log }) => {
+      const content = log ? (
+        <span className={styles.plus}>
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d={icon} />
           </svg>
-        )}
-        {label}
-        {to === "/friends" && incomingRequests > 0 && (
-          <span
-            className={cx(styles.badge, mobile && styles.tabBadge)}
-            aria-label={String(incomingRequests) + " friend requests"}
+        </span>
+      ) : (
+        <>
+          {mobile && (
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d={icon} />
+            </svg>
+          )}
+          {label}
+          {to === "/friends" && incomingRequests > 0 && (
+            <span
+              className={cx(styles.badge, mobile && styles.tabBadge)}
+              aria-label={String(incomingRequests) + " friend requests"}
+            >
+              {incomingRequests}
+            </span>
+          )}
+        </>
+      );
+      const className = cx(mobile ? styles.tab : styles.link);
+      if (to && log)
+        return (
+          <Link
+            key={label}
+            to={to}
+            className={className}
+            onClick={onNavigate}
+            aria-label={label}
           >
-            {incomingRequests}
-          </span>
-        )}
-      </>
-    );
-    const className = cx(mobile ? styles.tab : styles.link);
-    return to ? (
-      <NavLink
-        key={label}
-        end={to === "/"}
-        to={to}
-        className={className}
-        onClick={onNavigate}
-      >
-        {content}
-      </NavLink>
-    ) : (
-      <button
-        key={label}
-        type="button"
-        className={className}
-        onClick={onSignIn}
-      >
-        {content}
-      </button>
-    );
-  });
+            {content}
+          </Link>
+        );
+      return to ? (
+        <NavLink
+          key={label}
+          end={to === "/"}
+          to={to}
+          className={className}
+          onClick={onNavigate}
+        >
+          {content}
+        </NavLink>
+      ) : (
+        <button
+          key={label}
+          type="button"
+          aria-label={log ? label : undefined}
+          className={className}
+          onClick={onSignIn}
+        >
+          {content}
+        </button>
+      );
+    },
+  );
 }

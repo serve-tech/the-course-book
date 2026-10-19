@@ -3,6 +3,8 @@
 **Date:** 2026-10-19
 **Status:** Accepted
 
+**Rollout amendment:** [Opt-in layout preview](2026-10-19-opt-in-layout-preview-in-production.md) keeps Classic as the production default until the maintainer promotes this design. It also retains own-profile destinations for shared Log links; only the preview Home's Log action uses `/?log=1`.
+
 ## Context
 
 The product owner's feedback, endorsed by the maintainer, is that courses and the member's personal ranking are the app's core. The social feed is useful, but leading with it hid the ranking behind Profile → Ranking and list progress behind Profile → Lists. The maintainer requested a homepage redesign and less friction reaching these features.
