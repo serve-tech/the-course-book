@@ -32,6 +32,13 @@ export default function Privacy() {
         </p>
         <h3>Service providers</h3>
         <p>Sign-in is provided by Clerk. The app and its database run on Render in the United States.</p>
+        <p>
+          When performance monitoring is enabled, PostHog receives loading times, browser and device type,
+          layout version, page categories and request identifiers to help us investigate slow pages and failures.
+          We do not include your name, email, course lists, sign-in credentials or page contents in those measurements.
+          Session recording is disabled. Monitoring uses a temporary browser identifier rather than your account identity
+          and respects your browser's Do Not Track setting.
+        </p>
         <h3>Deleting your data</h3>
         <p>
           Delete your account on the <Link to="/account">Account</Link> page. That removes your list, rounds, friends,

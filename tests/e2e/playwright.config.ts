@@ -85,6 +85,9 @@ export default defineConfig({
         PORT: "3100",
         VITE_API_URL: API,
         VITE_CLERK_PUBLISHABLE_KEY: clerkKeys.CLERK_PUBLISHABLE_KEY,
+        // Every browser context intercepts PostHog. Never send test data to a live project.
+        VITE_POSTHOG_KEY: "phc_e2e",
+        VITE_POSTHOG_HOST: "https://us.i.posthog.com",
       },
     },
   ],

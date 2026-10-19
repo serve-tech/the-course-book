@@ -1,4 +1,4 @@
-import { getToken } from "@clerk/react-router";
+import { getToken } from "../lib/auth-token";
 import { ProfileRelationship } from "@coursebook/domain/social/types";
 import { Link } from "react-router";
 import type { Route } from "./+types/profile.timeline";

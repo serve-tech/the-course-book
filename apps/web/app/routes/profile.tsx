@@ -1,4 +1,4 @@
-import { getToken } from "@clerk/react-router";
+import { getToken } from "../lib/auth-token";
 import type { MemberList } from "@coursebook/domain/friends/types";
 import type { Profile } from "@coursebook/domain/social/types";
 import { data, Outlet, useRouteLoaderData, type ShouldRevalidateFunctionArgs } from "react-router";

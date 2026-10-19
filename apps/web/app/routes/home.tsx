@@ -1,4 +1,4 @@
-import { getToken } from "@clerk/react-router";
+import { getToken } from "../lib/auth-token";
 import { redirect, useRouteLoaderData } from "react-router";
 import type { Route } from "./+types/home";
 import type { clientLoader as layoutLoader } from "./layout";

@@ -9,5 +9,7 @@ export interface AppEnv {
   Variables: {
     requestId: string;
     session: VerifiedSession | null;
+    authMs?: number;
+    provisionMs?: number;
   };
 }

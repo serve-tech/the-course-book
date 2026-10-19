@@ -47,9 +47,15 @@ export function sessionMiddleware(verify: SessionVerifier, warn: RejectionLog): 
       c.set("session", null);
       return next();
     }
-    const result: SessionVerification = isBearerHeader(header)
-      ? await verify(c.req.raw)
-      : { ok: false, reason: SessionRejection.NotBearer };
+    const started = performance.now();
+    let result: SessionVerification;
+    try {
+      result = isBearerHeader(header)
+        ? await verify(c.req.raw)
+        : { ok: false, reason: SessionRejection.NotBearer };
+    } finally {
+      c.set("authMs", Math.round(performance.now() - started));
+    }
     if (!result.ok) {
       const azp = "azp" in result ? { azp: result.azp } : {};
       warn("Session token rejected", { requestId: c.get("requestId"), reason: result.reason, ...azp });
@@ -82,5 +88,10 @@ export const memberOnly: MiddlewareHandler<AppEnv> = async (c, next) => {
 export async function requireUser(c: Context<AppEnv>, provisioner: Provisioner): Promise<AppUser> {
   const session = c.get("session");
   if (!session) throw new AppError(401, ErrorCode.Unauthenticated, "Sign in to continue.");
-  return provisioner.resolve(session.clerkId, session.claims);
+  const started = performance.now();
+  try {
+    return await provisioner.resolve(session.clerkId, session.claims);
+  } finally {
+    c.set("provisionMs", (c.get("provisionMs") ?? 0) + Math.round(performance.now() - started));
+  }
 }

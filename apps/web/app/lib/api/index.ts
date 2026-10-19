@@ -1,6 +1,7 @@
 import { getToken } from "@clerk/react-router";
 import { createApiClient } from "./client";
 import { serverStatus } from "./server-status";
+import { recordMeasurement } from "../telemetry";
 
 /**
  * The web app's API client. Calls carry the Clerk session token (waiting for
@@ -10,6 +11,7 @@ import { serverStatus } from "./server-status";
 export const api = createApiClient({
   baseUrl: import.meta.env.VITE_API_URL,
   getToken: () => getToken(),
+  onMeasurement: recordMeasurement,
   onSlow: (slow) => {
     serverStatus.set(slow);
   },
