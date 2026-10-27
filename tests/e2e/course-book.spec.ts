@@ -91,6 +91,13 @@ const friendsLink = (page: Page) => page.getByRole("link", { name: /^Friends\b/ 
 const welcome = (page: Page) => page.getByRole("heading", { name: /Every course you.ve played/ });
 
 /**
+ * The preview Home's focal point. Every test sets Michigan as the chosen
+ * state, so Home leads with Best in Michigan unless a list elsewhere is
+ * started and Michigan is not.
+ */
+const progressHome = (page: Page) => page.getByRole("heading", { level: 1, name: "Best in Michigan" });
+
+/**
  * How far Clerk's card sits inside the auth dialog's content box on each side,
  * in whole pixels; `{ left: 0, right: 0 }` when it fills it exactly. The right
  * edge uses `clientWidth` so a scrollbar does not count as overflow.
@@ -199,8 +206,8 @@ test.describe("signed in", () => {
     const { owner } = members();
     await signInAs(page, owner);
     await expectSignedInAs(page, owner.username);
-    if (previewEnabled) await expect(page.getByRole("heading", { name: "Your courses, ranked." })).toBeVisible();
-    else await openRanking(page, owner);
+    if (previewEnabled) await expect(progressHome(page)).toBeVisible();
+    await openRanking(page, owner);
     await expect(page.locator("#rankingCount")).toHaveText("2 courses");
     await expect.poll(() => rankingOrder(page)).toEqual(["Test Beta Links", "Test Alpha Links"]);
 
@@ -221,35 +228,45 @@ test.describe("signed in", () => {
     await expect(welcome(page)).toBeVisible();
   });
 
-  test("Home makes lists, published rankings and friends activity one tap away", async ({ page }, testInfo) => {
+  test("Home leads with list progress, then friends' rounds and the top four", async ({ page }, testInfo) => {
     test.skip(!previewEnabled, "The layout preview is disabled in this build");
     const { owner, friend } = members();
+    await addPlayed(db, owner, await catalogCourse(db, "usa15")); // Crystal Downs, Michigan #1
+    await addPlayed(db, friend, await catalogCourse(db, "usa20")); // Oakland Hills South, Michigan #2
     await signInAs(page, owner);
-    await expect(page.getByRole("heading", { name: "Your courses, ranked." })).toBeVisible();
-    await expect(page.getByRole("link", { name: "My ranking", exact: true })).toHaveAttribute("aria-current", "page");
-    await expect(page.locator("#ranking > li[data-course]")).toHaveCount(2);
+
+    await expect(progressHome(page)).toBeVisible();
+    await expect(page.getByRole("link", { name: "Home", exact: true })).toHaveAttribute("aria-current", "page");
+    const hero = page.getByRole("region", { name: "Best in Michigan" });
+    await expect(hero).toContainText("Your home state");
+    await expect(hero.getByRole("progressbar", { name: "Best in Michigan played" })).toHaveAttribute("aria-valuenow", "1");
+    await expect(hero).toContainText(friend.displayName + " has played 1.");
+    const friends = page.getByRole("region", { name: /From your friends/ });
+    await expect(friends.getByRole("listitem").filter({ hasText: fixtureCourses.alpha.name })).toContainText("Your #2");
+    const topFour = page.getByRole("region", { name: /Top four/ });
+    await expect(topFour.getByRole("img")).toHaveCount(3);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-    await page.screenshot({ path: testInfo.outputPath("ranking-home.png"), fullPage: true, scale: "css" });
+    await page.screenshot({ path: testInfo.outputPath("progress-home.png"), fullPage: true, scale: "css" });
 
-    await page.getByRole("link", { name: "My lists", exact: true }).click();
-    await expect(page).toHaveURL(new RegExp(`/u/${owner.username}/lists$`));
-    await expect(page.getByRole("heading", { name: /^Want to play/ })).toBeVisible();
-    await page.getByRole("link", { name: /World Top 100/ }).click();
-    await expect(page).toHaveURL(new RegExp(`/u/${owner.username}/lists/world$`));
-    await expect(page.getByRole("link", { name: "My lists", exact: true })).toHaveAttribute("aria-current", "page");
+    await hero.getByRole("link", { name: "See the list" }).click();
+    await expect(page).toHaveURL(/\/courses\?list=state-mi$/);
+    await expect(page.getByRole("tab", { name: "Best in Michigan" })).toHaveAttribute("aria-selected", "true");
 
-    await page.getByRole("link", { name: "Activity", exact: true }).click();
+    await page.getByRole("link", { name: "Home", exact: true }).click();
+    await topFour.getByRole("link", { name: "Your ranking" }).click();
+    await expect(page).toHaveURL(new RegExp(`/u/${owner.username}/ranking$`));
+    await expect(page.getByRole("link", { name: "My ranking", exact: true })).toHaveAttribute("aria-current", "page");
+    await expect.poll(() => rankingOrder(page)).toEqual(["Test Beta Links", "Test Alpha Links", "Crystal Downs Country Club"]);
+
+    await page.getByRole("link", { name: "Home", exact: true }).click();
+    await friends.getByRole("link", { name: "All activity" }).click();
     await expect(page.getByRole("heading", { name: "Where your friends are playing" })).toBeVisible();
     await expect(page.getByRole("main")).toContainText(friend.displayName);
-    await page.getByRole("link", { name: "My ranking", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "Your courses, ranked." })).toBeVisible();
-    await page.getByRole("link", { name: "USA Public Top 100", exact: true }).click();
-    await expect(page).toHaveURL(/\/courses\?list=usa-public$/);
-    await expect(page.getByRole("tab", { name: "USA Public", exact: true })).toHaveAttribute("aria-selected", "true");
-    await page.getByRole("link", { name: "My ranking", exact: true }).click();
-    await page.getByRole("link", { name: "Best in State", exact: true }).click();
-    await expect(page.getByRole("tab", { name: "Best in Michigan" })).toHaveAttribute("aria-selected", "true");
-    await expect(page.locator("#toplist > li").first()).toContainText("Michigan #1");
+
+    // Home's Log links open the dialog on the member's Ranking, as Classic's do.
+    await page.goto("/?log=1");
+    await expect(page.locator("#modal")).toBeVisible();
+    await expect(page).toHaveURL(new RegExp(`/u/${owner.username}/ranking$`));
   });
 
   test("course details moves, count editing and confirmed final-round removal work", async ({ page }) => {
@@ -448,7 +465,7 @@ test.describe("signed in", () => {
     const { owner } = members();
     await addHiddenCourse(db, owner);
     await signInAs(page, owner);
-    if (!previewEnabled) await openRanking(page, owner);
+    await openRanking(page, owner);
     await expect(page.locator("#rankingCount")).toHaveText("3 courses");
     await expect.poll(() => rankingOrder(page)).toEqual(["Test Beta Links", "Test Alpha Links", "Hidden Course"]);
     const search = page.getByRole("searchbox", { name: "Search this ranking" });
@@ -599,9 +616,8 @@ test.describe("layout preview", () => {
     await page.getByRole("link", { name: "Home", exact: true }).click();
 
     await page.getByRole("button", { name: "Try the new layout" }).click();
-    await expect(
-      page.getByRole("heading", { name: "Your courses, ranked." }),
-    ).toBeVisible();
+    await expect(progressHome(page)).toBeVisible();
+    await page.getByRole("link", { name: "My ranking", exact: true }).click();
     await expect(row(page, "Test Alpha Links")).toContainText("2 rounds");
     await page.reload();
     await expect(
@@ -612,6 +628,10 @@ test.describe("layout preview", () => {
     await expect
       .poll(() => rankingOrder(page))
       .toEqual(["Test Alpha Links", "Test Beta Links"]);
+    await page.getByRole("link", { name: "Home", exact: true }).click();
+    await expect(
+      page.getByRole("region", { name: /Top four/ }).getByRole("img").first(),
+    ).toHaveAttribute("aria-label", /^Test Alpha Links/);
 
     await page.getByRole("button", { name: "Use classic layout" }).click();
     await expect(
@@ -659,14 +679,10 @@ test.describe("layout preview", () => {
     const opening = second.goto("/");
     await requested.promise;
     await page.getByRole("button", { name: "Try the new layout" }).click();
-    await expect(
-      page.getByRole("heading", { name: "Your courses, ranked." }),
-    ).toBeVisible();
+    await expect(progressHome(page)).toBeVisible();
     release.resolve();
     await opening;
-    await expect(
-      second.getByRole("heading", { name: "Your courses, ranked." }),
-    ).toBeVisible();
+    await expect(progressHome(second)).toBeVisible();
     await expect(
       second.getByRole("link", { name: "My ranking", exact: true }),
     ).toBeVisible();
