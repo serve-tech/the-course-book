@@ -237,7 +237,7 @@ test.describe("signed in", () => {
 
     await expect(progressHome(page)).toBeVisible();
     await expect(page.getByRole("link", { name: "Home", exact: true })).toHaveAttribute("aria-current", "page");
-    const hero = page.getByRole("region", { name: "Best in Michigan" });
+    const hero = page.getByRole("region", { name: "Best in Michigan", exact: true });
     await expect(hero).toContainText("Your home state");
     await expect(hero.getByRole("progressbar", { name: "Best in Michigan played" })).toHaveAttribute("aria-valuenow", "1");
     await expect(hero).toContainText(friend.displayName + " has played 1.");
@@ -248,7 +248,7 @@ test.describe("signed in", () => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await page.screenshot({ path: testInfo.outputPath("progress-home.png"), fullPage: true, scale: "css" });
 
-    await hero.getByRole("link", { name: "See the list" }).click();
+    await page.getByRole("region", { name: /Up next on Best in Michigan/ }).getByRole("link", { name: "See the list" }).click();
     await expect(page).toHaveURL(/\/courses\?list=state-mi$/);
     await expect(page.getByRole("tab", { name: "Best in Michigan" })).toHaveAttribute("aria-selected", "true");
 
@@ -267,6 +267,56 @@ test.describe("signed in", () => {
     await page.goto("/?log=1");
     await expect(page.locator("#modal")).toBeVisible();
     await expect(page).toHaveURL(new RegExp(`/u/${owner.username}/ranking$`));
+  });
+
+  test("Home's Up next saves Want to play and logs, and members can track another list", async ({ page }) => {
+    test.skip(!previewEnabled, "The layout preview is disabled in this build");
+    const { owner, friend } = members();
+    const [crystalDowns, oaklandHills, dunesClub] = [
+      await catalogCourse(db, "usa15"), // Michigan #1, USA #15
+      await catalogCourse(db, "usa20"), // Michigan #2, USA #20
+      await catalogCourse(db, "michigan100"), // Michigan #3
+    ];
+    await addPlayed(db, owner, crystalDowns);
+    await addPlayed(db, friend, oaklandHills);
+    await signInAs(page, owner);
+    await expect(progressHome(page)).toBeVisible();
+
+    const upNext = page.getByRole("list", { name: "Up next on Best in Michigan" });
+    // The rows' own items: rank pills and friends are nested lists of their own.
+    const rows = (list: Locator) => list.locator(":scope > li[data-course]");
+    const courseOrder = (list: Locator) => rows(list).evaluateAll((items) => items.map((item) => item.getAttribute("data-course")));
+    await expect.poll(() => courseOrder(upNext)).toEqual(["Oakland Hills Country Club: South", "Dunes Club", "Kingsley Club"]);
+    await expect(rows(upNext).first()).toContainText(friend.displayName);
+
+    // Want to play moves a course to the front of Up next.
+    await upNext.getByRole("button", { name: "Want to play Dunes Club" }).click();
+    await expect.poll(() => wantedIds(db, owner.id)).toEqual([dunesClub]);
+    await expect.poll(() => courseOrder(upNext)).toEqual(["Dunes Club", "Oakland Hills Country Club: South", "Kingsley Club"]);
+    await expect(rows(upNext).first()).toContainText("On your Want to play");
+
+    // Logging from Up next counts on the hero and takes the course off Up next.
+    await upNext.getByRole("button", { name: "Log a round at Oakland Hills Country Club: South" }).click();
+    await expect(page.locator("#selectedCourseCard")).toContainText("Oakland Hills Country Club: South");
+    await page.locator("#playedOn").fill("2026-05-01");
+    await page.locator("#confirmLog").click();
+    await expect(page.locator("#modal")).toHaveCount(0);
+    await expect(page.getByRole("progressbar", { name: "Best in Michigan played" })).toHaveAttribute("aria-valuenow", "2");
+    await expect.poll(() => courseOrder(upNext)).toEqual(["Dunes Club", "Kingsley Club", "Arcadia Bluffs Golf Club"]);
+    expect(await roundDates(db, owner.id, oaklandHills)).toEqual(["2026-05-01"]);
+
+    // Tracking another list puts it on Home and remembers it on this browser.
+    const lists = page.getByRole("region", { name: /Your lists/ });
+    await expect(lists.getByRole("button", { name: /^Track Best in Michigan/ })).toHaveAttribute("aria-pressed", "true");
+    await lists.getByRole("button", { name: /^Track USA Top 100/ }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "USA Top 100" })).toBeVisible();
+    await expect(page).toHaveURL(/\/\?goal=usa$/);
+    await expect(page.getByRole("region", { name: "USA Top 100", exact: true })).toContainText("Your pick");
+    await expect(page.getByRole("progressbar", { name: "USA Top 100 played" })).toHaveAttribute("aria-valuenow", "2");
+    await expect(page.getByRole("list", { name: "Up next on USA Top 100" })).toBeVisible();
+    await page.goto("/");
+    await expect(page.getByRole("heading", { level: 1, name: "USA Top 100" })).toBeVisible();
+    await expect(lists.getByRole("button", { name: /^Track USA Top 100/ })).toHaveAttribute("aria-pressed", "true");
   });
 
   test("course details moves, count editing and confirmed final-round removal work", async ({ page }) => {
