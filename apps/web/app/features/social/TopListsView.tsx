@@ -12,7 +12,6 @@ import { CourseActions } from "../top-lists/CourseActions";
 import { CourseRow, type PlayedMark } from "../top-lists/CourseRow";
 import { topListSlug } from "../top-lists/lists";
 import topListStyles from "../top-lists/top-lists.module.css";
-import { ComingSoon } from "./ComingSoon";
 import { shortDate } from "./format";
 import { profilePath } from "./paths";
 import profileStyles from "./profile.module.css";
@@ -136,11 +135,6 @@ export function TopListsView({
           )}
         </section>
       </div>
-      <aside className={profileStyles.aside}>
-        <ComingSoon title="Lists">
-          {self ? "Make your own lists, ranked or not, like a Bandon trip or the best munis in Michigan." : "Lists " + name + " makes will appear here."}
-        </ComingSoon>
-      </aside>
       {history && (
         <RoundHistory
           key={history.id}

@@ -1,7 +1,6 @@
 import { ProfileRelationship } from "@coursebook/domain/social/types";
 import type { Route } from "./+types/profile.stats";
 import { useProfileData } from "./profile";
-import { ComingSoon } from "../features/social/ComingSoon";
 import { CourseTile } from "../features/social/CourseTile";
 import { TileSize } from "../features/social/sizes";
 import profileStyles from "../features/social/profile.module.css";
@@ -60,9 +59,6 @@ export default function ProfileStats() {
         )}
         {places.topState && <p className={profileStyles.editHint} style={{ marginTop: 14 }}>Most courses in {places.topState}.</p>}
       </section>
-      <aside className={profileStyles.aside}>
-        <ComingSoon title="Charts and records">Rounds by year, a map of every course, scoring and a year in golf you can share.</ComingSoon>
-      </aside>
     </div>
   );
 }

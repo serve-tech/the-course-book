@@ -5,6 +5,8 @@
 
 **Rollout amendment:** [Opt-in layout preview](2026-10-19-opt-in-layout-preview-in-production.md) keeps Classic as the production default until the maintainer promotes this design. It also retains own-profile destinations for shared Log links; only the preview Home's Log action uses `/?log=1`.
 
+**Home amendment (2026-10-27):** [Progress-first preview Home](2026-10-27-progress-first-preview-home.md) replaces the editable-ranking Home, its single `/v1/me/courses` read and the preview navigation below. The editor stays on the own-profile Ranking tab, and `/?log=1` now redirects there in both layouts.
+
 ## Context
 
 The product owner's feedback, endorsed by the maintainer, is that courses and the member's personal ranking are the app's core. The social feed is useful, but leading with it hid the ranking behind Profile → Ranking and list progress behind Profile → Lists. The maintainer requested a homepage redesign and less friction reaching these features.

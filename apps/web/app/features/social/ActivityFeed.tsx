@@ -5,7 +5,6 @@ import { api, unwrap } from "../../lib/api";
 import { fromFeedItem } from "../../lib/api/mappers";
 import { apiFailureMessage } from "../../shared/lib/errors";
 import { Avatar } from "./Avatar";
-import { ComingSoon } from "./ComingSoon";
 import { RankPills } from "../top-lists/RankPills";
 import { CourseTile } from "./CourseTile";
 import { PersonalRank } from "./PersonalRank";
@@ -130,8 +129,6 @@ export function ActivityFeed({ first, hasFriends, me, home = false }: { first: F
               + Log a round
             </Link>
           </div>
-          <ComingSoon title="Ratings and notes">Rate courses with stars, add a score and a note to each round, and see what friends thought.</ComingSoon>
-          <ComingSoon title="Invite friends">Share a link or a QR code on the first tee and become friends in one tap.</ComingSoon>
         </aside>
       </div>
     </>

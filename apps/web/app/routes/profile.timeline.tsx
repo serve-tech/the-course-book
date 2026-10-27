@@ -4,7 +4,6 @@ import { Link } from "react-router";
 import type { Route } from "./+types/profile.timeline";
 import { profileUnavailable, useProfileData } from "./profile";
 import { displayName, profilePath } from "../features/social/paths";
-import { ComingSoon } from "../features/social/ComingSoon";
 import { ComparisonCard } from "../features/social/ComparisonCard";
 import { TimelineView } from "../features/social/TimelineView";
 import { timelineKey } from "../features/social/format";
@@ -98,11 +97,6 @@ export default function ProfileTimeline({ loaderData, params }: Route.ComponentP
             ))}
           </div>
         </section>
-        {self ? (
-          <ComingSoon title="Want to play">Save the courses you want to play and see which friends want them too.</ComingSoon>
-        ) : (
-          <ComingSoon title={"You and " + name + " both want to play"}>The courses on both your Want to play lists, for planning the next trip.</ComingSoon>
-        )}
       </aside>
     </div>
   );

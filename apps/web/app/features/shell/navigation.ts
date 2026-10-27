@@ -8,12 +8,26 @@ export interface NavDestination {
   log?: boolean;
 }
 
-/** Destinations for each layout. A null URL opens sign-in instead of a private page. */
+/**
+ * Destinations for each layout. A null URL opens sign-in instead of a private page.
+ *
+ * Note:
+ *     The preview's phone tab bar has five slots: Home, My ranking, Log a
+ *     round, Courses and Friends. Home links to Activity and the member's
+ *     lists, so those two are desktop-only destinations (decision 2026-10-27).
+ */
 export function mainDestinations(
   layout: LayoutMode,
   username: string | null,
   mobile: boolean,
 ): NavDestination[] {
+  const home = { label: "Home", to: "/", icon: "M3 11 12 4l9 7v9h-6v-6H9v6H3z" };
+  const log = {
+    label: "Log a round",
+    to: username ? logPath(username) : null,
+    icon: "M12 5v14M5 12h14",
+    log: true,
+  };
   const courses = {
     label: "Courses",
     to: "/courses",
@@ -26,18 +40,9 @@ export function mainDestinations(
   };
   if (layout === LayoutMode.Classic)
     return [
-      { label: "Home", to: "/", icon: "M3 11 12 4l9 7v9h-6v-6H9v6H3z" },
+      home,
       courses,
-      ...(mobile
-        ? [
-            {
-              label: "Log a round",
-              to: username ? logPath(username) : null,
-              icon: "M12 5v14M5 12h14",
-              log: true,
-            },
-          ]
-        : []),
+      ...(mobile ? [log] : []),
       friends,
       {
         label: "Profile",
@@ -45,12 +50,15 @@ export function mainDestinations(
         icon: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8M4 21c1-4 4-6 8-6s7 2 8 6",
       },
     ];
+  const ranking = {
+    label: "My ranking",
+    to: username ? profilePath(username, "ranking") : null,
+    icon: "M4 6h2m4 0h10M4 12h2m4 0h10M4 18h2m4 0h10",
+  };
+  if (mobile) return [home, ranking, log, courses, friends];
   return [
-    {
-      label: username ? "My ranking" : "Home",
-      to: "/",
-      icon: "M4 6h2m4 0h10M4 12h2m4 0h10M4 18h2m4 0h10",
-    },
+    home,
+    ranking,
     {
       label: "My lists",
       to: username ? profilePath(username, "lists") : null,
