@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { MemberListRow } from "@coursebook/domain/friends/types";
 import { CourseTile } from "./CourseTile";
 import profileStyles from "./profile.module.css";
@@ -10,12 +11,14 @@ import styles from "./social.module.css";
  *
  * @param rows - The member's top rows, in rank order.
  * @param self - Whether it is the viewer's own profile (changes the empty state).
+ * @param action - A link beside the heading, e.g. Home's way to the full ranking.
  */
-export function TopFour({ rows, self }: { rows: readonly MemberListRow[]; self: boolean }) {
+export function TopFour({ rows, self, action }: { rows: readonly Pick<MemberListRow, "course" | "rank">[]; self: boolean; action?: ReactNode }) {
   return (
     <section className={profileStyles.section} aria-labelledby="top-four">
       <h2 id="top-four" className={styles.sectionLabel}>
         Top four
+        {action}
       </h2>
       {rows.length ? (
         <div className={profileStyles.topFour}>

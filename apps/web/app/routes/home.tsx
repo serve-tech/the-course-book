@@ -2,7 +2,7 @@ import { getToken } from "@clerk/react-router";
 import { redirect, useRouteLoaderData } from "react-router";
 import type { Route } from "./+types/home";
 import type { clientLoader as layoutLoader } from "./layout";
-import { RankingHome } from "../features/home/RankingHome";
+import { ProgressHome } from "../features/home/ProgressHome";
 import { Welcome } from "../features/home/Welcome";
 import { api, unwrap } from "../lib/api";
 import { LayoutMode } from "../features/shell/layout-preview";
@@ -11,37 +11,44 @@ import { ActivityFeed } from "../features/social/ActivityFeed";
 import { loadFeed } from "../features/social/load-feed";
 import { feedKey } from "../features/social/format";
 import { logPath } from "../features/social/paths";
-import { fromMyCourse } from "../lib/api/mappers";
+import { fromFeedItem, fromMyCourse, fromTopListProgress } from "../lib/api/mappers";
 import { RouteError } from "../shared/ui/RouteError";
 import { useShell } from "../shared/ui/shell";
 
-export const meta: Route.MetaFunction = ({ loaderData }) => [
-  {
-    title:
-      loaderData?.signedIn && loaderData.layout === LayoutMode.CourseFirst
-        ? "My ranking · The Course Book"
-        : "The Course Book",
-  },
-];
+/** Feed items read for the preview's few friends' rounds; enough to find distinct courses past backfills. */
+const FEED_SAMPLE = 12;
 
-/** Classic loads the friends feed; the opt-in preview loads only the member's ranking. */
+export const meta: Route.MetaFunction = () => [{ title: "The Course Book" }];
+
+/**
+ * Classic loads the friends feed. The opt-in preview loads, in parallel, the
+ * member's progress on every published list, the newest feed items and their
+ * ranking (decision 2026-10-27). A `?log=1` link opens the Log dialog on the
+ * member's own Ranking in either layout.
+ */
 export async function clientLoader({
   request,
 }: Pick<Route.ClientLoaderArgs, "request">) {
   const layout = readLayoutPreference();
   if (!(await getToken())) return { signedIn: false as const };
-  if (layout === LayoutMode.Classic) {
-    // A saved Home Log link remains usable after switching back to Classic.
-    if (new URL(request.url).searchParams.get("log") === "1") {
-      const me = unwrap(await api.GET("/v1/me"));
-      throw redirect(logPath(me.username));
-    }
-    return { signedIn: true as const, layout, ...(await loadFeed()) };
+  if (new URL(request.url).searchParams.get("log") === "1") {
+    const me = unwrap(await api.GET("/v1/me"));
+    throw redirect(logPath(me.username));
   }
-  const mine = unwrap(await api.GET("/v1/me/courses"));
+  if (layout === LayoutMode.Classic)
+    return { signedIn: true as const, layout, ...(await loadFeed()) };
+  const [lists, feed, mine] = await Promise.all([
+    api.GET("/v1/top-lists").then(unwrap),
+    api
+      .GET("/v1/feed", { params: { query: { limit: FEED_SAMPLE } } })
+      .then(unwrap),
+    api.GET("/v1/me/courses").then(unwrap),
+  ]);
   return {
     signedIn: true as const,
     layout,
+    standings: lists.lists.map(fromTopListProgress),
+    activity: feed.items.flatMap((item) => fromFeedItem(item) ?? []),
     rows: mine.courses.map(fromMyCourse),
   };
 }
@@ -61,7 +68,14 @@ export default function Home({ loaderData }: Route.ComponentProps) {
         home
       />
     );
-  return <RankingHome rows={loaderData.rows} username={me} />;
+  return (
+    <ProgressHome
+      standings={loaderData.standings}
+      activity={loaderData.activity}
+      rows={loaderData.rows}
+      username={me}
+    />
+  );
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {

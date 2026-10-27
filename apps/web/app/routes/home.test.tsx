@@ -71,19 +71,31 @@ describe("home loader", () => {
     },
   );
 
-  it("keeps Home Log links working after returning to Classic", async () => {
-    boundary.fetch.mockResolvedValue(Response.json({ username: "golfer" }));
-    const response: unknown = await loadHome("/?log=1").catch(
-      (error: unknown) => error,
-    );
-    if (!(response instanceof Response))
-      throw new Error("Expected a redirect response");
-    expect(response.status).toBe(302);
-    expect(response.headers.get("Location")).toBe("/u/golfer/ranking?log=1");
-  });
+  it.each([
+    LayoutMode.Classic,
+    ...(isLayoutPreviewEnabled() ? [LayoutMode.CourseFirst] : []),
+  ])(
+    "sends Home Log links to the member's Ranking dialog in %s",
+    async (preference) => {
+      localStorage.setItem(LAYOUT_PREFERENCE_KEY, preference);
+      boundary.fetch.mockResolvedValue(Response.json({ username: "golfer" }));
+      const response: unknown = await loadHome("/?log=1").catch(
+        (error: unknown) => error,
+      );
+      if (!(response instanceof Response))
+        throw new Error("Expected a redirect response");
+      expect(response.status).toBe(302);
+      expect(response.headers.get("Location")).toBe("/u/golfer/ranking?log=1");
+      expect(
+        boundary.fetch.mock.calls.map(
+          ([request]) => new URL(request.url).pathname,
+        ),
+      ).toEqual(["/v1/me"]);
+    },
+  );
 
   it.skipIf(!isLayoutPreviewEnabled())(
-    "loads the member's courses without requesting the feed or a profile when opted in",
+    "loads list progress, the newest feed items and the member's courses in parallel when opted in",
     async () => {
       localStorage.setItem(LAYOUT_PREFERENCE_KEY, LayoutMode.CourseFirst);
       const course: ApiSchemas["Course"] = {
@@ -100,23 +112,81 @@ describe("home loader", () => {
           world: null,
           usa: null,
           usaPublic: null,
-          state: null,
+          state: 4,
         },
       };
-      boundary.fetch.mockResolvedValue(
-        Response.json({ courses: [{ course, rank: 1, played: 3 }] }),
+      const friend = { username: "friend", displayName: "A Friend" };
+      const bodies: Record<string, unknown> = {
+        "/v1/top-lists": {
+          lists: [
+            {
+              list: {
+                type: "state",
+                scope: "MI",
+                title: "Best in Michigan",
+                size: 100,
+                source: "Test",
+                sourceYear: 2026,
+              },
+              mine: 1,
+              friends: [{ member: friend, played: 3 }],
+            },
+          ],
+        },
+        "/v1/feed": {
+          items: [
+            {
+              id: "item-1",
+              type: "round",
+              at: "2026-10-01T12:00:00Z",
+              member: friend,
+              rounds: [
+                {
+                  id: "c0a9c1f3-7f0e-4a51-9a52-2a8f3c1d9e01",
+                  course,
+                  playedOn: "2026-09-30",
+                  visit: 1,
+                  rank: 2,
+                },
+              ],
+              count: 1,
+            },
+          ],
+          nextCursor: null,
+        },
+        "/v1/me/courses": { courses: [{ course, rank: 1, played: 3 }] },
+      };
+      boundary.fetch.mockImplementation((request) =>
+        Promise.resolve(Response.json(bodies[new URL(request.url).pathname])),
       );
       expect(await loadHome()).toMatchObject({
         signedIn: true,
+        layout: LayoutMode.CourseFirst,
+        standings: [
+          {
+            list: { type: "state", scope: "MI", size: 100 },
+            mine: 1,
+            friends: [{ member: friend, played: 3 }],
+          },
+        ],
+        activity: [{ id: "item-1", member: friend }],
         rows: [
           { course: { id: course.id, name: "Home Links" }, rank: 1, played: 3 },
         ],
       });
+      const requests = boundary.fetch.mock.calls.map(
+        ([request]) => new URL(request.url),
+      );
+      expect(requests.map((url) => url.pathname).sort()).toEqual([
+        "/v1/feed",
+        "/v1/me/courses",
+        "/v1/top-lists",
+      ]);
       expect(
-        boundary.fetch.mock.calls.map(
-          ([request]) => new URL(request.url).pathname,
+        requests.find((url) => url.pathname === "/v1/feed")?.searchParams.get(
+          "limit",
         ),
-      ).toEqual(["/v1/me/courses"]);
+      ).toBe("12");
     },
   );
 
