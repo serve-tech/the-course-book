@@ -17,12 +17,12 @@ describe("layout destinations", () => {
     {
       layout: LayoutMode.CourseFirst,
       mobile: false,
-      labels: ["My ranking", "My lists", "Courses", "Activity", "Friends"],
+      labels: ["Home", "My ranking", "My lists", "Courses", "Activity", "Friends"],
     },
     {
       layout: LayoutMode.CourseFirst,
       mobile: true,
-      labels: ["My ranking", "My lists", "Courses", "Activity", "Friends"],
+      labels: ["Home", "My ranking", "Log a round", "Courses", "Friends"],
     },
   ])("$layout, mobile=$mobile", ({ layout, mobile, labels }) => {
     expect(
@@ -36,6 +36,24 @@ describe("layout destinations", () => {
       "/u/a%20golfer/ranking?log=1",
     );
     expect(links.at(-1)?.to).toBe("/u/a%20golfer");
+  });
+
+  it("points the preview's ranking, lists and Log at the member's profile", () => {
+    const urls = (mobile: boolean) =>
+      Object.fromEntries(
+        mainDestinations(LayoutMode.CourseFirst, "a golfer", mobile).map(
+          (item) => [item.label, item.to],
+        ),
+      );
+    expect(urls(false)).toMatchObject({
+      Home: "/",
+      "My ranking": "/u/a%20golfer/ranking",
+      "My lists": "/u/a%20golfer/lists",
+    });
+    expect(urls(true)).toMatchObject({
+      "My ranking": "/u/a%20golfer/ranking",
+      "Log a round": "/u/a%20golfer/ranking?log=1",
+    });
   });
 
   it.each([LayoutMode.Classic, LayoutMode.CourseFirst])(

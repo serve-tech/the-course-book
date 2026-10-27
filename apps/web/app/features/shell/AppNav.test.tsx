@@ -75,36 +75,50 @@ describe.each([
       );
   });
 
-  it("puts the ranking and lists first, with direct access to activity and friends", () => {
+  it("leads with Home, then the member's ranking, with friends one tap away", () => {
     const { nav } = openNav();
     expect(
       nav.getAllByRole("link").map((link) => link.getAttribute("href")),
-    ).toEqual(["/", "/u/golfer/lists", "/courses", "/activity", "/friends"]);
-    expect(nav.getByRole("link", { name: "My ranking" })).toHaveAttribute(
+    ).toEqual(
+      Bar === TabBar
+        ? ["/", "/u/golfer/ranking", "/u/golfer/ranking?log=1", "/courses", "/friends"]
+        : ["/", "/u/golfer/ranking", "/u/golfer/lists", "/courses", "/activity", "/friends"],
+    );
+    expect(nav.getByRole("link", { name: "Home" })).toHaveAttribute(
       "aria-current",
       "page",
-    );
-    expect(nav.getByRole("link", { name: "My lists" })).toHaveAttribute(
-      "href",
-      "/u/golfer/lists",
     );
     expect(nav.getByLabelText("2 friend requests")).toBeInTheDocument();
   });
 
-  it("keeps My lists active while looking at an individual checklist", () => {
-    const { nav } = openNav(member, "/u/golfer/lists/world");
-    expect(nav.getByRole("link", { name: "My lists" })).toHaveAttribute(
+  it("marks My ranking, not Home, on the member's ranking", () => {
+    const { nav } = openNav(member, "/u/golfer/ranking");
+    expect(nav.getByRole("link", { name: "My ranking" })).toHaveAttribute(
       "aria-current",
       "page",
     );
-    expect(nav.getByRole("link", { name: "My ranking" })).not.toHaveAttribute(
+    expect(nav.getByRole("link", { name: "Home" })).not.toHaveAttribute(
       "aria-current",
     );
   });
 
-  it("offers visitors sign-in for their lists and keeps public courses available", () => {
+  it.runIf(Bar === TopBar)(
+    "keeps My lists active while looking at an individual checklist",
+    () => {
+      const { nav } = openNav(member, "/u/golfer/lists/world");
+      expect(nav.getByRole("link", { name: "My lists" })).toHaveAttribute(
+        "aria-current",
+        "page",
+      );
+      expect(nav.getByRole("link", { name: "My ranking" })).not.toHaveAttribute(
+        "aria-current",
+      );
+    },
+  );
+
+  it("offers visitors sign-in for their ranking and keeps public courses available", () => {
     const { nav, onSignIn } = openNav(null);
-    fireEvent.click(nav.getByRole("button", { name: "My lists" }));
+    fireEvent.click(nav.getByRole("button", { name: "My ranking" }));
     expect(onSignIn).toHaveBeenCalledOnce();
     expect(nav.getByRole("link", { name: "Courses" })).toHaveAttribute(
       "href",
