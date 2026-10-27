@@ -1,11 +1,13 @@
 import "@testing-library/jest-dom/vitest";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { createMemoryRouter, Outlet, RouterProvider } from "react-router";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { courseSchema, type Course } from "@coursebook/domain/catalog/course";
 import type { ListEntry } from "@coursebook/domain/journal/types";
-import { FeedItemType, type FeedItem, type TopListStanding } from "@coursebook/domain/social/types";
+import { FeedItemType, type FeedItem, type TopListCourse, type TopListStanding } from "@coursebook/domain/social/types";
+import { HOME_GOAL_LIST_KEY } from "../../shared/lib/storage";
 import type { Shell } from "../../shared/ui/shell";
+import { chooseGoalList } from "./goal-list";
 import { ProgressHome } from "./ProgressHome";
 
 const course = (id: string, name: string, fields: Partial<Course> = {}): Course =>
@@ -25,7 +27,23 @@ const standing = (type: string, scope: string, title: string, mine: number, frie
 });
 const standings: TopListStanding[] = [
   standing("global", "GLOBAL", "World Top 100", 5),
+  standing("usa", "USA", "USA Top 100", 7),
   standing("state", "MI", "Best in Michigan", 13, [{ member: dan, played: 20 }]),
+  standing("state", "OR", "Best in Oregon", 2),
+];
+const entry = (subject: Course, rank: number, played: number, wantToPlay = false): TopListCourse => ({
+  course: subject,
+  rank,
+  played,
+  wantToPlay,
+  friendsPlayed: rank === 1 ? [dan] : [],
+});
+const michigan: TopListCourse[] = [
+  entry(course("crystal", "Crystal Downs"), 1, 0),
+  entry(course("oakland", "Oakland Hills: South"), 2, 1),
+  entry(course("dunes", "Dunes Club"), 3, 0),
+  entry(course("kingsley", "Kingsley Club"), 4, 0, true),
+  entry(course("arcadia", "Arcadia Bluffs"), 5, 0),
 ];
 const rows: ListEntry[] = [
   { course: pacific, rank: 1, played: 2 },
@@ -47,34 +65,46 @@ const activity: FeedItem[] = [
   round("5", maya, pacific),
 ];
 
+type Props = Parameters<typeof ProgressHome>[0];
 const routers: ReturnType<typeof createMemoryRouter>[] = [];
+let shell: Shell;
+
+beforeEach(() => {
+  localStorage.clear();
+  shell = { selectedState: "MI", onState: vi.fn(), notify: vi.fn(), searchFocus: vi.fn(), openAuth: vi.fn() };
+});
 afterEach(() => {
   cleanup();
+  vi.restoreAllMocks();
   for (const router of routers.splice(0)) router.dispose();
 });
 
-function openHome(props: Partial<Parameters<typeof ProgressHome>[0]> = {}, selectedState = "MI") {
-  const shell: Shell = { selectedState, onState: vi.fn(), notify: vi.fn(), searchFocus: vi.fn(), openAuth: vi.fn() };
+function openHome(props: Partial<Props> = {}) {
+  const lists = props.standings ?? standings;
+  const homeState = props.homeState ?? "MI";
+  const element = (
+    <ProgressHome
+      homeState={homeState}
+      standings={lists}
+      goal={chooseGoalList(lists, homeState)}
+      goalCourses={michigan}
+      activity={activity}
+      rows={rows}
+      username="golfer"
+      {...props}
+    />
+  );
   const router = createMemoryRouter(
-    [
-      {
-        element: <Outlet context={shell} />,
-        children: [
-          {
-            path: "/",
-            element: <ProgressHome standings={standings} activity={activity} rows={rows} username="golfer" {...props} />,
-          },
-        ],
-      },
-    ],
+    [{ element: <Outlet context={shell} />, children: [{ path: "/", element }] }],
     { initialEntries: ["/"] },
   );
   routers.push(router);
   render(<RouterProvider router={router} />);
+  return router;
 }
 
 describe("progress home", () => {
-  it("leads with progress on the home-state list and one way to log a round", () => {
+  it("leads with progress on the tracked list and one way to log a round", () => {
     openHome();
     const hero = screen.getByRole("region", { name: "Best in Michigan" });
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Best in Michigan");
@@ -83,21 +113,64 @@ describe("progress home", () => {
     expect(within(hero).getByRole("progressbar", { name: "Best in Michigan played" })).toHaveAttribute("aria-valuenow", "13");
     expect(hero).toHaveTextContent("Dan Whitaker has played 20.");
     expect(within(hero).getByRole("link", { name: "+ Log a round" })).toHaveAttribute("href", "/u/golfer/ranking?log=1");
-    expect(within(hero).getByRole("link", { name: "See the list" })).toHaveAttribute("href", "/courses?list=state-mi");
     expect(screen.getAllByRole("link", { name: "+ Log a round" })).toHaveLength(1);
   });
 
-  it("follows the chosen state, and the closest list without one", () => {
-    openHome({}, "");
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Best in Michigan");
-    expect(screen.getByRole("region", { name: "Best in Michigan" })).toHaveTextContent("Your closest list");
+  it("shows every national list and the home state's, with the tracked one pressed", () => {
+    openHome();
+    const lists = screen.getByRole("region", { name: /Your lists/ });
+    expect(within(lists).getAllByRole("button").map((button) => button.getAttribute("aria-label"))).toEqual([
+      "Track World Top 100, 5 of 100 played",
+      "Track USA Top 100, 7 of 100 played",
+      "Track Best in Michigan, 13 of 100 played",
+    ]);
+    expect(within(lists).getByRole("button", { name: /Best in Michigan/ })).toHaveAttribute("aria-pressed", "true");
+    expect(within(lists).getByRole("button", { name: /USA Top 100/ })).toHaveAttribute("aria-pressed", "false");
+    expect(within(lists).getByRole("link", { name: "All lists" })).toHaveAttribute("href", "/u/golfer/lists");
+  });
+
+  it("tracks another list: remembers it on this browser and shows it through the URL", () => {
+    const router = openHome();
+    fireEvent.click(screen.getByRole("button", { name: /^Track USA Top 100/ }));
+    expect(localStorage.getItem(HOME_GOAL_LIST_KEY)).toBe("usa");
+    expect(router.state.location.search).toBe("?goal=usa");
+    expect(shell.notify).not.toHaveBeenCalled();
+  });
+
+  it("says so when the choice cannot be remembered, and still shows it", () => {
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("blocked");
+    });
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const router = openHome();
+    fireEvent.click(screen.getByRole("button", { name: /^Track USA Top 100/ }));
+    expect(shell.notify).toHaveBeenCalledWith("Couldn't remember that list on this browser. Home shows it until you leave.");
+    expect(router.state.location.search).toBe("?goal=usa");
+  });
+
+  it("offers the next unplayed courses on the tracked list, Want to play first, ready to log", () => {
+    openHome();
+    const next = screen.getByRole("list", { name: "Up next on Best in Michigan" });
+    expect(within(next).getAllByRole("listitem").map((item) => item.getAttribute("data-course"))).toEqual([
+      "Kingsley Club",
+      "Crystal Downs",
+      "Dunes Club",
+    ]);
+    expect(within(next).getAllByRole("listitem")[0]).toHaveTextContent("On your Want to play");
+    expect(screen.getByRole("link", { name: "See the list" })).toHaveAttribute("href", "/courses?list=state-mi");
+    fireEvent.click(within(next).getByRole("button", { name: "Log a round at Crystal Downs" }));
+    expect(screen.getByRole("dialog")).toBeVisible();
+  });
+
+  it("points a finished list to the others", () => {
+    openHome({ goalCourses: michigan.map((course) => ({ ...course, played: 1 })) });
+    expect(screen.getByText("Every course played")).toBeVisible();
   });
 
   it("shows three friends' rounds at different courses, noted from the member's side", () => {
     openHome();
     const friends = screen.getByRole("region", { name: /From your friends/ });
-    const items = within(friends).getAllByRole("listitem");
-    expect(items.map((item) => item.textContent)).toEqual([
+    expect(within(friends).getAllByRole("listitem").map((item) => item.textContent)).toEqual([
       "MCMaya Castillo played Bandon TrailsSep 25 · First visitYour #2",
       "DWDan Whitaker played Bethpage BlackSep 25 · 10th roundUSA #38",
       "DWDan Whitaker played RackhamSep 25 · 32nd roundMichigan #89",
@@ -108,16 +181,17 @@ describe("progress home", () => {
   it("closes with the member's top four and a way to the full ranking", () => {
     openHome();
     const top = screen.getByRole("region", { name: /Top four/ });
-    expect(within(top).getAllByRole("img").map((tile) => tile.getAttribute("aria-label"))).toEqual([
-      "Pacific Dunes, OR",
-      "Bandon Trails, OR",
-    ]);
+    expect(within(top).getAllByRole("img").map((tile) => tile.getAttribute("aria-label"))).toEqual(["Pacific Dunes, OR", "Bandon Trails, OR"]);
     expect(within(top).getByRole("link", { name: "Your ranking" })).toHaveAttribute("href", "/u/golfer/ranking");
     expect(screen.getByText("2 courses ranked")).toBeVisible();
   });
 
   it("gives a new member a first step in every section", () => {
-    openHome({ standings: [standing("global", "GLOBAL", "World Top 100", 0), standing("state", "MI", "Best in Michigan", 0)], activity: [], rows: [] });
+    openHome({
+      standings: [standing("global", "GLOBAL", "World Top 100", 0), standing("state", "MI", "Best in Michigan", 0)],
+      activity: [],
+      rows: [],
+    });
     const hero = screen.getByRole("region", { name: "Best in Michigan" });
     expect(hero).toHaveTextContent("0of 100 played · 100 to go");
     expect(hero).toHaveTextContent("Log the courses you've played on it and watch this fill in.");
@@ -128,9 +202,10 @@ describe("progress home", () => {
   });
 
   it("still offers Log a round when there are no published lists", () => {
-    openHome({ standings: [] });
+    openHome({ standings: [], goal: null, goalCourses: [] });
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Log a round to start your ranking");
     expect(screen.getByRole("link", { name: "+ Log a round" })).toHaveAttribute("href", "/u/golfer/ranking?log=1");
     expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: /Your lists/ })).not.toBeInTheDocument();
   });
 });
