@@ -1,6 +1,6 @@
 /*
  * Shared pieces of the social pages: avatars, course tiles, tags, buttons,
- * section labels and "coming soon" cards. Colors and fonts come from the
+ * section labels and empty notes. Colors and fonts come from the
  * :root tokens and font imports in legacy.css (--bg, --panel, --panel2,
  * --cream, --muted, --gold, --line, --green; Playfair Display, DM Sans).
  */
@@ -191,47 +191,6 @@ a.tile:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
 .buttonSolid:hover { background: #d4b97c; }
 .buttonGhost { border-color: var(--line); background: transparent; color: #d7d9d2; }
 .buttonGhost:hover { background: rgba(255, 255, 255, 0.05); }
-
-/* A section that is not built yet: designed, honest and quiet. */
-.soon {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 14px;
-  align-items: start;
-  padding: 18px;
-  border: 1px dashed rgba(199, 170, 107, 0.3);
-  border-radius: 12px;
-  background: linear-gradient(180deg, rgba(199, 170, 107, 0.05), rgba(199, 170, 107, 0.015));
-}
-.soonIcon {
-  width: 38px;
-  height: 38px;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  border: 1px solid rgba(199, 170, 107, 0.45);
-  color: var(--gold);
-}
-.soonIcon svg { width: 18px; height: 18px; }
-.soonTitle {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  margin: 2px 0 4px;
-  font: 600 18px/1.25 "Playfair Display", Georgia, serif;
-  color: var(--cream);
-}
-.soonText { margin: 0; color: #bfc6bf; font-size: 14px; line-height: 1.5; max-width: 60ch; }
-.soonPill {
-  padding: 3px 9px;
-  border-radius: 999px;
-  border: 1px solid rgba(199, 170, 107, 0.45);
-  color: var(--gold);
-  font: 700 10px/1.4 "DM Sans", Arial, sans-serif;
-  letter-spacing: 1.2px;
-  text-transform: uppercase;
-}
 
 /* Quiet empty states inside a section. */
 .emptyNote {
