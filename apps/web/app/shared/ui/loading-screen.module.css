@@ -1,0 +1,66 @@
+/*
+ * First-load screen: the brand mark in a gold ring, larger than the top bar's,
+ * slowly "breathing" (scale, brightness and a soft gold glow) in the middle of
+ * the site background. It fades in after a short delay so fast loads do not
+ * flash it, and holds still for members who prefer reduced motion.
+ */
+.screen {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  min-height: 100dvh;
+  animation: appear 0.5s ease-out 0.2s both;
+}
+
+.mark {
+  display: grid;
+  place-items: center;
+  width: 112px;
+  height: 100px;
+  border: 1px solid rgba(199, 170, 107, 0.72);
+  border-radius: 50%;
+  background: rgba(199, 170, 107, 0.04);
+  color: var(--gold);
+  animation: breathe 2.8s ease-in-out infinite;
+}
+.mark svg {
+  display: block;
+  width: 90px;
+  height: 71px;
+}
+
+/* Read by screen readers, not shown. */
+.label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@keyframes appear {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes breathe {
+  0%,
+  100% {
+    transform: scale(0.94);
+    opacity: 0.62;
+    box-shadow: 0 0 0 0 rgba(199, 170, 107, 0);
+  }
+  50% {
+    transform: scale(1);
+    opacity: 1;
+    box-shadow: 0 0 44px 6px rgba(199, 170, 107, 0.2);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .screen,
+  .mark {
+    animation: none;
+  }
+}
