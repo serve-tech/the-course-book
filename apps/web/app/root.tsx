@@ -9,6 +9,7 @@ import {
 } from "react-router";
 import type { Route } from "./+types/root";
 import legacyStylesheet from "./shared/styles/legacy.css?url";
+import { LoadingScreen } from "./shared/ui/LoadingScreen";
 
 export const links: Route.LinksFunction = () => [
   { rel: "stylesheet", href: legacyStylesheet },
@@ -57,7 +58,7 @@ export default function App() {
 
 /** Shown while the first route data loads in the browser. */
 export function HydrateFallback() {
-  return <p className="empty">Loading The Course Book…</p>;
+  return <LoadingScreen />;
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
