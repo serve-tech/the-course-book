@@ -4,7 +4,7 @@ A golf course journal: log rounds, rank the courses you have played, compare aga
 
 - Repository: https://github.com/serve-tech/the-course-book
 - Production: https://coursebook.golf (API https://api.coursebook.golf) on Render, deployed from `main`, signing in with the Clerk production instance. The `onrender.com` hostnames (https://coursebook-golf-web.onrender.com, https://coursebook-golf-api.onrender.com) serve the same services.
-- Retired: https://serve-tech.github.io/the-course-book/ (the old static build, live until GitHub Pages is disabled). The free API sleeps after 15 idle minutes; the first request then waits for it to wake (12.5 s measured on 2026-09-28; Render documents up to about a minute).
+- Retired: https://serve-tech.github.io/the-course-book/ (the old static build, live until GitHub Pages is disabled). The API is on a paid plan and does not sleep.
 
 ## Working on the project
 
@@ -51,7 +51,7 @@ The rebuild and the split into an API with clients are on `main` ([rebuild decis
 
 ## Deployment and data
 
-`render.yaml` is the Render Blueprint: the API as a Docker web service (`apps/api/Dockerfile`), the web app as a static site (`apps/web/build/client`) and a Postgres 17 database, the API and database in Ohio (the static site is on Render's global CDN), all on free plans for now (the database must move to a paid plan before it expires, 30 days after creation). `render.yaml` declares no environment variables: every production variable, including `DATABASE_URL` and the Clerk keys, is set in Doppler, which syncs it to the Render services ([list](docs/architecture.md#production-configuration)). The API runs its migrations on start. Create or update the infrastructure by syncing the Blueprint from the Render dashboard, never by hand-creating services. Both services deploy from `main` after its CI checks pass.
+`render.yaml` is the Render Blueprint: the API as a Docker web service (`apps/api/Dockerfile`), the web app as a static site (`apps/web/build/client`) and a Postgres 17 database, the API and database in Ohio (the static site is on Render's global CDN), the database and API on Render's smallest paid plans and the static site free. `render.yaml` declares no environment variables: every production variable, including `DATABASE_URL` and the Clerk keys, is set in Doppler, which syncs it to the Render services ([list](docs/architecture.md#production-configuration)). The API runs its migrations on start. Create or update the infrastructure by syncing the Blueprint from the Render dashboard, never by hand-creating services. Both services deploy from `main` after its CI checks pass.
 
 Local check of the API image:
 
