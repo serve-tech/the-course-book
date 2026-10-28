@@ -34,7 +34,7 @@ The general Log a round buttons opened the dialog by navigating to `/u/<me>/rank
 ## Decision
 
 Option 1.
-- **Opening it.** `Shell.openLog()` opens `LogRound` (`features/rounds/LogRound.tsx`) over the current page: course search, then the hand-entered course dialog. Signed out, it opens sign-in. Like the account dialog, it closes if the member navigates away.
+- **Opening it.** `Shell.openLog()` opens `LogRound` (`features/rounds/LogRound.tsx`) over the current page: course search, then the hand-entered course dialog. Signed out, it opens sign-in. It closes once the member ends up on another page (Back, a link). A tap while a page is loading opens it on the loading page, so it is not dropped when that page arrives.
 - **Buttons.** All general Log a round buttons call it:
   - Home's hero;
   - the navigation's Log item, which has no URL;

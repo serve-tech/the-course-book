@@ -1,6 +1,6 @@
 import { getToken, useAuth, useClerk } from "@clerk/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, Outlet, useLocation, useRevalidator, useSearchParams, type ShouldRevalidateFunctionArgs } from "react-router";
+import { Link, Outlet, useLocation, useNavigation, useRevalidator, useSearchParams, type ShouldRevalidateFunctionArgs } from "react-router";
 import type { Route } from "./+types/layout";
 import { AuthDialog } from "../features/auth/AuthDialog";
 import { isClerkFlowHash } from "../features/auth/clerk-flow";
@@ -119,12 +119,15 @@ export default function Layout({ loaderData }: Route.ComponentProps) {
     if (isClerkFlowHash(window.location.hash))
       window.history.replaceState(window.history.state, "", window.location.pathname + window.location.search);
   };
-  // Log a round opens over the page it was opened on and, like the account
-  // dialog, closes if the member navigates away.
+  // Log a round opens over the page it was opened on, or the page loading
+  // when it was tapped, and closes once the member ends up somewhere else
+  // (Back, a link). Closing waits for navigation to settle, so a tap during a
+  // page load does not open the dialog on the old page and drop it on the new.
+  const navigation = useNavigation();
   const [logOpenOn, setLogOpenOn] = useState<string | null>(null);
-  if (logOpenOn !== null && logOpenOn !== pathname) setLogOpenOn(null);
+  if (logOpenOn !== null && navigation.state === "idle" && logOpenOn !== pathname) setLogOpenOn(null);
   const openLog = () => {
-    if (user) setLogOpenOn(pathname);
+    if (user) setLogOpenOn(navigation.location?.pathname ?? pathname);
     else openAuthDialog();
   };
   // `?log=1` links (saved before Log opened in place) open the dialog on
@@ -232,7 +235,7 @@ export default function Layout({ loaderData }: Route.ComponentProps) {
       <TabBar layout={layout} member={user} incomingRequests={requests} onSignIn={openAuthDialog} onLog={openLog} onNavigate={navigate} />
 
       {authOpen && !user && <AuthDialog onClose={closeAuthDialog} />}
-      {logOpenOn === pathname && user && (
+      {logOpenOn !== null && user && (
         <LogRound
           notify={notify}
           onSignIn={openAuthDialog}
