@@ -110,7 +110,6 @@ export function ProgressHome({
                   <span className={styles.choiceBar} aria-hidden="true">
                     <span style={{ width: share(choice.mine, choice.list.size) }} />
                   </span>
-                  {tracked && <span className={styles.tracking}>On Home</span>}
                 </button>
               );
             })}

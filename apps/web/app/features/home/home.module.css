@@ -111,7 +111,6 @@
   gap: 10px;
 }
 .choice {
-  position: relative;
   display: grid;
   gap: 6px;
   min-width: 0;
@@ -169,16 +168,6 @@
 }
 .choice[aria-pressed="true"] .choiceBar span {
   background: var(--gold);
-}
-.tracking {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  color: var(--gold);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 1.2px;
-  text-transform: uppercase;
 }
 
 .columns {
