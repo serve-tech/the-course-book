@@ -73,29 +73,6 @@ describe("home loader", () => {
     },
   );
 
-  it.each([
-    LayoutMode.Classic,
-    ...(isLayoutPreviewEnabled() ? [LayoutMode.CourseFirst] : []),
-  ])(
-    "sends Home Log links to the member's Ranking dialog in %s",
-    async (preference) => {
-      localStorage.setItem(LAYOUT_PREFERENCE_KEY, preference);
-      boundary.fetch.mockResolvedValue(Response.json({ username: "golfer" }));
-      const response: unknown = await loadHome("/?log=1").catch(
-        (error: unknown) => error,
-      );
-      if (!(response instanceof Response))
-        throw new Error("Expected a redirect response");
-      expect(response.status).toBe(302);
-      expect(response.headers.get("Location")).toBe("/u/golfer/ranking?log=1");
-      expect(
-        boundary.fetch.mock.calls.map(
-          ([request]) => new URL(request.url).pathname,
-        ),
-      ).toEqual(["/v1/me"]);
-    },
-  );
-
   describe.skipIf(!isLayoutPreviewEnabled())("opted in", () => {
     const course: ApiSchemas["Course"] = {
       id: "b13e97cb-640b-4124-8366-564138abc168",

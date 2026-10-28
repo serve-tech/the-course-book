@@ -9,7 +9,7 @@ import { RankPills } from "../top-lists/RankPills";
 import { CourseTile } from "./CourseTile";
 import { PersonalRank } from "./PersonalRank";
 import { newFromFriends, relativeDay, shortDate, visitLabel, type FeedFirstPage } from "./format";
-import { displayName, logPath, profilePath } from "./paths";
+import { displayName, profilePath } from "./paths";
 import { AvatarSize, TileSize } from "./sizes";
 import feedStyles from "./feed.module.css";
 import styles from "./social.module.css";
@@ -24,8 +24,9 @@ const STRIP = 4;
  *
  * @param first - The first page from the loader.
  * @param hasFriends - Whether the member has any friends (chooses the empty state).
+ * @param onLog - Opens the Log a round dialog over this page.
  */
-export function ActivityFeed({ first, hasFriends, me, home = false }: { first: FeedFirstPage; hasFriends: boolean; me: string; home?: boolean }) {
+export function ActivityFeed({ first, hasFriends, onLog, home = false }: { first: FeedFirstPage; hasFriends: boolean; onLog: () => void; home?: boolean }) {
   const [more, setMore] = useState<{ items: FeedItem[]; cursor: string | null } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -125,9 +126,9 @@ export function ActivityFeed({ first, hasFriends, me, home = false }: { first: F
           <div className={feedStyles.cta}>
             <b>Played somewhere?</b>
             <p>Log it and it lands on your timeline and in your friends&apos; feeds.</p>
-            <Link className={[styles.button, styles.buttonSolid].join(" ")} to={logPath(me)}>
+            <button type="button" className={[styles.button, styles.buttonSolid].join(" ")} onClick={onLog}>
               + Log a round
-            </Link>
+            </button>
           </div>
         </aside>
       </div>

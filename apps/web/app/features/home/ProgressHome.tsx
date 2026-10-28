@@ -10,7 +10,7 @@ import { coursesLabel } from "../journal/ranking";
 import { LogRoundDialog } from "../rounds/LogRoundDialog";
 import { Avatar } from "../social/Avatar";
 import { newFromFriends, shortDate, visitLabel } from "../social/format";
-import { displayName, logPath, profilePath } from "../social/paths";
+import { displayName, profilePath } from "../social/paths";
 import { AvatarSize } from "../social/sizes";
 import { TopFour } from "../social/TopFour";
 import socialStyles from "../social/social.module.css";
@@ -83,7 +83,7 @@ export function ProgressHome({
 
   return (
     <div className={styles.page} aria-busy={switching}>
-      <GoalHero goal={goal} username={username} switching={switching} />
+      <GoalHero goal={goal} onLog={shell.openLog} switching={switching} />
       {goal && (
         <section aria-labelledby="your-lists">
           <h2 id="your-lists" className={socialStyles.sectionLabel}>
@@ -155,11 +155,11 @@ export function ProgressHome({
 }
 
 /** The focal point: progress on the tracked list and Log a round. */
-function GoalHero({ goal, username, switching }: { goal: GoalList | null; username: string; switching: boolean }) {
+function GoalHero({ goal, onLog, switching }: { goal: GoalList | null; onLog: () => void; switching: boolean }) {
   const log = (
-    <Link to={logPath(username)} className={cx(socialStyles.button, socialStyles.buttonSolid)}>
+    <button type="button" className={cx(socialStyles.button, socialStyles.buttonSolid)} onClick={onLog}>
       + Log a round
-    </Link>
+    </button>
   );
   if (!goal)
     return (

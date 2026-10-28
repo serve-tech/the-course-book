@@ -19,6 +19,8 @@ interface NavProps {
   /** Pending friend requests to the member, shown as a badge on Friends. */
   incomingRequests: number;
   onSignIn: () => void;
+  /** Opens the Log a round dialog over the current page. */
+  onLog: () => void;
   onSignOut: () => void;
   onNavigate: () => void;
 }
@@ -29,6 +31,7 @@ export function TopBar({
   member,
   incomingRequests,
   onSignIn,
+  onLog,
   onSignOut,
   onNavigate,
 }: NavProps) {
@@ -51,6 +54,7 @@ export function TopBar({
           member={member}
           incomingRequests={incomingRequests}
           onSignIn={onSignIn}
+          onLog={onLog}
           onNavigate={onNavigate}
           mobile={false}
         />
@@ -83,6 +87,7 @@ export function TabBar({
   member,
   incomingRequests,
   onSignIn,
+  onLog,
   onNavigate,
 }: Omit<NavProps, "onSignOut">) {
   return (
@@ -92,6 +97,7 @@ export function TabBar({
         member={member}
         incomingRequests={incomingRequests}
         onSignIn={onSignIn}
+        onLog={onLog}
         onNavigate={onNavigate}
         mobile
       />
@@ -104,6 +110,7 @@ function Destinations({
   member,
   incomingRequests,
   onSignIn,
+  onLog,
   onNavigate,
   mobile,
 }: Omit<NavProps, "onSignOut"> & { mobile: boolean }) {
@@ -134,17 +141,11 @@ function Destinations({
         </>
       );
       const className = cx(mobile ? styles.tab : styles.link);
-      if (to && log)
+      if (log)
         return (
-          <Link
-            key={label}
-            to={to}
-            className={className}
-            onClick={onNavigate}
-            aria-label={label}
-          >
+          <button key={label} type="button" className={className} aria-label={label} onClick={member ? onLog : onSignIn}>
             {content}
-          </Link>
+          </button>
         );
       return to ? (
         <NavLink
@@ -157,13 +158,7 @@ function Destinations({
           {content}
         </NavLink>
       ) : (
-        <button
-          key={label}
-          type="button"
-          aria-label={log ? label : undefined}
-          className={className}
-          onClick={onSignIn}
-        >
+        <button key={label} type="button" className={className} onClick={onSignIn}>
           {content}
         </button>
       );

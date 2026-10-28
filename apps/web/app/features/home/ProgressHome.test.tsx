@@ -71,7 +71,7 @@ let shell: Shell;
 
 beforeEach(() => {
   localStorage.clear();
-  shell = { selectedState: "MI", onState: vi.fn(), notify: vi.fn(), searchFocus: vi.fn(), openAuth: vi.fn() };
+  shell = { selectedState: "MI", onState: vi.fn(), notify: vi.fn(), searchFocus: vi.fn(), openAuth: vi.fn(), openLog: vi.fn() };
 });
 afterEach(() => {
   cleanup();
@@ -112,8 +112,9 @@ describe("progress home", () => {
     expect(hero).toHaveTextContent("13of 100 played · 87 to go");
     expect(within(hero).getByRole("progressbar", { name: "Best in Michigan played" })).toHaveAttribute("aria-valuenow", "13");
     expect(hero).toHaveTextContent("Dan Whitaker has played 20.");
-    expect(within(hero).getByRole("link", { name: "+ Log a round" })).toHaveAttribute("href", "/u/golfer/ranking?log=1");
-    expect(screen.getAllByRole("link", { name: "+ Log a round" })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "+ Log a round" })).toHaveLength(1);
+    fireEvent.click(within(hero).getByRole("button", { name: "+ Log a round" }));
+    expect(shell.openLog).toHaveBeenCalledOnce();
   });
 
   it("shows every national list and the home state's, with the tracked one pressed", () => {
@@ -204,7 +205,8 @@ describe("progress home", () => {
   it("still offers Log a round when there are no published lists", () => {
     openHome({ standings: [], goal: null, goalCourses: [] });
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Log a round to start your ranking");
-    expect(screen.getByRole("link", { name: "+ Log a round" })).toHaveAttribute("href", "/u/golfer/ranking?log=1");
+    fireEvent.click(screen.getByRole("button", { name: "+ Log a round" }));
+    expect(shell.openLog).toHaveBeenCalledOnce();
     expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
     expect(screen.queryByRole("region", { name: /Your lists/ })).not.toBeInTheDocument();
   });

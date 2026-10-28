@@ -65,7 +65,7 @@ Option 2, in the course-first preview only.
   - Desktop: Home, My ranking, My lists, Courses, Activity, Friends.
   - Phones: Home, My ranking, Log a round, Courses, Friends. That is five slots. Home links to Activity and to the member's lists, so those two are desktop-only.
   - All six desktop links fit at the 901px breakpoint.
-- **Log links.** `/?log=1` redirects to the own-profile Ranking dialog in both layouts.
+- **Log links.** `/?log=1` redirects to the own-profile Ranking dialog in both layouts. *Superseded 2026-10-28: Log a round opens over the current page ([decision](2026-10-28-log-a-round-opens-over-the-current-page.md)).*
 - **Coming soon cards removed app-wide:** Activity and Classic Home's sidebar, the Profile timeline, Stats, and member Lists. This also changes Classic.
 - **Reads.** Home reads `/v1/top-lists`, then the tracked list's detail (`/v1/top-lists/{type}/{scope}`), alongside the newest 12 feed items and `/v1/me/courses`. There are no API, contract, schema, auth or infrastructure changes.
 

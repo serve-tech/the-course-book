@@ -81,8 +81,8 @@ async function openRanking(page: Page, member: TestMember): Promise<void> {
   await expect(page.getByRole("tablist", { name: "Ranking regions" })).toBeVisible();
 }
 
-/** Open the Log dialog from Home or the profile header. */
-const openLog = (page: Page) => page.getByRole("main").getByRole("link", { name: "+ Log a round" }).click();
+/** Open the Log dialog from the page's own Log a round button (Home, Activity or the profile header). */
+const openLog = (page: Page) => page.getByRole("main").getByRole("button", { name: "+ Log a round" }).click();
 
 /** The Friends destination; its name gains the request count when there are requests. */
 const friendsLink = (page: Page) => page.getByRole("link", { name: /^Friends\b/ });
@@ -263,10 +263,23 @@ test.describe("signed in", () => {
     await expect(page.getByRole("heading", { name: "Where your friends are playing" })).toBeVisible();
     await expect(page.getByRole("main")).toContainText(friend.displayName);
 
-    // Home's Log links open the dialog on the member's Ranking, as Classic's do.
+    // Log a round opens over the page the member is on; nothing navigates.
+    await openLog(page);
+    await expect(page.locator("#modal")).toBeVisible();
+    await expect(page).toHaveURL(/\/activity$/);
+    await page.getByRole("button", { name: "Close" }).click();
+    if (testInfo.project.name === "mobile") {
+      await page.getByRole("link", { name: "Courses", exact: true }).click();
+      await page.getByRole("navigation", { name: "Main" }).getByRole("button", { name: "Log a round" }).click();
+      await expect(page.locator("#modal")).toBeVisible();
+      await expect(page).toHaveURL(/\/courses/);
+      await page.getByRole("button", { name: "Close" }).click();
+    }
+    // A saved ?log=1 link opens the dialog over that page and drops the parameter.
     await page.goto("/?log=1");
     await expect(page.locator("#modal")).toBeVisible();
-    await expect(page).toHaveURL(new RegExp(`/u/${owner.username}/ranking$`));
+    await expect(page).toHaveURL(/\/$/);
+    await expect(progressHome(page)).toBeVisible();
   });
 
   test("Home's Up next saves Want to play and logs, and members can track another list", async ({ page }) => {
@@ -653,7 +666,7 @@ test.describe("layout preview", () => {
       scale: "css",
     });
 
-    // Classic still logs into the same ranking through the profile route.
+    // Classic logs into the same ranking from Home, without leaving it.
     await openLog(page);
     await page.locator("#modalsearch").fill("Test Alpha");
     await page
@@ -662,8 +675,10 @@ test.describe("layout preview", () => {
       .click();
     await page.locator("#confirmLog").click();
     await expect(page.locator("#modal")).toHaveCount(0);
-    await expect(row(page, "Test Alpha Links")).toContainText("2 rounds");
-    await page.getByRole("link", { name: "Home", exact: true }).click();
+    await expect(page).toHaveURL(/\/$/);
+    await expect(
+      page.getByRole("heading", { name: "Where your friends are playing" }),
+    ).toBeVisible();
 
     await page.getByRole("button", { name: "Try the new layout" }).click();
     await expect(progressHome(page)).toBeVisible();
@@ -702,7 +717,7 @@ test.describe("layout preview", () => {
     ]);
     await page.goto("/?log=1");
     await expect(page.locator("#modal")).toBeVisible();
-    await expect(page).toHaveURL(new RegExp(`/u/${owner.username}/ranking$`));
+    await expect(page).toHaveURL(/\/$/);
   });
 
   test("layout changes stay consistent across tabs, including one still loading", async ({

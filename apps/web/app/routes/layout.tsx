@@ -1,6 +1,6 @@
 import { getToken, useAuth, useClerk } from "@clerk/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, Outlet, useLocation, useRevalidator, type ShouldRevalidateFunctionArgs } from "react-router";
+import { Link, Outlet, useLocation, useRevalidator, useSearchParams, type ShouldRevalidateFunctionArgs } from "react-router";
 import type { Route } from "./+types/layout";
 import { AuthDialog } from "../features/auth/AuthDialog";
 import { isClerkFlowHash } from "../features/auth/clerk-flow";
@@ -18,6 +18,7 @@ import navStyles from "../features/shell/nav.module.css";
 import { cx } from "../shared/lib/cx";
 import type { Notify, Shell, ToastAction } from "../shared/ui/shell";
 import { replyMessage, useJournalFetcher } from "../features/journal/use-journal-fetcher";
+import { LogRound } from "../features/rounds/LogRound";
 
 const MOBILE_BREAKPOINT = 760;
 const TOAST_MS = 1900;
@@ -65,7 +66,7 @@ export function shouldRevalidate({ formAction, defaultShouldRevalidate }: Should
 
 /**
  * Application shell: header, account bar, tab navigation, the routed page,
- * toast, footer and the account dialog. Browser-only concerns (viewport
+ * toast, footer, the account dialog and the Log a round dialog. Browser-only concerns (viewport
  * height, stored preferences, geolocation) run in effects so the server and
  * client render the same markup.
  */
@@ -118,6 +119,29 @@ export default function Layout({ loaderData }: Route.ComponentProps) {
     if (isClerkFlowHash(window.location.hash))
       window.history.replaceState(window.history.state, "", window.location.pathname + window.location.search);
   };
+  // Log a round opens over the page it was opened on and, like the account
+  // dialog, closes if the member navigates away.
+  const [logOpenOn, setLogOpenOn] = useState<string | null>(null);
+  if (logOpenOn !== null && logOpenOn !== pathname) setLogOpenOn(null);
+  const openLog = () => {
+    if (user) setLogOpenOn(pathname);
+    else openAuthDialog();
+  };
+  // `?log=1` links (saved before Log opened in place) open the dialog on
+  // that page; the parameter is consumed so a reload or Back does not reopen it.
+  const [params, setParams] = useSearchParams();
+  const logRequested = params.get("log") === "1";
+  if (logRequested && user && logOpenOn !== pathname) setLogOpenOn(pathname);
+  useEffect(() => {
+    if (!logRequested) return;
+    setParams(
+      (current) => {
+        current.delete("log");
+        return current;
+      },
+      { replace: true },
+    );
+  }, [logRequested, setParams]);
   const [storedState, setStoredState] = usePreference(SELECTED_STATE_KEY);
   const selectedState = storedState.toUpperCase();
   const [toast, setToast] = useState<{ message: string; followUp: ToastAction | null }>(NO_TOAST);
@@ -178,6 +202,7 @@ export default function Layout({ loaderData }: Route.ComponentProps) {
     onState,
     searchFocus,
     openAuth: openAuthDialog,
+    openLog,
   };
 
   const signOut = () => {
@@ -192,7 +217,7 @@ export default function Layout({ loaderData }: Route.ComponentProps) {
 
   return (
     <div className={cx("app", navStyles.shell)}>
-      <TopBar layout={layout} member={user} incomingRequests={requests} onSignIn={openAuthDialog} onSignOut={signOut} onNavigate={navigate} />
+      <TopBar layout={layout} member={user} incomingRequests={requests} onSignIn={openAuthDialog} onLog={openLog} onSignOut={signOut} onNavigate={navigate} />
       <LayoutPreview layout={layout} />
       {problem && (
         <p className="error-text" id="authProblem" role="alert">
@@ -204,9 +229,18 @@ export default function Layout({ loaderData }: Route.ComponentProps) {
         <Outlet context={shell} />
       </main>
 
-      <TabBar layout={layout} member={user} incomingRequests={requests} onSignIn={openAuthDialog} onNavigate={navigate} />
+      <TabBar layout={layout} member={user} incomingRequests={requests} onSignIn={openAuthDialog} onLog={openLog} onNavigate={navigate} />
 
       {authOpen && !user && <AuthDialog onClose={closeAuthDialog} />}
+      {logOpenOn === pathname && user && (
+        <LogRound
+          notify={notify}
+          onSignIn={openAuthDialog}
+          onClose={() => {
+            setLogOpenOn(null);
+          }}
+        />
+      )}
 
       <div className={"toast" + (toast.message ? " show" : "") + (toast.followUp ? " has-action" : "")} id="toast" role="status">
         {toast.message}

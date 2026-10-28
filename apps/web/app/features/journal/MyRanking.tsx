@@ -4,8 +4,6 @@ import { RegionFilter, type Course } from "@coursebook/domain/catalog/course";
 import { reorder } from "@coursebook/domain/journal/reorder";
 import type { ListEntry } from "@coursebook/domain/journal/types";
 import { cx } from "../../shared/lib/cx";
-import { AddCourseDialog } from "../rounds/AddCourseDialog";
-import { LogRoundDialog } from "../rounds/LogRoundDialog";
 import { RoundHistory } from "../rounds/RoundHistory";
 import { CourseSummary, PlayedMarks, type PlayedMark } from "../top-lists/CourseRow";
 import styles from "../top-lists/top-lists.module.css";
@@ -15,11 +13,6 @@ import { coursesLabel, rankingRows, roundsLabel } from "./ranking";
 import { RankingFilters } from "./RankingFilters";
 import { useCourseDrag } from "./use-course-drag";
 import { replyMessage, useJournalFetcher } from "./use-journal-fetcher";
-
-enum Dialog {
-  Log = "log",
-  Add = "add",
-}
 
 /**
  * The member's own Ranking, laid out like the Courses page. Rows come from
@@ -31,44 +24,31 @@ enum Dialog {
  * there are overall ranks, and a drop would land among courses the tab
  * hides. Search keeps editing, because a move renumbers the full list.
  *
- * Home and the member's own profile both use this editor; `openLog` opens the Log dialog when it turns true (the Log a
- * round buttons link to `?log=1`).
- *
  * @param rows - The member's ranking in rank order.
- * @param openLog - Opens the Log dialog each time it turns true.
+ * @param onLog - Opens the Log a round dialog over the page (the empty ranking's Log your first round).
  * @param selectedState - The state for Best in State, shared with the Courses page.
  * @param onState - Chooses that state.
  */
 export function MyRanking({
   rows,
-  openLog = false,
+  onLog,
   selectedState,
   onState,
   notify,
   onSearchFocus,
-  openAuth,
 }: {
   rows: readonly ListEntry[];
-  openLog?: boolean;
+  onLog: () => void;
   selectedState: string;
   onState: (value: string) => void;
   notify: (message: string) => void;
   onSearchFocus: (focused: boolean) => void;
-  openAuth: () => void;
 }) {
   const [query, setQuery] = useState(""),
     [region, setRegion] = useState(RegionFilter.All),
     [details, setDetails] = useState<Course | null>(null),
     [history, setHistory] = useState<Course | null>(null),
-    [editing, setEditing] = useState<string | null>(null),
-    [dialog, setDialog] = useState<Dialog | null>(openLog ? Dialog.Log : null),
-    [logRequested, setLogRequested] = useState(openLog);
-  // Open the Log dialog each time `openLog` turns true, adjusting state
-  // during render rather than in an effect (react.dev, "You Might Not Need an Effect").
-  if (openLog !== logRequested) {
-    setLogRequested(openLog);
-    if (openLog) setDialog(Dialog.Log);
-  }
+    [editing, setEditing] = useState<string | null>(null);
   const move = useJournalFetcher((reply) => {
     notify(reply.error ? replyMessage(reply) : "Ranking updated");
   });
@@ -139,7 +119,7 @@ export function MyRanking({
       {!courses.length ? (
         <div className={styles.empty}>
           <p>Your ranking is empty. Log your first round to start ranking courses.</p>
-          <button type="button" className={styles.filter} onClick={() => { setDialog(Dialog.Log); }}>Log your first round</button>
+          <button type="button" className={styles.filter} onClick={onLog}>Log your first round</button>
         </div>
       ) : stateMissing ? (
         <div className={styles.empty}>Pick a state to see the courses you've played there.</div>
@@ -219,31 +199,6 @@ export function MyRanking({
           course={history}
           onClose={() => {
             setHistory(null);
-          }}
-          notify={notify}
-        />
-      )}
-      {dialog === Dialog.Log && (
-        <LogRoundDialog
-          signedIn
-          played={played}
-          onClose={() => {
-            setDialog(null);
-          }}
-          onAdd={() => {
-            setDialog(Dialog.Add);
-          }}
-          onSignIn={() => {
-            setDialog(null);
-            openAuth();
-          }}
-          notify={notify}
-        />
-      )}
-      {dialog === Dialog.Add && (
-        <AddCourseDialog
-          onClose={() => {
-            setDialog(null);
           }}
           notify={notify}
         />

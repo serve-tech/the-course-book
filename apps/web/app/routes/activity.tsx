@@ -42,7 +42,7 @@ export default function Activity({ loaderData }: Route.ComponentProps) {
   return (
     <ActivityFeed
       key={feedKey(loaderData.first)}
-      me={me}
+      onLog={shell.openLog}
       first={loaderData.first}
       hasFriends={loaderData.hasFriends}
     />
