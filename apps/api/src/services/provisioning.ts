@@ -1,7 +1,8 @@
 import { isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Database } from "../db/client";
-import { users } from "../db/schema";
+import { isUniqueViolation } from "../db/errors";
+import { USERNAME_UNIQUE_INDEX, users } from "../db/schema";
 import { USERNAME_RULE, isValidUsername } from "../domain/username";
 import { AppError, ErrorCode } from "./errors";
 
@@ -70,6 +71,9 @@ export function identityFromClerkUser(user: ClerkUserFields): Identity {
   };
 }
 
+/** Member-facing message of `username_taken`. */
+export const USERNAME_TAKEN = "That username belongs to another member. Please choose a different username.";
+
 /**
  * Insert or refresh the `users` row for a Clerk user.
  *
@@ -84,9 +88,12 @@ export function identityFromClerkUser(user: ClerkUserFields): Identity {
  * Raises:
  *     AppError: 403 `username_invalid` when the username violates the
  *         product rule, so a misconfigured Clerk instance cannot create
- *         unusable accounts; 401 `account_deleted` when the account was
- *         deleted. A deleted account's tombstone row is never refreshed, so
- *         a session token that outlives the deletion (up to a minute)
+ *         unusable accounts; 409 `username_taken` when another member's row
+ *         holds the username (usernames are unique case-insensitively, and
+ *         a member who renamed themselves in Clerk keeps the old name here
+ *         until their next request); 401 `account_deleted` when the account
+ *         was deleted. A deleted account's tombstone row is never refreshed,
+ *         so a session token that outlives the deletion (up to a minute)
  *         cannot bring its personal data back.
  */
 export async function provisionUser(
@@ -121,6 +128,11 @@ export async function provisionUser(
       id: users.id,
       username: users.username,
       displayName: users.displayName,
+    })
+    .catch((error: unknown) => {
+      if (isUniqueViolation(error, USERNAME_UNIQUE_INDEX))
+        throw new AppError(409, ErrorCode.UsernameTaken, USERNAME_TAKEN, { cause: error });
+      throw error;
     });
   // The conflict update is skipped only for a deleted account.
   if (!row) throw new AppError(401, ErrorCode.AccountDeleted, "This account was deleted.");

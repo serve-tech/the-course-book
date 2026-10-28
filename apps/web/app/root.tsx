@@ -18,7 +18,7 @@ export const links: Route.LinksFunction = () => [
 ];
 
 export const meta: Route.MetaFunction = () => [
-  { title: "coursebook.golf" },
+  { title: "The Course Book" },
   { name: "theme-color", content: "#0b2117" },
   { name: "apple-mobile-web-app-title", content: "Course Book" },
 ];
@@ -38,8 +38,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </head>
       <body>
         {/* In the Layout, not App: route clientLoaders run before App renders and
-            await Clerk's getToken(), which needs the provider mounted. */}
-        <ClerkProvider publishableKey={import.meta.env.VITE_CLERK_PUBLISHABLE_KEY}>{children}</ClerkProvider>
+            await Clerk's getToken(), which needs the provider mounted. The
+            sign-in and sign-up URLs keep Clerk's own redirects in the app;
+            without them Clerk falls back to its hosted pages. */}
+        <ClerkProvider publishableKey={import.meta.env.VITE_CLERK_PUBLISHABLE_KEY} signInUrl="/sign-in" signUpUrl="/sign-up">
+          {children}
+        </ClerkProvider>
         <ScrollRestoration />
         <Scripts />
       </body>
@@ -53,7 +57,7 @@ export default function App() {
 
 /** Shown while the first route data loads in the browser. */
 export function HydrateFallback() {
-  return <p className="empty">Loading coursebook.golf…</p>;
+  return <p className="empty">Loading The Course Book…</p>;
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {

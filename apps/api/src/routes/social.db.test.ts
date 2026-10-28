@@ -84,6 +84,17 @@ describe("GET /v1/members/{username}/rounds", () => {
     expect(second.nextCursor).toBeNull();
   });
 
+  it("gives September's full count on both pages it is split across", async () => {
+    const t = createTestApp(db);
+    const auth = t.bearer("user_1", "golfer_1");
+    const first = TimelineSchema.parse((await t.get("/v1/members/bravo/rounds?limit=2", auth)).body);
+    expect(first.months).toEqual([{ month: "2026-09", rounds: 3 }]);
+    const second = TimelineSchema.parse(
+      (await t.get(`/v1/members/bravo/rounds?limit=2&cursor=${encodeURIComponent(first.nextCursor ?? "")}`, auth)).body,
+    );
+    expect(second.months).toEqual([{ month: "2026-09", rounds: 3 }]);
+  });
+
   it.each([
     ["a tampered cursor", "cursor=" + encodeCursor({ at: "yesterday" })],
     ["garbage", "cursor=%%%"],

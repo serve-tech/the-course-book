@@ -154,7 +154,8 @@ describe("choosing the list", () => {
   it.each([
     { name: "a published list in the URL", requested: "usa", remembered: "world", state: "", tab: ListTab.USA, list: { type: "usa", scope: "USA" } },
     { name: "a state list in the URL", requested: "state-mi", remembered: "", state: "OR", tab: ListTab.State, list: { type: "state", scope: "MI" } },
-    { name: "a bare state request", requested: "state", remembered: "", state: "MI", tab: ListTab.State, list: null },
+    { name: "a bare state request with a saved state", requested: "state", remembered: "", state: "MI", tab: ListTab.State, list: { type: "state", scope: "MI" } },
+    { name: "a bare state request without a saved state", requested: "state", remembered: "", state: "", tab: ListTab.State, list: null },
     { name: "an unknown list, falling back to the remembered tab", requested: "state-zz", remembered: "usa", state: "", tab: ListTab.USA, list: { type: "usa", scope: "USA" } },
     { name: "nothing, on a first visit", requested: null, remembered: "", state: "", tab: ListTab.World, list: { type: "global", scope: "GLOBAL" } },
     { name: "the remembered State tab with a state", requested: null, remembered: "state", state: "ga", tab: ListTab.State, list: { type: "state", scope: "GA" } },

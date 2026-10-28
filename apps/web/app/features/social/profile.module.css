@@ -211,19 +211,7 @@
 .entryDelete:disabled { opacity: 0.5; cursor: default; }
 .more { display: flex; justify-content: center; margin-top: 18px; }
 
-/* A friend's ranking. */
-.filters { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 12px; }
-.filter {
-  padding: 6px 12px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  background: transparent;
-  color: #bfc6bf;
-  font: 600 12.5px "DM Sans", Arial, sans-serif;
-  cursor: pointer;
-}
-.filter[aria-pressed="true"] { background: var(--cream); border-color: var(--cream); color: #0f2419; }
-.filter:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+/* The most-played course row on the Stats tab. */
 .rankRow {
   display: grid;
   grid-template-columns: 34px 26px minmax(0, 1fr) auto;
@@ -233,12 +221,6 @@
   border-top: 1px solid var(--line);
 }
 .rankRow:first-of-type { border-top: 0; }
-.rankNumber {
-  font: 600 20px / 1 "Playfair Display", Georgia, serif;
-  color: var(--gold);
-  text-align: center;
-  font-variant-numeric: lining-nums tabular-nums;
-}
 .rankPlace { color: var(--muted); font-size: 12.5px; margin-top: 2px; }
 .you { text-align: right; font-size: 12px; color: var(--muted); white-space: nowrap; }
 .you b { color: var(--cream); font-variant-numeric: tabular-nums; }

@@ -3,8 +3,8 @@
 A golf course journal: log rounds, rank the courses you have played, compare against published Top 100 lists and see what your friends are playing. Built by Serve Electric: a JSON API (Hono, Drizzle over Postgres, Clerk) and a React Router web app, on Render; native iOS and Android apps will use the same API.
 
 - Repository: https://github.com/serve-tech/the-course-book
-- Production: https://serve-tech.github.io/the-course-book/ (retired static build, still live until cutover); coursebook.golf will point at Render after cutover.
-- Render (production services, before the domain): https://coursebook-golf-web.onrender.com (API https://coursebook-golf-api.onrender.com), deployed from `main`, using the Clerk development instance until launch.
+- Production: https://coursebook.golf (API https://api.coursebook.golf) on Render, deployed from `main`, signing in with the Clerk production instance. The `onrender.com` hostnames (https://coursebook-golf-web.onrender.com, https://coursebook-golf-api.onrender.com) serve the same services.
+- Retired: https://serve-tech.github.io/the-course-book/ (the old static build, live until GitHub Pages is disabled). The API is on a paid plan and does not sleep.
 
 ## Working on the project
 
@@ -51,7 +51,7 @@ The rebuild and the split into an API with clients are on `main` ([rebuild decis
 
 ## Deployment and data
 
-`render.yaml` is the Render Blueprint: the API as a Docker web service (`apps/api/Dockerfile`), the web app as a static site (`apps/web/build/client`) and a Postgres 17 database, the API and database in Ohio (the static site is on Render's global CDN), the database and API on Render's smallest paid plans and the static site free. Non-secret settings (Clerk publishable and JWT public keys, `WEB_ORIGINS`, `PUBLIC_WEB_URL`, `VITE_API_URL`) are values in `render.yaml`; the only secret, `CLERK_SECRET_KEY`, is entered in the Render dashboard; the database URL is wired from the database resource. The API runs its migrations on start. Create or update the infrastructure by syncing the Blueprint from the Render dashboard, never by hand-creating services. Both services deploy from `main` after its CI checks pass.
+`render.yaml` is the Render Blueprint: the API as a Docker web service (`apps/api/Dockerfile`), the web app as a static site (`apps/web/build/client`) and a Postgres 17 database, the API and database in Ohio (the static site is on Render's global CDN), the database and API on Render's smallest paid plans and the static site free. `render.yaml` declares no environment variables: every production variable, including `DATABASE_URL` and the Clerk keys, is set in Doppler, which syncs it to the Render services ([list](docs/architecture.md#production-configuration)). The API runs its migrations on start. Create or update the infrastructure by syncing the Blueprint from the Render dashboard, never by hand-creating services. Both services deploy from `main` after its CI checks pass.
 
 Local check of the API image:
 

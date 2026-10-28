@@ -1,7 +1,11 @@
+import { TokenVerificationErrorReason } from "@clerk/backend/errors";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { SessionRejection } from "../auth/session";
 import { ApiErrorSchema } from "../contract/schemas";
+import { createDatabase } from "../db/client";
 import { users } from "../db/schema";
+import { USERNAME_TAKEN } from "../services/provisioning";
 import { createTestApp, WEB_ORIGIN } from "../test/app";
 import { resetMemberData, testDatabase } from "../test/db";
 
@@ -31,6 +35,23 @@ describe("health", () => {
     expect(result).toMatchObject({ status: 200, body: { ok: true } });
     expect(t.requests).toHaveLength(0);
   });
+
+  it("answers 503 when the database is unreachable and logs the cause", async () => {
+    // Port 1 on loopback refuses connections immediately.
+    const unreachable = createDatabase("postgres://coursebook:coursebook@127.0.0.1:1/coursebook_test");
+    try {
+      const t = createTestApp(unreachable.db);
+      const result = await t.get("/healthz");
+      expect(result).toMatchObject({ status: 503, body: { ok: false } });
+      expect(t.errors).toHaveLength(1);
+      expect(t.errors[0]?.detail).toEqual({ requestId: result.headers.get("x-request-id") });
+      // The logger gets the log-safe description, not the thrown error.
+      expect(t.errors[0]?.error).not.toBeInstanceOf(Error);
+      expect(JSON.stringify(t.errors[0]?.error)).toContain("ECONNREFUSED");
+    } finally {
+      await unreachable.pool.end();
+    }
+  });
 });
 
 describe("error envelope", () => {
@@ -53,7 +74,30 @@ describe("error envelope", () => {
     });
     const error = expectError(await t.get("/v1/me", t.bearer("user_1", "golfer_1")), 500, "internal");
     expect(error.message).not.toContain("boom");
-    expect(t.errors).toEqual([expect.objectContaining({ message: "boom" })]);
+    expect(t.errors).toHaveLength(1);
+    expect(t.errors[0]?.message).toBe("Unhandled API error");
+    expect(t.errors[0]?.error).toMatchObject({ name: "Error", message: "boom" });
+    // The request id is a field, so the error line joins its request line.
+    expect(t.errors[0]?.detail).toEqual({ requestId: error.requestId });
+  });
+
+  it("logs a failed query's SQL and constraint, never its parameters or the row's values", async () => {
+    await db.insert(users).values({ id: "user_1", username: "golfer_1", displayName: "Golfer" });
+    // A real driver failure whose parameters include an email address.
+    const insertAgain = async () => {
+      await db.insert(users).values({ id: "user_1", username: "golfer_2", displayName: "Again", email: "private@example.com" });
+      throw new Error("the insert should have failed");
+    };
+    const t = createTestApp(db, { provisioner: { resolve: insertAgain, forget: () => undefined } });
+    expectError(await t.get("/v1/me", t.bearer("user_1", "golfer_1")), 500, "internal");
+    expect(t.errors).toHaveLength(1);
+    const logged = JSON.stringify(t.errors);
+    expect(logged).not.toContain("private@example.com");
+    expect(logged).not.toContain("golfer_2");
+    // Postgres's detail, "Key (id)=(user_1) already exists.", quotes the row.
+    expect(logged).not.toContain("already exists");
+    expect(t.errors[0]?.error).toMatchObject({ message: "Failed query", cause: { code: "23505", constraint: "users_pkey" } });
+    expect(t.errors[0]?.error.query).toContain('insert into "users"');
   });
 });
 
@@ -63,19 +107,87 @@ describe("authentication", () => {
     expectError(await t.get("/v1/me"), 401, "unauthenticated");
   });
 
+  // Clerk composes some reasons, e.g. "session-token-expired-refresh-non-eligible-no-refresh-cookie".
   it.each([
-    ["an expired token", (t: ReturnType<typeof createTestApp>) => t.tokens.issue({ sub: "user_1", username: "golfer_1" }, { expiresIn: -120 })],
-    ["a forged token", (t: ReturnType<typeof createTestApp>) => t.tokens.forge({ sub: "user_1", username: "golfer_1" })],
-    ["a web token from another origin", (t: ReturnType<typeof createTestApp>) => t.tokens.issue({ sub: "user_1", username: "golfer_1", azp: "https://evil.example" })],
-  ])("rejects %s even on a public operation", async (_label, token) => {
+    [
+      "an expired token",
+      (t: ReturnType<typeof createTestApp>) => t.tokens.issue({ sub: "user_1", username: "golfer_1" }, { expiresIn: -120 }),
+      /^session-token-expired/,
+      {},
+    ],
+    [
+      "a forged token",
+      (t: ReturnType<typeof createTestApp>) => t.tokens.forge({ sub: "user_1", username: "golfer_1" }),
+      new RegExp("^" + TokenVerificationErrorReason.TokenInvalidSignature + "$"),
+      {},
+    ],
+    [
+      "a web token from another origin",
+      (t: ReturnType<typeof createTestApp>) => t.tokens.issue({ sub: "user_1", username: "golfer_1", azp: "https://evil.example" }),
+      new RegExp("^" + SessionRejection.UnauthorizedParty + "$"),
+      { azp: "https://evil.example" },
+    ],
+  ])("rejects %s even on a public operation and logs why, without the token", async (_label, token, reason, azp) => {
     const t = createTestApp(db);
-    expectError(await t.get("/v1/client-config", { authorization: "Bearer " + token(t) }), 401, "unauthenticated");
+    const sent = token(t);
+    const result = await t.get("/v1/client-config", { authorization: "Bearer " + sent });
+    expectError(result, 401, "unauthenticated");
+    expect(t.warnings).toHaveLength(1);
+    const { message, detail } = t.warnings[0] ?? { message: "", detail: {} };
+    expect(message).toBe("Session token rejected");
+    expect(detail).toEqual({ requestId: result.headers.get("x-request-id"), reason: detail["reason"], ...azp });
+    expect(String(detail["reason"])).toMatch(reason);
+    const warning = JSON.stringify(t.warnings);
+    expect(warning).not.toContain(sent);
+    expect(warning).not.toContain("user_1");
+    expect(warning).not.toContain("golfer_1");
   });
 
-  it("accepts web tokens from the web origin and native tokens without azp", async () => {
+  it.each(["Basic dXNlcjpwYXNz", "bearer header.payload.signature", "header.payload.signature"])(
+    "rejects Authorization: %s without calling Clerk",
+    async (header) => {
+      let calls = 0;
+      // Accepts anything, so a call would turn the expected 401 into a 200.
+      const t = createTestApp(db, {
+        verifySession: () => {
+          calls += 1;
+          return Promise.resolve({ ok: true, session: { clerkId: "user_1", claims: { username: "golfer_1" } } });
+        },
+      });
+      const result = await t.get("/v1/me", { authorization: header });
+      expectError(result, 401, "unauthenticated");
+      // Public operations too: a credential that cannot be checked is never ignored.
+      expectError(await t.get("/v1/client-config", { authorization: header }), 401, "unauthenticated");
+      expect(calls).toBe(0);
+      expect(t.warnings).toHaveLength(2);
+      expect(t.warnings[0]).toEqual({
+        message: "Session token rejected",
+        detail: { requestId: result.headers.get("x-request-id"), reason: SessionRejection.NotBearer },
+      });
+    },
+  );
+
+  it("rejects a valid token sent without the Bearer scheme, which Clerk alone would accept", async () => {
+    const t = createTestApp(db);
+    const token = t.tokens.issue({ sub: "user_1", username: "golfer_1" });
+    expect((await t.get("/v1/me", { authorization: "Bearer " + token })).status).toBe(200);
+    expectError(await t.get("/v1/me", { authorization: token }), 401, "unauthenticated");
+  });
+
+  it("accepts web tokens from the web origin and native tokens without azp, and warns about neither", async () => {
     const t = createTestApp(db);
     expect((await t.get("/v1/me", t.bearer("user_1", "golfer_1", { azp: WEB_ORIGIN }))).status).toBe(200);
     expect((await t.get("/v1/me", t.bearer("user_2", "golfer_2"))).status).toBe(200);
+    expect((await t.get("/v1/client-config")).status).toBe(200);
+    expect(t.warnings).toEqual([]);
+  });
+
+  it("answers 409 username_taken, unlogged, when another member holds the username", async () => {
+    const t = createTestApp(db);
+    expect((await t.get("/v1/me", t.bearer("user_1", "golfer_1"))).status).toBe(200);
+    const error = expectError(await t.get("/v1/me", t.bearer("user_2", "GOLFER_1")), 409, "username_taken");
+    expect(error.message).toBe(USERNAME_TAKEN);
+    expect(t.errors).toEqual([]);
   });
 
   it("refuses accounts whose username breaks the product rule", async () => {
@@ -113,6 +225,51 @@ describe("CORS", () => {
   it("does not allow other origins", async () => {
     const response = await preflight(createTestApp(db), "https://evil.example");
     expect(response.headers.get("access-control-allow-origin")).toBeNull();
+  });
+});
+
+describe("security headers", () => {
+  const expected = {
+    "content-security-policy": "default-src 'none'; frame-ancestors 'none'",
+    "x-frame-options": "DENY",
+    "x-content-type-options": "nosniff",
+    "strict-transport-security": "max-age=15552000; includeSubDomains",
+    "referrer-policy": "no-referrer",
+    // The web app reads the API cross-origin; CORS, not CORP, decides who may.
+    "cross-origin-resource-policy": "cross-origin",
+  };
+
+  it.each([
+    ["a public response", (t: ReturnType<typeof createTestApp>) => t.app.request("/v1/client-config")],
+    ["a member's response", (t: ReturnType<typeof createTestApp>) => t.app.request("/v1/me", { headers: t.bearer("user_1", "golfer_1") })],
+    ["a not-found envelope", (t: ReturnType<typeof createTestApp>) => t.app.request("/v1/nothing-here")],
+    ["an error thrown by middleware", (t: ReturnType<typeof createTestApp>) => t.app.request("/v1/me")],
+    [
+      "a CORS preflight",
+      (t: ReturnType<typeof createTestApp>) =>
+        t.app.request("/v1/me", { method: "OPTIONS", headers: { origin: WEB_ORIGIN, "access-control-request-method": "GET" } }),
+    ],
+  ])("are set on %s", async (_label, send) => {
+    const response = await send(createTestApp(db));
+    expect(response.status).toBeLessThan(500);
+    expect(Object.fromEntries(Object.keys(expected).map((name) => [name, response.headers.get(name)]))).toEqual(expected);
+  });
+});
+
+describe("request ids", () => {
+  it("are generated by the API, never taken from the client", async () => {
+    const t = createTestApp(db);
+    const result = await t.get("/v1/nothing-here", { "x-request-id": "chosen-by-the-client" });
+    const id = expectError(result, 404, "not_found").requestId;
+    expect(id).not.toBe("chosen-by-the-client");
+    expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    expect(t.requests).toEqual([expect.objectContaining({ requestId: id })]);
+  });
+
+  it("differ between requests", async () => {
+    const t = createTestApp(db);
+    const ids = await Promise.all([1, 2].map(async () => (await t.get("/v1/client-config")).headers.get("x-request-id")));
+    expect(new Set(ids).size).toBe(2);
   });
 });
 

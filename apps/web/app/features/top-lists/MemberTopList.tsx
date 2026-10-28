@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import type { Course, RankedCourse } from "@coursebook/domain/catalog/course";
 import { topListTitle } from "@coursebook/domain/social/top-lists";
 import type { ViewerCourses } from "../../lib/api/viewer";
+import { countLabel } from "../../shared/lib/count-label";
 import { cx } from "../../shared/lib/cx";
 import type { Notify } from "../../shared/ui/shell";
 import { LogRoundDialog } from "../rounds/LogRoundDialog";
@@ -74,11 +75,11 @@ export function MemberTopList({
         });
 
   const filters: [MemberFilter, string][] = [
-    [MemberFilter.All, "All " + String(entries.length)],
-    [MemberFilter.Played, (self ? "Played " : name + " played ") + String(theirs)],
+    [MemberFilter.All, countLabel("All", entries.length)],
+    [MemberFilter.Played, countLabel(self ? "Played" : name + " played", theirs)],
   ];
-  if (!self) filters.push([MemberFilter.OnlyThem, "Only " + name + " " + String(playedCount(entries, onlyThem))]);
-  filters.push([MemberFilter.NotPlayed, "Not played " + String(entries.length - theirs)]);
+  if (!self) filters.push([MemberFilter.OnlyThem, countLabel("Only " + name, playedCount(entries, onlyThem))]);
+  filters.push([MemberFilter.NotPlayed, countLabel("Not played", entries.length - theirs)]);
 
   const marks = (course: Course): PlayedMark[] => {
     const openRounds = () => {

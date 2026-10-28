@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { createApp } from "../app";
+import { SessionRejection } from "../auth/session";
 import { createDatabase } from "../db/client";
 import { contractDocument } from "./emit";
 
@@ -21,6 +22,7 @@ interface Operation {
   tags?: string[];
   security?: Record<string, string[]>[];
   parameters?: { name: string; in: string }[];
+  responses?: Record<string, unknown>;
 }
 interface SchemaObject {
   properties?: Record<string, unknown>;
@@ -55,7 +57,7 @@ describe("published contract", () => {
   it("is served unchanged at /v1/openapi.json", async () => {
     const app = createApp({
       db: createDatabase("postgres://contract@127.0.0.1:1/contract").db,
-      verifySession: () => Promise.resolve(null),
+      verifySession: () => Promise.resolve({ ok: false, reason: SessionRejection.NoActiveSession }),
       provisioner: { resolve: () => Promise.reject(new Error("unused")), forget: () => undefined },
       accounts: { deleteUser: () => Promise.reject(new Error("unused")) },
       search: { search: () => Promise.resolve([]) },
@@ -92,10 +94,24 @@ describe("published contract", () => {
     }
   });
 
+  it("documents the account failures of every secured operation that provisions the member", () => {
+    // deleteMe never provisions; every other secured operation calls requireUser.
+    const provisioning = operations.filter(
+      ({ operation }) => (operation.security?.length ?? 0) > 0 && operation.operationId !== "deleteMe",
+    );
+    expect(provisioning.length).toBeGreaterThan(0);
+    const missing = provisioning.flatMap(({ operation }) =>
+      ["401", "403", "409"]
+        .filter((status) => !(status in (operation.responses ?? {})))
+        .map((status) => (operation.operationId ?? "?") + " " + status),
+    );
+    expect(missing).toEqual([]);
+  });
+
   it("rejects every secured operation without a token", async () => {
     const app = createApp({
       db: createDatabase("postgres://contract@127.0.0.1:1/contract").db,
-      verifySession: () => Promise.resolve(null),
+      verifySession: () => Promise.resolve({ ok: false, reason: SessionRejection.NoActiveSession }),
       provisioner: { resolve: () => Promise.reject(new Error("must not be reached")), forget: () => undefined },
       accounts: { deleteUser: () => Promise.reject(new Error("must not be reached")) },
       search: { search: () => Promise.reject(new Error("must not be reached")) },

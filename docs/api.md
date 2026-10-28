@@ -5,7 +5,7 @@ The authoritative description is [contract/openapi.json](../contract/openapi.jso
 ## Basics
 
 - **Base URL:** the `coursebook-golf-api` Render service, `https://coursebook-golf-api.onrender.com` (`https://api.coursebook.golf` after cutover).
-- **Authentication:** `Authorization: Bearer <Clerk session token>` on member operations. Omit the header on public operations. Cookies are ignored.
+- **Authentication:** `Authorization: Bearer <Clerk session token>` on member operations, exactly in that form: the scheme spelled `Bearer`, one space, then the token. Any other Authorization value (another scheme, a lowercase `bearer`, a bare token) is 401 `unauthenticated`, as is a token that does not verify, even on public operations. Omit the header on public operations. Cookies are ignored.
 - **Bodies:** JSON with `Content-Type: application/json`, at most 32 KB. Optional request fields may be missing or `null`.
 - **Responses:** every documented field is always present; absent values are `null`. Changes to your list return the whole updated list (`courses`), so clients replace their copy.
 - **Dates:** `playedOn` is `YYYY-MM-DD` in the member's time zone; send it, because the server's date is UTC.
@@ -25,13 +25,14 @@ Every failure returns:
 | 401 | `unauthenticated`, `account_deleted` |
 | 403 | `username_invalid` |
 | 404 | `not_found`, `course_not_found`, `not_on_list`, `round_not_found`, `member_not_found`, `friendship_not_found`, `top_list_not_found` |
+| 409 | `username_taken` (another member holds the Clerk account's username; choose a different one) |
 | 413 | `payload_too_large` |
 | 415 | `unsupported_media_type` |
 | 500 | `internal` |
 | 502 | `account_deletion_incomplete` (retry `DELETE /v1/me`) |
 | 503 | `search_unavailable` |
 
-`message` is written for members; `requestId` matches the server log and the `X-Request-Id` header.
+`message` is written for members; `requestId` matches the server log and the `X-Request-Id` header. The API generates every request id; an `X-Request-Id` sent by the client is ignored.
 
 ## Operations
 
@@ -40,7 +41,7 @@ Every failure returns:
 | `GET /v1/client-config` | `getClientConfig` | public | Minimum app versions, privacy and account-deletion URLs |
 | `GET /v1/rankings` | `listRankings` | public | Every published entry; `ETag` and `If-None-Match` (304), cacheable for an hour |
 | `GET /v1/me` | `getMe` | member | Username and display name |
-| `DELETE /v1/me` | `deleteMe` | member | Deletes the account; 204. Retry after a 502 |
+| `DELETE /v1/me` | `deleteMe` | member | Deletes the account; 204. Retry after a 502. Works even for an account other operations refuse with 403 `username_invalid` or 409 `username_taken` |
 | `GET /v1/me/courses` | `listMyCourses` | member | The list in personal rank order with play counts |
 | `PUT /v1/me/courses/{courseId}` | `addToList` | member | Add a catalog course; logs one round if it has none; idempotent |
 | `POST /v1/me/courses` | `addCourse` | member | Add a course by details (`source` `search` or `manual`), at `rank`, with `quantity` rounds; returns their `roundIds` |
@@ -50,9 +51,10 @@ Every failure returns:
 | `GET /v1/me/courses/{courseId}/rounds` | `listMyCourseRounds` | member | Rounds at a course, newest first |
 | `POST /v1/me/courses/{courseId}/rounds` | `logRounds` | member | Log rounds at a catalog course; returns their `roundIds`, so Undo is `deleteRound` for each (the last one takes the course off the list) |
 | `DELETE /v1/me/rounds/{roundId}` | `deleteRound` | member | Delete one round; the last one removes the course |
-| `GET /v1/course-search?q=` | `searchCourses` | member | Up to ten hits; catalog hits carry `courseId` |
+| `GET /v1/course-search?q=&page=&source=` | `searchCourses` | member | Stored courses by default; `source=external` explicitly discovers more. Alphabetical pages of ten hits (`page` defaults to 1), with `page`, `pageSize` and `total`; catalog hits carry `courseId` |
 | `GET /v1/members?cursor=&limit=` | `listMembers` | member | The member's friends, paged by username (limit 1–200, default 50) |
 | `GET /v1/members/{username}` | `getMemberList` | member | The member's own list or a friend's, with `onMyList` flags; anyone else is 404 `member_not_found` |
+| `GET /v1/members/{username}/rounds?cursor=&limit=` | `listMemberRounds` | member | The member's own or a friend's timeline, newest played first (limit 1–100, default 30), with `months`: the full round count of every month on the page, so a month split across pages shows its total from the first page; anyone else is 404 `member_not_found` |
 | `GET /v1/member-search?q=` | `searchMembers` | member | Up to 20 other members whose username contains `q` (3–64 characters), prefix matches first, each with the viewer's `relationship`; `no-store` |
 | `GET /v1/me/friend-requests` | `listFriendRequests` | member | Pending requests: `incoming` (they asked) and `outgoing` (the viewer asked) |
 | `PUT /v1/me/friends/{username}` | `befriendMember` | member | Send a request, or accept theirs; returns the resulting `relationship`; idempotent. 400 for the viewer's own username |

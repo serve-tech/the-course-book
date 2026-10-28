@@ -2,6 +2,7 @@ import type { SearchResult } from "@coursebook/domain/catalog/search-results";
 import { createApp, type AppDependencies, type Logger, type RequestLog } from "../app";
 import { createClerkSessionVerifier } from "../auth/session";
 import type { Database } from "../db/client";
+import type { LoggedError } from "../http/loggable-error";
 import { createProvisioner, provisionUser } from "../services/provisioning";
 import { createTestTokens, TEST_PUBLISHABLE_KEY, TEST_SECRET_KEY } from "./tokens";
 
@@ -23,13 +24,15 @@ export const TEST_CLIENT_CONFIG = {
 export function createTestApp(db: Database, overrides: Partial<AppDependencies> = {}) {
   const tokens = createTestTokens();
   const requests: RequestLog[] = [];
-  const errors: unknown[] = [];
+  const errors: { message: string; error: LoggedError; detail: Record<string, unknown> | undefined }[] = [];
+  const warnings: { message: string; detail: Record<string, unknown> }[] = [];
   let searchResults: SearchResult[] | Error = [];
   const deletedAccounts: string[] = [];
   let accountDeletionFailure: Error | null = null;
   const logger: Logger = {
     request: (entry) => requests.push(entry),
-    error: (_message, detail) => errors.push(detail),
+    warn: (message, detail) => warnings.push({ message, detail }),
+    error: (message, error, detail) => errors.push({ message, error, detail }),
   };
   const app = createApp({
     db,
@@ -72,6 +75,7 @@ export function createTestApp(db: Database, overrides: Partial<AppDependencies> 
     app,
     tokens,
     requests,
+    warnings,
     errors,
     bearer,
     setSearchResults: (value: SearchResult[] | Error) => {

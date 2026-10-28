@@ -52,6 +52,9 @@ const timestamps = {
     .defaultNow(),
 };
 
+/** The unique index on `lower(users.username)`; a second member with the same username violates it. */
+export const USERNAME_UNIQUE_INDEX = "users_username_lower_idx";
+
 /** One row per Clerk user. Rows are soft-deleted only. */
 export const users = pgTable(
   "users",
@@ -66,7 +69,7 @@ export const users = pgTable(
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
   },
   (table) => [
-    uniqueIndex("users_username_lower_idx").on(sql`lower(${table.username})`),
+    uniqueIndex(USERNAME_UNIQUE_INDEX).on(sql`lower(${table.username})`),
     uniqueIndex("users_legacy_supabase_id_idx").on(table.legacySupabaseId),
   ],
 );

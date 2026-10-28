@@ -1,7 +1,7 @@
 import { Link } from "react-router";
 import type { Route } from "./+types/privacy";
 
-export const meta: Route.MetaFunction = () => [{ title: "Privacy · coursebook.golf" }];
+export const meta: Route.MetaFunction = () => [{ title: "Privacy · The Course Book" }];
 
 /**
  * What the app stores and who sees it, as implemented. The maintainer owns
@@ -18,7 +18,7 @@ export default function Privacy() {
         </div>
       </div>
       <div className="prose">
-        <h3>What coursebook.golf stores</h3>
+        <h3>What The Course Book stores</h3>
         <p>
           Your username, display name, email address and profile image from your sign-in; the courses on your list
           and their order; the rounds you log, with their dates; and your friends and friend requests. Courses you add

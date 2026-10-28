@@ -110,12 +110,14 @@ jobs:
       - run: docker build -f apps/api/Dockerfile -t coursebook-api:ci .
       # Proves the bundle starts with no node_modules, migrates on start and
       # serves the seeded catalog. Clerk keys are placeholders; no token is sent.
+      # The image runs with NODE_ENV=production, which requires a web origin.
       - name: Smoke test the API image
         run: |
           docker run -d --name api --network host \
             -e DATABASE_URL="$DATABASE_URL" \
             -e CLERK_PUBLISHABLE_KEY="pk_test_$(printf 'example.clerk.accounts.dev$' | base64)" \
             -e CLERK_SECRET_KEY="sk_test_000000000000000000000000000000000000000000000000" \
+            -e WEB_ORIGINS=http://localhost:5173 \
             -e PORT=3001 \
             coursebook-api:ci
           curl --retry 30 --retry-delay 1 --retry-all-errors -fsS localhost:3001/healthz

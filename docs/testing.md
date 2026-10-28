@@ -52,24 +52,27 @@ A green suite does not verify Clerk's production instance, Render's environment 
 - **Web client code:** pure mappers and the API client are unit-tested with an injected `fetch` ([client.test.ts](../apps/web/app/lib/api/client.test.ts)). Components: colocated `*.test.tsx` with Testing Library when a focused UI test is useful.
 - **Browser flows:** extend [course-book.spec.ts](../tests/e2e/course-book.spec.ts). Mock only external boundaries: the OpenGolfAPI stub server and Clerk testing tokens. The database is real; [tests/e2e/db.ts](../tests/e2e/db.ts) seeds the fixture courses and resets both test members to the baseline scenario (friends with each other, with fixed lists) before each authenticated test; the friend-request scenario removes the friendship first. Assert persisted outcomes through it.
 
+The redesigned signed-in browser journeys opt in through the visible preview control. Separate `layout preview` journeys start from Classic and verify switching both ways with persisted edits, refreshes and other tabs; anonymous navigation and account deletion also exercise the default layout. Tests read the build's `LAYOUT_PREVIEW_ENABLED` setting: when disabled, shared journeys run in Classic, preview-only journeys skip, and a shutoff journey proves a saved opt-in cannot enable the preview or its control. Unit tests likewise exercise the configured mode. Verify a shutoff change with the normal checks, including the browser suite; no test-only build override is needed.
+
 Mock external services, not the domain or service logic whose behavior the test claims to verify.
 
 ## Regressions to consider by change
 
 | Area changed | Relevant assertions |
 | --- | --- |
-| Course matching/search | Canonical identity survives richer labels, aliases and inconsistent geography; catalog hits carry `courseId`; catalog rows never appear as search results; CSV fallback and `search_unavailable` |
+| Course matching/search | Canonical identity survives richer labels, aliases and inconsistent geography; catalog hits carry `courseId`; catalog/default search works without discovery (including custom courses and Oakland University: Katke-Cousins); alphabetical pages have no gaps/overlap; explicit external discovery, CSV fallback and `search_unavailable` |
 | Round logging/count/history | Count equals round rows; existing rank untouched; oldest rounds removed first on count reduction (newest history kept); last-round delete removes membership; returned lists match the database |
 | Personal ordering/filtering | Move renumbers the full list; hidden memberships survive filtered moves; geographic filters remain read-only; ranks stay contiguous under concurrent moves |
-| Authorization | Writes affect only the token's member; lists are visible only to their member and accepted friends (strangers and pending requests get 404); secured operations 401 before validation; web tokens need an allowed `azp`; deleted accounts cannot write or be re-provisioned; no emails anywhere |
+| Authorization | Writes affect only the token's member; lists are visible only to their member and accepted friends (strangers and pending requests get 404); secured operations 401 before validation; web tokens need an allowed `azp`; Authorization values other than `Bearer <token>` 401 without calling Clerk; rejections log a warning (`t.warnings`) without the token; deleted accounts cannot write or be re-provisioned; `DELETE /v1/me` works without provisioning (invalid username, no row); a username another member holds is 409 `username_taken`; no emails anywhere |
+| Logging and errors | Error logs (`t.errors`) go through `loggableError`: no query parameters, Postgres `detail` or emails; a request whose client went away is 499 and its cancellation is not logged, while unrelated server failures still are; security headers and server-generated request ids on every response |
 | Contract | Additive only; `pnpm contract:emit` committed; `contract.test.ts` passes |
-| UI/navigation/styles | Existing flows at desktop/mobile sizes, accessible dialog controls, error panels with Retry |
+| UI/navigation/styles | Existing flows at desktop/mobile sizes, accessible dialog controls, error panels with Retry. Layout preview: Classic by default, opt-in and switch-back through the UI, persistence on refresh, shared edits, cross-tab consistency and storage failure |
 
 A bug fix needs a regression that would fail with the bug present.
 
 ## Live checks
 
-Do not sign into production or create/delete real records as part of an automated test. `pnpm smoke:staging` ([staging-smoke.ts](../tests/e2e/staging-smoke.ts)) runs the main signed-in flows against the deployed staging site with a throwaway Clerk development-instance user and refuses any key other than a development one (`sk_test_`); an interrupted run deletes its account through the API before deleting the Clerk user, so no orphan member row is left. Local development uses the docker-compose database and a Clerk development instance. A live production check needs explicit authorization, a defined account and an agreed cleanup plan.
+Do not sign into production or create or delete real records as part of an automated test. There is no staging environment: verification happens in CI (`verify`, `browser` and `docker`, which run the real API image, the static web app, Postgres and a Clerk development instance) and locally (`pnpm dev` and `pnpm test:e2e`, using the docker-compose database and a Clerk development instance); see the [decision record](../.planning/decisions/2026-10-06-test-in-ci-and-locally-not-against-production.md). A live check against production needs explicit maintainer authorization, a defined account and an agreed cleanup plan.
 
 ## CI and handoff
 

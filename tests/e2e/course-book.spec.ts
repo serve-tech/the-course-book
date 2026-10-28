@@ -2,13 +2,15 @@ import { randomBytes } from "node:crypto";
 import { createClerkClient } from "@clerk/backend";
 import { users } from "@coursebook/api/db/schema";
 import { FriendshipStatus } from "@coursebook/api/domain/friendship";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { eq } from "drizzle-orm";
 import { clerk } from "@clerk/testing/playwright";
+import { isLayoutPreviewEnabled, LAYOUT_PREFERENCE_KEY, LayoutMode } from "../../apps/web/app/features/shell/layout-preview";
 import { authAvailable, clerkAvailable, signInAs } from "./auth";
 import {
   addHiddenCourse,
   addPlayed,
+  addRounds,
   catalogCourse,
   connect,
   courseByName,
@@ -35,6 +37,7 @@ const members = (): { owner: TestMember; friend: TestMember } => {
 };
 
 const { db, pool } = connect();
+const previewEnabled = isLayoutPreviewEnabled();
 
 test.afterAll(async () => {
   await pool.end();
@@ -47,23 +50,52 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-const row = (page: Page, name: string) =>
-  page.locator("#mylist .rankrow").filter({ has: page.getByText(name, { exact: true }) });
+/** A course's row on the Ranking tab, the member's own or a friend's. */
+const row = (page: Page, name: string) => page.locator(`#ranking > li[data-course="${name}"]`);
 
-/** The member's own Ranking tab (My List) on their profile. */
+/** Course names on the Ranking tab, top to bottom. */
+const rankingOrder = (page: Page) =>
+  page.locator("#ranking > li[data-course]").evaluateAll((rows) => rows.map((item) => item.getAttribute("data-course")));
+
+/** Click a course's name on the member's own Ranking, which opens its details (the mini tile's copy of the name is hidden). */
+const openDetails = (page: Page, name: string) => row(page, name).getByText(name, { exact: true }).filter({ visible: true }).click();
+
+/**
+ * The vertical center of an element's own text, measured on the text rather
+ * than the element's box: a stretched box can be centered while its text sits
+ * at the top.
+ */
+const textCenter = (locator: Locator) =>
+  locator.evaluate((element) => {
+    const text = [...element.childNodes].find((node) => node.nodeType === Node.TEXT_NODE && node.textContent?.trim());
+    if (!text) throw new Error("The element has no text of its own");
+    const range = document.createRange();
+    range.selectNodeContents(text);
+    const box = range.getBoundingClientRect();
+    return box.top + box.height / 2;
+  });
+
+/** The member's own Ranking tab on their profile. */
 async function openRanking(page: Page, member: TestMember): Promise<void> {
   await page.goto(`/u/${member.username}/ranking`);
-  await expect(page.locator("#mine")).toBeVisible();
+  await expect(page.getByRole("tablist", { name: "Ranking regions" })).toBeVisible();
 }
 
-/** Open the Log dialog with the profile's Log a round button. */
-const openLog = (page: Page) => page.getByRole("main").getByRole("link", { name: "+ Log a round" }).click();
+/** Open the Log dialog from the page's own Log a round button (Home, Activity or the profile header). */
+const openLog = (page: Page) => page.getByRole("main").getByRole("button", { name: "+ Log a round" }).click();
 
 /** The Friends destination; its name gains the request count when there are requests. */
 const friendsLink = (page: Page) => page.getByRole("link", { name: /^Friends\b/ });
 
 /** The signed-out Home page. */
 const welcome = (page: Page) => page.getByRole("heading", { name: /Every course you.ve played/ });
+
+/**
+ * The preview Home's focal point. Every test sets Michigan as the chosen
+ * state, so Home leads with Best in Michigan unless a list elsewhere is
+ * started and Michigan is not.
+ */
+const progressHome = (page: Page) => page.getByRole("heading", { level: 1, name: "Best in Michigan" });
 
 /**
  * How far Clerk's card sits inside the auth dialog's content box on each side,
@@ -82,6 +114,32 @@ const authCardInset = (page: Page) =>
     const contentRight = box.left + parseFloat(style.borderLeftWidth) + modal.clientWidth - parseFloat(style.paddingRight);
     return { left: Math.round(inner.left - contentLeft), right: Math.round(contentRight - inner.right) };
   });
+
+/**
+ * How far the center of Clerk's card on a full-page sign-in or sign-up sits
+ * from the center of its page section (the content column), in whole pixels;
+ * 0 when centered.
+ */
+const pageCardOffset = (page: Page, sectionId: string) =>
+  page.evaluate((id) => {
+    const section = document.getElementById(id);
+    const card = section?.querySelector(".cl-cardBox");
+    if (!section || !card) return null;
+    const outer = section.getBoundingClientRect();
+    const inner = card.getBoundingClientRect();
+    return Math.round((inner.left + inner.right) / 2 - (outer.left + outer.right) / 2);
+  }, sectionId);
+
+/** The signed-in member's avatar in the top bar, which opens the account menu. */
+const accountMenuButton = (page: Page) => page.locator("#authbar").getByRole("button", { name: /^Account menu for / });
+
+/** Checks who is signed in through the account menu's Profile link, then closes the menu. */
+async function expectSignedInAs(page: Page, username: string) {
+  await accountMenuButton(page).click();
+  await expect(page.getByRole("menuitem", { name: "Profile" })).toHaveAttribute("href", "/u/" + username);
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("menu")).toHaveCount(0);
+}
 
 test("anonymous navigation, dialogs and mobile layout remain usable", async ({ page }) => {
   test.skip(!clerkAvailable, "Clerk development instance keys are not configured");
@@ -110,32 +168,48 @@ test("anonymous navigation, dialogs and mobile layout remain usable", async ({ p
   // fell short of its padding on phones; it fills the content box instead.
   await expect(page.locator("#authClerk .cl-cardBox.cl-signIn-start")).toBeVisible();
   await expect.poll(() => authCardInset(page)).toEqual({ left: 0, right: 0 });
-  // Clerk's "Sign up" link goes to the full-page sign-up, which the dialog
-  // once kept covering.
-  await page.locator("#authClerk .cl-footerActionLink").click();
-  await expect(page).toHaveURL(/\/sign-up/);
+  await page.locator("#authmodal").getByRole("button", { name: "Close" }).click();
   await expect(page.locator("#authmodal")).toHaveCount(0);
+  // The full-page sign-up once left Clerk's card against the column's left edge.
+  await page.goto("/sign-up");
   await expect(page.locator("#signup .cl-cardBox.cl-signUp-start")).toBeVisible();
+  await expect.poll(() => pageCardOffset(page, "signup")).toBe(0);
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
   ).toBe(true);
+  // Google returns to the page the dialog was opened on, as a full page load
+  // with Clerk's next step in the hash (a new account: #/create/sso-callback,
+  // then #/create/continue for the username). The dialog once stayed closed,
+  // so the account was never created. A step that needs no sign-in in
+  // progress stands in for them here; closing the dialog clears it.
+  await page.goto("/courses#/factor-one");
+  await expect(page.locator("#authmodal")).toBeVisible();
+  await page.locator("#authmodal").getByRole("button", { name: "Close" }).click();
+  await expect(page.locator("#authmodal")).toHaveCount(0);
+  expect(await page.evaluate(() => location.hash)).toBe("");
 });
 
 test.describe("signed in", () => {
   test.skip(!authAvailable, "Clerk development instance keys or test users are not configured");
 
-  test.beforeEach(async () => {
+  test.beforeEach(async ({ page }) => {
     const { owner, friend } = members();
     await resetScenario(db, owner, friend);
+    await page.goto("/");
+    if (previewEnabled) {
+      await page.getByRole("button", { name: "Try the new layout" }).click();
+      await expect(page.getByRole("button", { name: "Use classic layout" })).toBeEnabled();
+    }
   });
 
   test("sign-in shows the stored order and logging preserves it", async ({ page }) => {
     const { owner } = members();
     await signInAs(page, owner);
-    await expect(page.locator("#authLabel")).toHaveText(owner.username);
+    await expectSignedInAs(page, owner.username);
+    if (previewEnabled) await expect(progressHome(page)).toBeVisible();
     await openRanking(page, owner);
-    await expect(page.locator("#myCourseCount")).toHaveText("2");
-    await expect(page.locator("#mylist .course")).toHaveText(["Test Beta Links", "Test Alpha Links"]);
+    await expect(page.locator("#rankingCount")).toHaveText("2 courses");
+    await expect.poll(() => rankingOrder(page)).toEqual(["Test Beta Links", "Test Alpha Links"]);
 
     await openLog(page);
     await page.locator("#modalsearch").fill("Test Alpha");
@@ -143,37 +217,152 @@ test.describe("signed in", () => {
     await page.locator("#timesPlayed").fill("2");
     await page.locator("#confirmLog").click();
     await expect(page.locator("#modal")).toHaveCount(0);
-    await expect(row(page, "Test Alpha Links").locator(".count")).toContainText("3×");
-    await expect(page.locator("#mylist .course")).toHaveText(["Test Beta Links", "Test Alpha Links"]);
+    await expect(row(page, "Test Alpha Links")).toContainText("3 rounds");
+    await expect.poll(() => rankingOrder(page)).toEqual(["Test Beta Links", "Test Alpha Links"]);
     expect(await listOrder(db, owner.id)).toEqual([fixtureCourses.beta.id, fixtureCourses.alpha.id]);
 
     await page.reload();
-    await expect(page.locator("#mylist .course")).toHaveText(["Test Beta Links", "Test Alpha Links"]);
-    await page.locator("#authOpen").click();
+    await expect.poll(() => rankingOrder(page)).toEqual(["Test Beta Links", "Test Alpha Links"]);
+    await accountMenuButton(page).click();
+    await page.getByRole("menuitem", { name: "Sign out" }).click();
     await expect(welcome(page)).toBeVisible();
+  });
+
+  test("Home leads with list progress, then friends' rounds and the top four", async ({ page }, testInfo) => {
+    test.skip(!previewEnabled, "The layout preview is disabled in this build");
+    const { owner, friend } = members();
+    await addPlayed(db, owner, await catalogCourse(db, "usa15")); // Crystal Downs, Michigan #1
+    await addPlayed(db, friend, await catalogCourse(db, "usa20")); // Oakland Hills South, Michigan #2
+    await signInAs(page, owner);
+
+    await expect(progressHome(page)).toBeVisible();
+    await expect(page.getByRole("link", { name: "Home", exact: true })).toHaveAttribute("aria-current", "page");
+    const hero = page.getByRole("region", { name: "Best in Michigan", exact: true });
+    await expect(hero.getByRole("group", { name: "Your lists" })).toBeVisible();
+    await expect(hero.getByRole("progressbar", { name: "Best in Michigan played" })).toHaveAttribute("aria-valuenow", "1");
+    await expect(hero).toContainText(friend.displayName + " has played 1.");
+    const friends = page.getByRole("region", { name: /From your friends/ });
+    await expect(friends.getByRole("listitem").filter({ hasText: fixtureCourses.alpha.name })).toContainText("Your #2");
+    const topFour = page.getByRole("region", { name: /Top four/ });
+    await expect(topFour.getByRole("img")).toHaveCount(3);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await page.screenshot({ path: testInfo.outputPath("progress-home.png"), fullPage: true, scale: "css" });
+
+    await page.getByRole("region", { name: /Up next on Best in Michigan/ }).getByRole("link", { name: "See the list" }).click();
+    await expect(page).toHaveURL(/\/courses\?list=state-mi$/);
+    await expect(page.getByRole("tab", { name: "Best in Michigan" })).toHaveAttribute("aria-selected", "true");
+
+    await page.getByRole("link", { name: "Home", exact: true }).click();
+    await topFour.getByRole("link", { name: "Your ranking" }).click();
+    await expect(page).toHaveURL(new RegExp(`/u/${owner.username}/ranking$`));
+    await expect(page.getByRole("link", { name: "My ranking", exact: true })).toHaveAttribute("aria-current", "page");
+    await expect.poll(() => rankingOrder(page)).toEqual(["Test Beta Links", "Test Alpha Links", "Crystal Downs Country Club"]);
+
+    await page.getByRole("link", { name: "Home", exact: true }).click();
+    await friends.getByRole("link", { name: "All activity" }).click();
+    await expect(page.getByRole("heading", { name: "Where your friends are playing" })).toBeVisible();
+    await expect(page.getByRole("main")).toContainText(friend.displayName);
+
+    // Log a round opens over the page the member is on; nothing navigates.
+    await openLog(page);
+    await expect(page.locator("#modal")).toBeVisible();
+    await expect(page).toHaveURL(/\/activity$/);
+    await page.getByRole("button", { name: "Close" }).click();
+    if (testInfo.project.name === "mobile") {
+      await page.getByRole("link", { name: "Courses", exact: true }).click();
+      await page.getByRole("navigation", { name: "Main" }).getByRole("button", { name: "Log a round" }).click();
+      await expect(page.locator("#modal")).toBeVisible();
+      await expect(page).toHaveURL(/\/courses/);
+      await page.getByRole("button", { name: "Close" }).click();
+    }
+    // A saved ?log=1 link opens the dialog over that page and drops the parameter.
+    await page.goto("/?log=1");
+    await expect(page.locator("#modal")).toBeVisible();
+    await expect(page).toHaveURL(/\/$/);
+    await expect(progressHome(page)).toBeVisible();
+  });
+
+  test("Home's Up next saves Want to play and logs, and members can track another list", async ({ page }, testInfo) => {
+    test.skip(!previewEnabled, "The layout preview is disabled in this build");
+    const { owner, friend } = members();
+    const [crystalDowns, oaklandHills, dunesClub] = [
+      await catalogCourse(db, "usa15"), // Michigan #1, USA #15
+      await catalogCourse(db, "usa20"), // Michigan #2, USA #20
+      await catalogCourse(db, "michigan100"), // Michigan #3
+    ];
+    await addPlayed(db, owner, crystalDowns);
+    await addPlayed(db, friend, oaklandHills);
+    await signInAs(page, owner);
+    await expect(progressHome(page)).toBeVisible();
+
+    const upNext = page.getByRole("list", { name: "Up next on Best in Michigan" });
+    // The rows' own items: rank pills and friends are nested lists of their own.
+    const rows = (list: Locator) => list.locator(":scope > li[data-course]");
+    const courseOrder = (list: Locator) => rows(list).evaluateAll((items) => items.map((item) => item.getAttribute("data-course")));
+    await expect.poll(() => courseOrder(upNext)).toEqual(["Oakland Hills Country Club: South", "Dunes Club", "Kingsley Club"]);
+    await expect(rows(upNext).first()).toContainText(friend.displayName);
+
+    // Want to play moves a course to the front of Up next.
+    await upNext.getByRole("button", { name: "Want to play Dunes Club" }).click();
+    await expect.poll(() => wantedIds(db, owner.id)).toEqual([dunesClub]);
+    await expect.poll(() => courseOrder(upNext)).toEqual(["Dunes Club", "Oakland Hills Country Club: South", "Kingsley Club"]);
+    await expect(rows(upNext).first()).toContainText("On your Want to play");
+
+    // Logging from Up next counts on the hero and takes the course off Up next.
+    await upNext.getByRole("button", { name: "Log a round at Oakland Hills Country Club: South" }).click();
+    await expect(page.locator("#selectedCourseCard")).toContainText("Oakland Hills Country Club: South");
+    await page.locator("#playedOn").fill("2026-05-01");
+    await page.locator("#confirmLog").click();
+    await expect(page.locator("#modal")).toHaveCount(0);
+    await expect(page.getByRole("progressbar", { name: "Best in Michigan played" })).toHaveAttribute("aria-valuenow", "2");
+    await expect.poll(() => courseOrder(upNext)).toEqual(["Dunes Club", "Kingsley Club", "Arcadia Bluffs Golf Club"]);
+    expect(await roundDates(db, owner.id, oaklandHills)).toEqual(["2026-05-01"]);
+
+    // Tracking another list puts it on Home and remembers it on this browser.
+    // Desktop picks with the buttons at the top of the hero; phones with its dropdown.
+    const lists = page.getByRole("group", { name: "Your lists" });
+    const dropdown = lists.getByRole("combobox", { name: "Track a list" });
+    const phone = testInfo.project.name === "mobile";
+    if (phone) {
+      await expect(lists.getByRole("button", { name: /^Track / })).toHaveCount(0);
+      await expect(dropdown).toHaveValue("state-mi");
+      await dropdown.selectOption("usa");
+    } else {
+      await expect(dropdown).toBeHidden();
+      await expect(lists.getByRole("button", { name: /^Track Best in Michigan/ })).toHaveAttribute("aria-pressed", "true");
+      await lists.getByRole("button", { name: /^Track USA Top 100/ }).click();
+    }
+    await expect(page.getByRole("heading", { level: 1, name: "USA Top 100" })).toBeVisible();
+    await expect(page).toHaveURL(/\/\?goal=usa$/);
+    await expect(page.getByRole("progressbar", { name: "USA Top 100 played" })).toHaveAttribute("aria-valuenow", "2");
+    await expect(page.getByRole("list", { name: "Up next on USA Top 100" })).toBeVisible();
+    await page.goto("/");
+    await expect(page.getByRole("heading", { level: 1, name: "USA Top 100" })).toBeVisible();
+    if (phone) await expect(dropdown).toHaveValue("usa");
+    else await expect(lists.getByRole("button", { name: /^Track USA Top 100/ })).toHaveAttribute("aria-pressed", "true");
   });
 
   test("course details moves, count editing and confirmed final-round removal work", async ({ page }) => {
     const { owner } = members();
     await signInAs(page, owner);
     await openRanking(page, owner);
-    await expect(page.locator("#myCourseCount")).toHaveText("2");
-    await page.locator("#mylist .course").filter({ hasText: "Test Alpha Links" }).click();
+    await expect(page.locator("#rankingCount")).toHaveText("2 courses");
+    await openDetails(page, "Test Alpha Links");
     await page.locator("#moveTop").click();
-    await expect(page.locator("#mylist .course").first()).toHaveText("Test Alpha Links");
+    await expect.poll(() => rankingOrder(page)).toEqual(["Test Alpha Links", "Test Beta Links"]);
     await expect.poll(() => listOrder(db, owner.id)).toEqual([fixtureCourses.alpha.id, fixtureCourses.beta.id]);
 
-    await page.locator("#mylist .course").first().click();
+    await openDetails(page, "Test Alpha Links");
     await page.locator("#editTimesPlayed").click();
     await expect(page.locator(".counteditinput")).toBeVisible();
     await page.locator(".cancelcount").click();
 
-    await page.locator("#mylist .roundslink").first().click();
+    await page.getByRole("button", { name: "Your rounds at Test Alpha Links" }).click();
     await expect(page.locator(".roundhistory-row")).toHaveCount(1);
     page.once("dialog", (dialog) => void dialog.accept());
     await page.locator(".delete-round").click();
     await expect(page.locator("#roundmodal")).toHaveCount(0);
-    await expect(page.locator("#myCourseCount")).toHaveText("1");
+    await expect(page.locator("#rankingCount")).toHaveText("1 course");
   });
 
   test("manual US course stores its state and logs one round", async ({ page }) => {
@@ -186,12 +375,13 @@ test.describe("signed in", () => {
     await page.locator("#newstate").selectOption("MI");
     await page.locator("#save").click();
     await expect(page.locator("#addmodal")).toHaveCount(0);
-    await expect(page.locator("#myCourseCount")).toHaveText("3");
+    await expect(page.locator("#rankingCount")).toHaveText("3 courses");
     expect(await courseByName(db, "New Test Club")).toMatchObject({ state: "MI", country: "USA", isCustom: true, createdBy: owner.id });
   });
 
   test("a friend's profile shows their ranking next to the viewer's", async ({ page }) => {
     const { owner, friend } = members();
+    await addRounds(db, friend, fixtureCourses.alpha.id, ["2026-03-01"]);
     await signInAs(page, owner);
     await friendsLink(page).click();
     await page.locator(`[data-friend="${friend.username}"]`).click();
@@ -199,11 +389,20 @@ test.describe("signed in", () => {
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     await page.getByRole("link", { name: "Ranking", exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`/u/${friend.username}/ranking$`));
-    const ranking = page.locator("#friendRanking");
-    await expect(ranking.locator("[data-course]")).toHaveCount(2);
-    await page.getByRole("button", { name: "Both played" }).click();
-    await expect(ranking.locator("[data-course]")).toHaveCount(1);
-    await expect(ranking.locator('[data-course="Test Alpha Links"]')).toContainText("You #2");
+    const rows = page.locator("#ranking > li[data-course]");
+    await expect(rows).toHaveCount(2);
+    await expect(page.getByRole("button", { name: "All (2)", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Only " + friend.displayName + " (1)", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Both played (1)", exact: true }).click();
+    await expect(rows).toHaveCount(1);
+    const alpha = row(page, "Test Alpha Links");
+    await expect(alpha).toContainText("You #2");
+    // The rounds note and the You tick sit on one line, centered on each other.
+    const [note, tick] = await Promise.all([
+      textCenter(alpha.getByText("2 rounds", { exact: true })),
+      textCenter(alpha.getByText("You #2", { exact: true })),
+    ]);
+    expect(Math.abs(note - tick)).toBeLessThanOrEqual(1);
   });
 
   test("course rows save Want to play and log a dated round", async ({ page }) => {
@@ -263,6 +462,21 @@ test.describe("signed in", () => {
     expect(await listOrder(db, owner.id)).toEqual([fixtureCourses.alpha.id]);
   });
 
+  test("the timeline shows a month's full count before all its rounds load", async ({ page }) => {
+    const { owner } = members();
+    const march = Array.from({ length: 30 }, (_, day) => `2026-03-${String(day + 1).padStart(2, "0")}`);
+    await addRounds(db, owner, fixtureCourses.alpha.id, march);
+    await signInAs(page, owner);
+    await page.goto(`/u/${owner.username}`);
+    const month = page.locator('[data-month="2026-03"]');
+    await expect(month.getByRole("heading", { name: /^March 2026/ })).toContainText("30 rounds");
+    // The first page cut March off, yet its header already counts every round.
+    expect(await month.locator("[data-round]").count()).toBeLessThan(30);
+    await page.getByRole("button", { name: "Show more rounds" }).click();
+    await expect(month.locator("[data-round]")).toHaveCount(30);
+    await expect(month.getByRole("heading", { name: /^March 2026/ })).toContainText("30 rounds");
+  });
+
   test("a friend's Top list shows which courses they played and you haven't", async ({ page }) => {
     const { owner, friend } = members();
     await addPlayed(db, friend, await catalogCourse(db, "usa4"));
@@ -274,7 +488,7 @@ test.describe("signed in", () => {
     const list = page.locator("#memberTopList");
     await expect(list.locator('[data-course="Shinnecock Hills Golf Club"]')).toHaveAttribute("data-played", "true");
     await expect(list.locator('[data-course="Pine Valley Golf Club"]')).toContainText("You");
-    await page.getByRole("button", { name: /^Only / }).click();
+    await page.getByRole("button", { name: "Only " + friend.displayName + " (1)", exact: true }).click();
     await expect(list.locator(":scope > li")).toHaveCount(1);
     await expect(list.locator(":scope > li")).toHaveAttribute("data-course", "Shinnecock Hills Golf Club");
 
@@ -325,11 +539,12 @@ test.describe("signed in", () => {
     await addHiddenCourse(db, owner);
     await signInAs(page, owner);
     await openRanking(page, owner);
-    await expect(page.locator("#myCourseCount")).toHaveText("3");
-    await expect(page.locator("#mylist .course")).toHaveText(["Test Beta Links", "Test Alpha Links", "Hidden Course"]);
-    await page.locator("#mysearch").fill("Test");
-    await page.locator("#mysearch").blur();
-    const source = row(page, "Test Alpha Links").locator(".handle");
+    await expect(page.locator("#rankingCount")).toHaveText("3 courses");
+    await expect.poll(() => rankingOrder(page)).toEqual(["Test Beta Links", "Test Alpha Links", "Hidden Course"]);
+    const search = page.getByRole("searchbox", { name: "Search this ranking" });
+    await search.fill("Test");
+    await search.blur();
+    const source = row(page, "Test Alpha Links").locator("[data-drag-handle]");
     const target = row(page, "Test Beta Links");
     await source.scrollIntoViewIfNeeded();
     const from = await source.boundingBox(),
@@ -338,21 +553,74 @@ test.describe("signed in", () => {
     const pointer = { pointerId: 1, pointerType: "touch", button: 0, buttons: 1 };
     await source.dispatchEvent("pointerdown", { ...pointer, clientX: from.x + 5, clientY: from.y + 5 });
     await page.locator("body").dispatchEvent("pointermove", { ...pointer, clientX: to.x + 20, clientY: to.y + 10 });
-    await expect(page.locator(".drag-ghost")).toBeVisible();
+    await expect(page.locator("[data-drag-ghost]")).toBeVisible();
     await page.locator("body").dispatchEvent("pointerup", { ...pointer, buttons: 0, clientX: to.x + 20, clientY: to.y + 10 });
-    await page.locator("#mysearch").fill("");
-    await page.locator("#mysearch").blur();
+    await search.fill("");
+    await search.blur();
     const reordered = ["Test Alpha Links", "Test Beta Links", "Hidden Course"];
-    await expect(page.locator("#mylist .course")).toHaveText(reordered);
+    await expect.poll(() => rankingOrder(page)).toEqual(reordered);
     await expect.poll(() => listOrder(db, owner.id)).toEqual([
       fixtureCourses.alpha.id,
       fixtureCourses.beta.id,
       "aaaaaaaa-0000-4000-8000-000000000004",
     ]);
     await page.reload();
-    await expect(page.locator("#mylist .course")).toHaveText(reordered);
-    await page.locator("#mylistFilter").getByRole("button", { name: "US", exact: true }).click();
-    await expect(page.locator("#mylist .roundslink").first()).toBeDisabled();
+    await expect.poll(() => rankingOrder(page)).toEqual(reordered);
+
+    // Region tabs are read-only, and only the state tab shows the state picker.
+    const statePicker = page.getByRole("combobox", { name: "State for Best in State" });
+    await expect(statePicker).toHaveCount(0);
+    await page.getByRole("tab", { name: "USA", exact: true }).click();
+    await expect(page.locator("#ranking > li[data-course]").first()).toHaveAttribute("aria-disabled", "true");
+    await expect(page.getByRole("button", { name: /^Your rounds at / })).toHaveCount(0);
+    await expect(statePicker).toHaveCount(0);
+    await page.getByRole("tab", { name: "Best in Michigan" }).click();
+    await expect(statePicker).toHaveValue("MI");
+  });
+
+  test("catalog search finds Oakland University and pages alphabetically on desktop and mobile", async ({ page }, testInfo) => {
+    const { owner } = members();
+    await signInAs(page, owner);
+    await openRanking(page, owner);
+    await openLog(page);
+    await page.locator("#modalsearch").fill("Oakland");
+    await page.locator(".result").filter({ hasText: "Oakland University: Katke-Cousins" }).click();
+    await expect(page.locator("#selectedCourseCard")).toContainText("Oakland University: Katke-Cousins");
+    await page.locator("#backToSearch").click();
+    await page.locator("#modalsearch").fill("Pagination Catalog");
+    await expect(page.locator("#results .result strong")).toHaveText(Array.from({ length: 10 }, (_, index) => `Pagination Catalog ${String(index + 1).padStart(2, "0")}`));
+    await expect(page.getByRole("button", { name: "Previous", exact: true })).toBeDisabled();
+    await page.getByRole("button", { name: "Next", exact: true }).click();
+    await expect(page.locator("#results .result strong")).toHaveText(["Pagination Catalog 11", "Pagination Catalog 12", "Pagination Catalog 13"]);
+    await page.screenshot({ path: testInfo.outputPath("course-search-page-two.png"), fullPage: true });
+    await expect(page.getByRole("button", { name: "Next", exact: true })).toBeDisabled();
+    await page.getByRole("button", { name: "Previous", exact: true }).click();
+    await expect(page.locator("#results .result")).toHaveCount(10);
+    await page.getByRole("button", { name: "Next", exact: true }).click();
+    await page.locator(".result").filter({ hasText: "Pagination Catalog 13" }).click();
+    await page.locator("#playedOn").fill("2026-05-01");
+    await page.locator("#confirmLog").click();
+    await expect(page.locator("#modal")).toHaveCount(0);
+    expect(await roundDates(db, owner.id, "bbbbbbbb-0000-4000-8000-000000000013")).toEqual(["2026-05-01"]);
+    expect(await listOrder(db, owner.id)).toEqual([fixtureCourses.beta.id, fixtureCourses.alpha.id, "bbbbbbbb-0000-4000-8000-000000000013"]);
+  });
+
+  test("external discovery is explicit and can log a result from its second page", async ({ page }) => {
+    const { owner } = members();
+    await signInAs(page, owner);
+    await openRanking(page, owner);
+    await openLog(page);
+    await page.locator("#modalsearch").fill("External Pagination");
+    await expect(page.getByText("No courses found in our catalog. Try Search more courses.")).toBeVisible();
+    await page.getByRole("button", { name: "Search more courses" }).click();
+    await expect(page.locator("#results .result strong")).toHaveText(Array.from({ length: 10 }, (_, index) => `External Pagination ${String(index + 1).padStart(2, "0")}`));
+    await page.getByRole("button", { name: "Next", exact: true }).click();
+    await expect(page.locator("#results .result strong")).toHaveText(["External Pagination 11", "External Pagination 12", "External Pagination 13"]);
+    await page.locator(".result").filter({ hasText: "External Pagination 13" }).click();
+    await page.locator("#confirmLog").click();
+    await expect(page.locator("#modal")).toHaveCount(0);
+    await expect(row(page, "External Pagination 13")).toContainText("1 round");
+    expect(await courseByName(db, "External Pagination 13")).toMatchObject({ state: "MI", country: "USA", isCustom: false, createdBy: owner.id });
   });
 
   test("course search uses the dataset fallback when the REST API is unavailable", async ({ page }) => {
@@ -361,12 +629,164 @@ test.describe("signed in", () => {
     await openRanking(page, owner);
     await openLog(page);
     await page.locator("#modalsearch").fill("Fallback Test");
+    await page.getByRole("button", { name: "Search more courses" }).click();
     await page.locator(".result").filter({ hasText: "Fallback Test Links" }).click();
     await page.locator("#timesPlayed").fill("2");
     await page.locator("#confirmLog").click();
     await expect(page.locator("#modal")).toHaveCount(0);
-    await expect(row(page, "Fallback Test Links").locator(".count")).toContainText("2×");
+    await expect(row(page, "Fallback Test Links")).toContainText("2 rounds");
   });
+});
+
+/** Coordinate real network responses without depending on timing delays. */
+function signal() {
+  let resolve: () => void = () => { throw new Error("signal not initialized"); };
+  const promise = new Promise<void>((complete) => { resolve = complete; });
+  return { promise, resolve };
+}
+
+test.describe("layout preview", () => {
+  test.skip(!previewEnabled, "The layout preview is disabled in this build");
+  test.skip(
+    !authAvailable,
+    "Clerk development instance keys or test users are not configured",
+  );
+  test.beforeEach(async () => {
+    const { owner, friend } = members();
+    await resetScenario(db, owner, friend);
+  });
+
+  test("Classic is the default, and members can switch both ways without losing their edits", async ({
+    page,
+  }, testInfo) => {
+    const { owner } = members();
+    await signInAs(page, owner);
+    await expect(
+      page.getByRole("heading", { name: "Where your friends are playing" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Profile", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "My lists", exact: true }),
+    ).toHaveCount(0);
+    await page.screenshot({
+      path: testInfo.outputPath("classic-home.png"),
+      fullPage: true,
+      scale: "css",
+    });
+
+    // Classic logs into the same ranking from Home, without leaving it.
+    await openLog(page);
+    await page.locator("#modalsearch").fill("Test Alpha");
+    await page
+      .locator(".result")
+      .filter({ hasText: "Test Alpha Links" })
+      .click();
+    await page.locator("#confirmLog").click();
+    await expect(page.locator("#modal")).toHaveCount(0);
+    await expect(page).toHaveURL(/\/$/);
+    await expect(
+      page.getByRole("heading", { name: "Where your friends are playing" }),
+    ).toBeVisible();
+
+    await page.getByRole("button", { name: "Try the new layout" }).click();
+    await expect(progressHome(page)).toBeVisible();
+    await page.getByRole("link", { name: "My ranking", exact: true }).click();
+    await expect(row(page, "Test Alpha Links")).toContainText("2 rounds");
+    await page.reload();
+    await expect(
+      page.getByRole("link", { name: "My ranking", exact: true }),
+    ).toBeVisible();
+    await openDetails(page, "Test Alpha Links");
+    await page.locator("#moveTop").click();
+    await expect
+      .poll(() => rankingOrder(page))
+      .toEqual(["Test Alpha Links", "Test Beta Links"]);
+    await page.getByRole("link", { name: "Home", exact: true }).click();
+    await expect(
+      page.getByRole("region", { name: /Top four/ }).getByRole("img").first(),
+    ).toHaveAttribute("aria-label", /^Test Alpha Links/);
+
+    await page.getByRole("button", { name: "Use classic layout" }).click();
+    await expect(
+      page.getByRole("heading", { name: "Where your friends are playing" }),
+    ).toBeVisible();
+    await page.reload();
+    await expect(
+      page.getByRole("link", { name: "Profile", exact: true }),
+    ).toBeVisible();
+    await openRanking(page, owner);
+    await expect
+      .poll(() => rankingOrder(page))
+      .toEqual(["Test Alpha Links", "Test Beta Links"]);
+    await expect(row(page, "Test Alpha Links")).toContainText("2 rounds");
+    expect(await listOrder(db, owner.id)).toEqual([
+      fixtureCourses.alpha.id,
+      fixtureCourses.beta.id,
+    ]);
+    await page.goto("/?log=1");
+    await expect(page.locator("#modal")).toBeVisible();
+    await expect(page).toHaveURL(/\/$/);
+  });
+
+  test("layout changes stay consistent across tabs, including one still loading", async ({
+    page,
+    context,
+  }) => {
+    const { owner } = members();
+    await signInAs(page, owner);
+    const second = await context.newPage();
+    const requested = signal();
+    const release = signal();
+    // Hold a real API response so the initial shell cannot mount its listener
+    // until after the first tab changes the preference.
+    await second.route(
+      "**/v1/me",
+      async (route) => {
+        const response = await route.fetch();
+        requested.resolve();
+        await release.promise;
+        await route.fulfill({ response });
+      },
+      { times: 1 },
+    );
+    const opening = second.goto("/");
+    await requested.promise;
+    await page.getByRole("button", { name: "Try the new layout" }).click();
+    await expect(progressHome(page)).toBeVisible();
+    release.resolve();
+    await opening;
+    await expect(progressHome(second)).toBeVisible();
+    await expect(
+      second.getByRole("link", { name: "My ranking", exact: true }),
+    ).toBeVisible();
+    await second.getByRole("button", { name: "Use classic layout" }).click();
+    await expect(
+      page.getByRole("heading", { name: "Where your friends are playing" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Home", exact: true }),
+    ).toBeVisible();
+    await second.close();
+  });
+});
+
+test("disabled preview keeps Classic even with a saved opt-in", async ({ page }) => {
+  test.skip(previewEnabled, "The layout preview is enabled in this build");
+  test.skip(!authAvailable, "Clerk development instance keys or test users are not configured");
+  const { owner, friend } = members();
+  await resetScenario(db, owner, friend);
+  await page.addInitScript(({ key, value }) => { localStorage.setItem(key, value); }, {
+    key: LAYOUT_PREFERENCE_KEY,
+    value: LayoutMode.CourseFirst,
+  });
+  await signInAs(page, owner);
+  await expect(page.getByRole("heading", { name: "Where your friends are playing" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Home", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Profile", exact: true })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Layout preview" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "My lists", exact: true })).toHaveCount(0);
 });
 
 test.describe("account deletion", () => {
@@ -385,11 +805,12 @@ test.describe("account deletion", () => {
     });
     try {
       await signInAs(page, { id: created.id, username: "e2e_del_" + suffix, displayName: "Leaving", email });
-      await expect(page.locator("#authLabel")).toHaveText("e2e_del_" + suffix);
+      await expectSignedInAs(page, "e2e_del_" + suffix);
       await page.getByRole("link", { name: "Account", exact: true }).click();
       await page.locator("#deleteAccount").click();
       await page.locator("#confirmDeleteAccount").click();
-      await expect(page.locator("#authLabel")).toHaveText("Not signed in");
+      await expect(page.locator("#authOpen")).toHaveText("Sign in");
+      await expect(accountMenuButton(page)).toHaveCount(0);
       await expect
         .poll(async () => (await clerkClient.users.getUserList({ userId: [created.id] })).data.length)
         .toBe(0);

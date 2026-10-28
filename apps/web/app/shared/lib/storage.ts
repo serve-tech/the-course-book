@@ -65,3 +65,6 @@ export const SELECTED_STATE_KEY = "theCourseBookSelectedState";
 
 /** Preference: the Courses tab last shown on this device (a `ListTab` value). */
 export const TOP_LIST_TAB_KEY = "coursebookTopListTab";
+
+/** Preference: the Top list Home tracks, picked on this device (a `topListSlug`, e.g. `usa` or `state-mi`). */
+export const HOME_GOAL_LIST_KEY = "coursebookHomeGoalList";

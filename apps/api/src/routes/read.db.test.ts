@@ -15,8 +15,10 @@ import {
 } from "../contract/schemas";
 import { courseRankings, courses, friendships, users } from "../db/schema";
 import { FriendshipStatus } from "../domain/friendship";
-import { invalidateCatalog } from "../services/catalog";
+import { CLIENT_CLOSED_REQUEST } from "../http/errors";
+import { allCourses, invalidateCatalog } from "../services/catalog";
 import { logRounds } from "../services/journal";
+import { createCourseSearch } from "../services/search";
 import { createTestApp, TEST_CLIENT_CONFIG } from "../test/app";
 import { resetMemberData, testDatabase } from "../test/db";
 
@@ -148,7 +150,7 @@ describe("GET /v1/course-search", () => {
       { course: hit(catalogId, "Arcadia Bluffs"), display: hit(catalogId, "Arcadia Bluffs"), catalogId },
       { course: external, display: external, catalogId: null },
     ]);
-    const result = await t.get("/v1/course-search?q=Arcadia", t.bearer("user_1", "golfer_1"));
+    const result = await t.get("/v1/course-search?q=Arcadia&source=external", t.bearer("user_1", "golfer_1"));
     const body = SearchResultsSchema.parse(result.body);
     expect(body.results.map((r) => [r.courseId, r.course.name])).toEqual([
       [catalogId, "Arcadia Bluffs"],
@@ -157,17 +159,78 @@ describe("GET /v1/course-search", () => {
     expect(body.results[0]?.ranks.state).toBe(3);
   });
 
+  it("finds stored Oakland courses without calling external discovery", async () => {
+    const t = createTestApp(db, { search: { search: () => { throw new Error("Catalog search must not call discovery"); } } });
+    const result = await t.get("/v1/course-search?q=Oakland", t.bearer("user_1", "golfer_1"));
+    expect(result.status).toBe(200);
+    const body = SearchResultsSchema.parse(result.body);
+    const katke = body.results.find((hit) => hit.course.name === "Oakland University: Katke-Cousins");
+    expect(katke?.courseId).toBe("6f977d77-3e2d-4dbd-818e-cd8687de35cd");
+    expect(katke?.ranks.state).toBeGreaterThan(0);
+    expect(body).toMatchObject({ page: 1, pageSize: 10 });
+    expect(body.total).toBeGreaterThan(0);
+  });
+
+  it.each(["page=0", "page=-1", "page=1.5", "page=oops", "page=2147483648", "source=other", "q=%00bad"])("rejects invalid search inputs: %s", async (parameter) => {
+    const t = createTestApp(db);
+    const query = parameter.startsWith("q=") ? parameter : "q=Oakland&" + parameter;
+    const result = await t.get("/v1/course-search?" + query, t.bearer("user_1", "golfer_1"));
+    expect(result.status).toBe(400);
+  });
+
+  it("paginates external results and returns totals on empty later pages", async () => {
+    const t = createTestApp(db);
+    const matches = Array.from({ length: 13 }, (_, index) => {
+      const course = hit(`external-${index}`, `External Course ${index}`);
+      return { course, display: course, catalogId: null };
+    });
+    t.setSearchResults(matches);
+    const headers = t.bearer("user_1", "golfer_1");
+    const first = SearchResultsSchema.parse((await t.get("/v1/course-search?q=External&source=external", headers)).body);
+    const second = SearchResultsSchema.parse((await t.get("/v1/course-search?q=External&source=external&page=2", headers)).body);
+    const last = SearchResultsSchema.parse((await t.get("/v1/course-search?q=External&source=external&page=3", headers)).body);
+    expect(first.results).toHaveLength(10);
+    expect(second.results.map((result) => result.course.name)).toEqual(["External Course 10", "External Course 11", "External Course 12"]);
+    expect(second).toMatchObject({ total: 13, page: 2, pageSize: 10 });
+    expect(last).toEqual({ results: [], total: 13, page: 3, pageSize: 10 });
+  });
+
   it("requires a member", async () => {
     const t = createTestApp(db);
     expect((await t.get("/v1/course-search?q=Arcadia")).status).toBe(401);
   });
 
-  it("reports search_unavailable when discovery fails", async () => {
+  it("reports search_unavailable when discovery fails, and logs it", async () => {
     const t = createTestApp(db);
     t.setSearchResults(new Error("both sources down"));
-    const result = await t.get("/v1/course-search?q=Arcadia", t.bearer("user_1", "golfer_1"));
+    const result = await t.get("/v1/course-search?q=Arcadia&source=external", t.bearer("user_1", "golfer_1"));
     expect(result.status).toBe(503);
     expect(ApiErrorSchema.parse(result.body).error.code).toBe("search_unavailable");
+    expect(t.errors).toHaveLength(1);
+  });
+
+  it("neither reports nor logs a search the client cancelled as a server error", async () => {
+    // @hono/node-server aborts the request of a closed connection with a string, not an Error.
+    const client = new AbortController();
+    const search = createCourseSearch({
+      catalog: () => allCourses(db),
+      apiUrl: "http://opengolf.invalid/v1/courses/search",
+      csvUrl: "http://opengolf.invalid/opengolfapi-us.csv",
+      fetcher: (_input, init) => {
+        client.abort("Client connection prematurely closed.");
+        // Throws the string reason, as fetch rejects with it.
+        init?.signal?.throwIfAborted();
+        return Promise.reject(new Error("the request signal should have been aborted"));
+      },
+    });
+    const t = createTestApp(db, { search });
+    const response = await t.app.request("/v1/course-search?q=Arcadia&source=external", {
+      headers: t.bearer("user_1", "golfer_1"),
+      signal: client.signal,
+    });
+    expect(response.status).toBe(CLIENT_CLOSED_REQUEST);
+    expect(t.errors).toEqual([]);
+    expect(t.requests).toEqual([expect.objectContaining({ path: "/v1/course-search", status: CLIENT_CLOSED_REQUEST })]);
   });
 });
 

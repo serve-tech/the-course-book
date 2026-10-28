@@ -24,6 +24,8 @@ export interface Shell {
   searchFocus: (focused: boolean) => void;
   /** Open the account dialog. */
   openAuth: () => void;
+  /** Open the Log a round dialog over the current page; signed out, open the account dialog. */
+  openLog: () => void;
 }
 
 export function useShell(): Shell {

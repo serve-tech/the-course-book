@@ -21,13 +21,17 @@ export function registerAccountRoutes(app: OpenAPIHono<AppEnv>, deps: AppDepende
    * failed, the data would remain with no account left to retry from. A
    * retry after a Clerk failure finds the tombstone (`account_deleted`) and
    * goes straight to Clerk.
+   *
+   * Deletion keys on the session's Clerk id (`users.id`) and never
+   * provisions: a member whose Clerk username breaks the product rule gets
+   * 403 `username_invalid` from provisioning, and must still be able to
+   * delete their account.
    */
   app.openapi(guarded(deleteMe), async (c) => {
     const session = c.get("session");
     if (!session) throw new AppError(401, ErrorCode.Unauthenticated, "Sign in to continue.");
     try {
-      const user = await requireUser(c, deps.provisioner);
-      await deleteAccountData(deps.db, user.id);
+      await deleteAccountData(deps.db, session.clerkId);
     } catch (error) {
       if (!(error instanceof AppError && error.code === ErrorCode.AccountDeleted)) throw error;
     }

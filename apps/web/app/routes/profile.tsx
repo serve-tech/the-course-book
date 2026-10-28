@@ -13,7 +13,7 @@ import { RouteError } from "../shared/ui/RouteError";
 import { useShell } from "../shared/ui/shell";
 
 export const meta: Route.MetaFunction = ({ loaderData: loaded }) => [
-  { title: (loaded?.signedIn ? displayName(loaded.profile.member) : "Profile") + " · coursebook.golf" },
+  { title: (loaded?.signedIn ? displayName(loaded.profile.member) : "Profile") + " · The Course Book" },
 ];
 
 /** Shown for a member the viewer may not see; the API does not say which case it is. */
@@ -71,7 +71,7 @@ export default function ProfileRoute({ loaderData }: Route.ComponentProps) {
     );
   return (
     <div className={profileStyles.page}>
-      <ProfileHeader profile={loaderData.profile} notify={shell.notify} />
+      <ProfileHeader profile={loaderData.profile} notify={shell.notify} onLog={shell.openLog} />
       <Outlet context={shell} />
     </div>
   );

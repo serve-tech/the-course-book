@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   extractCourses,
+  extractCoursePage,
   matchesQuery,
   parseAPICourse,
   parseCSV,
@@ -20,6 +21,14 @@ describe("OpenGolfAPI parsing", () => {
 
   it("returns no courses for an unknown envelope", () => {
     expect(extractCourses({ meta: {} })).toEqual([]);
+  });
+
+  it("parses upstream pagination totals while supporting older response envelopes", () => {
+    expect(extractCoursePage({ courses: [{ name: "A" }], total: 55 })).toEqual({ courses: [{ name: "A" }], total: 55 });
+    expect(extractCoursePage([{ name: "A" }])).toEqual({ courses: [{ name: "A" }], total: null });
+    expect(extractCoursePage({ courses: [] })).toEqual({ courses: [], total: null });
+    expect(() => extractCoursePage({ courses: [], total: -1 })).toThrow();
+    expect(() => extractCoursePage({ courses: [], total: "55" })).toThrow();
   });
 
   it("parses quoted CSV fields, doubled quotes and CRLF endings", () => {

@@ -6,6 +6,7 @@ import {
   ProfileRelationship,
   type FeedItem,
   type Profile,
+  type TimelineMonthCount,
   type TimelineRound,
   type TopListDetail,
   type TopListStanding,
@@ -98,6 +99,10 @@ export function fromMemberList(list: ApiSchemas["MemberList"]): MemberList {
 
 export function fromTimelineRound(round: ApiSchemas["TimelineRound"]): TimelineRound {
   return { id: round.id, course: fromApiCourse(round.course), playedOn: round.playedOn, visit: round.visit, rank: round.rank };
+}
+
+export function fromTimelineMonth(count: ApiSchemas["TimelineMonth"]): TimelineMonthCount {
+  return { month: count.month, rounds: count.rounds };
 }
 
 /** Relationship values this client knows; anything newer reads as a friend's profile. */

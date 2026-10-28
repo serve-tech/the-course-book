@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import type { TimelineRound } from "@coursebook/domain/social/types";
+import type { TimelineMonthCount, TimelineRound } from "@coursebook/domain/social/types";
 import { api, unwrap } from "../../lib/api";
-import { fromTimelineRound } from "../../lib/api/mappers";
+import { fromTimelineMonth, fromTimelineRound } from "../../lib/api/mappers";
 import { apiFailureMessage } from "../../shared/lib/errors";
 import { TrashIcon } from "../top-lists/icons";
 import { RankPills } from "../top-lists/RankPills";
@@ -17,8 +17,10 @@ const PAGE_SIZE = 20;
 /**
  * A member's rounds, newest played first, grouped by month like
  * Letterboxd's diary. The first page comes from the route loader; "Show
- * more" asks the API for the next page with the cursor it returned. Key it
- * by the first page (`timelineKey`) so a new first page starts over.
+ * more" asks the API for the next page with the cursor it returned. Each
+ * month header shows the month's full count from the API, even while some
+ * of its rounds are on a page not loaded yet. Key it by the first page
+ * (`timelineKey`) so a new first page starts over.
  *
  * @param username - Whose timeline.
  * @param first - The first page from the loader.
@@ -36,13 +38,13 @@ export function TimelineView({
   deleting = null,
 }: {
   username: string;
-  first: { rounds: readonly TimelineRound[]; nextCursor: string | null };
+  first: { rounds: readonly TimelineRound[]; nextCursor: string | null; months: readonly TimelineMonthCount[] };
   self: boolean;
   name: string;
   onDelete?: ((round: TimelineRound) => void) | undefined;
   deleting?: string | null;
 }) {
-  const [more, setMore] = useState<{ rounds: TimelineRound[]; cursor: string | null } | null>(null);
+  const [more, setMore] = useState<{ rounds: TimelineRound[]; months: TimelineMonthCount[]; cursor: string | null } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inFlight = useRef<AbortController | null>(null);
@@ -52,6 +54,7 @@ export function TimelineView({
   useEffect(() => () => inFlight.current?.abort(), []);
 
   const rounds = more ? [...first.rounds, ...more.rounds] : first.rounds;
+  const months = more ? [...first.months, ...more.months] : first.months;
   const cursor = more ? more.cursor : first.nextCursor;
 
   const loadMore = () => {
@@ -69,7 +72,11 @@ export function TimelineView({
       .then(
         (page) => {
           if (controller.signal.aborted) return;
-          setMore((current) => ({ rounds: [...(current?.rounds ?? []), ...page.rounds.map(fromTimelineRound)], cursor: page.nextCursor }));
+          setMore((current) => ({
+            rounds: [...(current?.rounds ?? []), ...page.rounds.map(fromTimelineRound)],
+            months: [...(current?.months ?? []), ...page.months.map(fromTimelineMonth)],
+            cursor: page.nextCursor,
+          }));
           setLoading(false);
         },
         (failure: unknown) => {
@@ -91,12 +98,12 @@ export function TimelineView({
 
   return (
     <div>
-      {groupByMonth(rounds).map((month) => (
-        <div key={month.key}>
+      {groupByMonth(rounds, months).map((month) => (
+        <div key={month.key} data-month={month.key}>
           <h3 className={profileStyles.month}>
             {month.label}
             <small>
-              {month.rounds.length} {month.rounds.length === 1 ? "round" : "rounds"}
+              {month.total} {month.total === 1 ? "round" : "rounds"}
             </small>
           </h3>
           {month.rounds.map((round) => (

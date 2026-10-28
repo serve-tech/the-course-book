@@ -109,7 +109,7 @@ export const STATE_WITHOUT_SCOPE = "state";
 
 /**
  * Which list the Courses page shows. A list named in the URL wins when it is
- * published (or the bare `state`, which asks for a state); otherwise the
+ * published (or the bare `state`, which uses the chosen state); otherwise the
  * tab remembered on this device, with `state` for Best in State.
  *
  * Args:
@@ -123,7 +123,7 @@ export function chooseList(options: {
   state: string;
   lists: readonly TopListRef[];
 }): { tab: ListTab; list: TopListRef | null } {
-  if (options.requested === STATE_WITHOUT_SCOPE) return { tab: ListTab.State, list: null };
+  if (options.requested === STATE_WITHOUT_SCOPE) return { tab: ListTab.State, list: tabList(ListTab.State, options.state) };
   const named = options.requested ? findList(options.requested, options.lists) : null;
   const namedTab = named ? listTab(named) : null;
   if (named && namedTab) return { tab: namedTab, list: named };

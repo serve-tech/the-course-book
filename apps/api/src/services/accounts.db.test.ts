@@ -7,6 +7,7 @@ import { deleteAccountData } from "./accounts";
 import { ErrorCode } from "./errors";
 import { memberPage } from "./friends";
 import { addCourseByDetails, logRounds, moveCourse } from "./journal";
+import { provisionUser } from "./provisioning";
 import { addWantToPlay } from "./want-to-play";
 
 const { db, pool } = testDatabase();
@@ -65,9 +66,22 @@ describe("account deletion", () => {
     expect(await db.select().from(userCourses).where(eq(userCourses.userId, USER))).toHaveLength(0);
   });
 
-  it("rejects deleting an account twice", async () => {
+  it("rejects deleting an account twice and leaves the tombstone as it was", async () => {
     await deleteAccountData(db, USER);
+    const [first] = await db.select().from(users).where(eq(users.id, USER));
     await expect(deleteAccountData(db, USER)).rejects.toMatchObject({ code: ErrorCode.AccountDeleted });
+    const [second] = await db.select().from(users).where(eq(users.id, USER));
+    expect(second).toEqual(first);
+  });
+
+  it("tombstones a member who was never provisioned, so a live token cannot provision them", async () => {
+    await deleteAccountData(db, "user_never_seen");
+    const [row] = await db.select().from(users).where(eq(users.id, "user_never_seen"));
+    expect(row).toMatchObject({ displayName: "Deleted member", email: null });
+    expect(row?.username).toMatch(/^deleted_[0-9a-f]{16}$/);
+    expect(row?.deletedAt).not.toBeNull();
+    const identity = { username: "late_token", displayName: "Late", email: "late@example.com", avatarUrl: null };
+    await expect(provisionUser(db, "user_never_seen", identity)).rejects.toMatchObject({ status: 401, code: ErrorCode.AccountDeleted });
   });
 
   it("serializes with a concurrent list change", async () => {

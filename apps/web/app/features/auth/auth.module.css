@@ -1,0 +1,9 @@
+/*
+ * Full-page sign-in and sign-up (/sign-in, /sign-up): Clerk's card has a fixed
+ * width, so it is centered in the content column instead of hugging its left
+ * edge. The dialog styles its card separately (AuthDialog's FILL_DIALOG).
+ */
+.page {
+  display: flex;
+  justify-content: center;
+}

@@ -51,7 +51,7 @@
         "properties": {
           "code": {
             "type": "string",
-            "description": "Stable machine-readable code. Current values: bad_request, validation_failed, us_state_required, unauthenticated, account_deleted, username_invalid, not_found, course_not_found, not_on_list, round_not_found, member_not_found, friendship_not_found, top_list_not_found, payload_too_large, unsupported_media_type, account_deletion_incomplete, search_unavailable, internal. New codes may appear; treat unknown codes by HTTP status.",
+            "description": "Stable machine-readable code. Current values: bad_request, validation_failed, us_state_required, unauthenticated, account_deleted, username_invalid, username_taken, not_found, course_not_found, not_on_list, round_not_found, member_not_found, friendship_not_found, top_list_not_found, payload_too_large, unsupported_media_type, account_deletion_incomplete, search_unavailable, internal. New codes may appear; treat unknown codes by HTTP status.",
             "example": "not_on_list"
           },
           "message": {
@@ -591,11 +591,29 @@
             "items": {
               "$ref": "#/components/schemas/SearchHit"
             },
-            "description": "At most 10, best match first."
+            "description": "At most 10, ordered alphabetically by course name, then location and id."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The requested page, starting at 1."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Results per page (10)."
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Total matching courses after catalog resolution and deduplication."
           }
         },
         "required": [
-          "results"
+          "results",
+          "page",
+          "pageSize",
+          "total"
         ]
       },
       "SearchHit": {
@@ -889,11 +907,19 @@
             "type": "string",
             "nullable": true,
             "description": "Pass as `cursor` for the next page; null on the last page."
+          },
+          "months": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TimelineMonth"
+            },
+            "description": "Full round counts for every month with a round on this page, so a month split across pages shows its total from the first page. Newest month first; undated last."
           }
         },
         "required": [
           "rounds",
-          "nextCursor"
+          "nextCursor",
+          "months"
         ]
       },
       "TimelineRound": {
@@ -929,6 +955,27 @@
           "playedOn",
           "visit",
           "rank"
+        ]
+      },
+      "TimelineMonth": {
+        "type": "object",
+        "properties": {
+          "month": {
+            "type": "string",
+            "nullable": true,
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+            "description": "Year and month as YYYY-MM; null for the member's rounds without a date.",
+            "example": "2026-09"
+          },
+          "rounds": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Every round the member logged in that month, including rounds on other pages."
+          }
+        },
+        "required": [
+          "month",
+          "rounds"
         ]
       },
       "MemberSearchResults": {
@@ -1307,6 +1354,16 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Another member holds the Clerk account's username: `username_taken`. Choose a different username.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
           }
         }
       },
@@ -1316,7 +1373,7 @@
           "Account"
         ],
         "summary": "Delete the member's account",
-        "description": "Deletes the member's list and rounds, removes their name and email, and deletes the sign-in account. Courses they added stay in the shared catalog. Safe to retry: after a 502, call it again with the same token.",
+        "description": "Deletes the member's list and rounds, removes their name and email, and deletes the sign-in account. Courses they added stay in the shared catalog. Safe to retry: after a 502, call it again with the same token. Works even for an account that other operations refuse with 403 `username_invalid` or 409 `username_taken`.",
         "security": [
           {
             "ClerkSession": []
@@ -1337,7 +1394,7 @@
             }
           },
           "403": {
-            "description": "The Clerk account cannot use the app: `username_invalid`.",
+            "description": "Not returned since account deletion stopped provisioning the member; kept so existing clients still compile.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1394,6 +1451,16 @@
           },
           "403": {
             "description": "The Clerk account cannot use the app: `username_invalid`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Another member holds the Clerk account's username: `username_taken`. Choose a different username.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1466,6 +1533,16 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Another member holds the Clerk account's username: `username_taken`. Choose a different username.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
           }
         }
       }
@@ -1527,6 +1604,16 @@
           },
           "403": {
             "description": "The Clerk account cannot use the app: `username_invalid`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Another member holds the Clerk account's username: `username_taken`. Choose a different username.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1613,6 +1700,16 @@
           },
           "404": {
             "description": "No such catalog course: `course_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Another member holds the Clerk account's username: `username_taken`. Choose a different username.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1708,6 +1805,16 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Another member holds the Clerk account's username: `username_taken`. Choose a different username.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
           }
         }
       },
@@ -1777,6 +1884,16 @@
           },
           "404": {
             "description": "The course is not on the list: `not_on_list`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Another member holds the Clerk account's username: `username_taken`. Choose a different username.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1872,6 +1989,16 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Another member holds the Clerk account's username: `username_taken`. Choose a different username.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
           }
         }
       }
@@ -1960,6 +2087,16 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Another member holds the Clerk account's username: `username_taken`. Choose a different username.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
           }
         }
       }
@@ -2038,6 +2175,16 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Another member holds the Clerk account's username: `username_taken`. Choose a different username.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
           }
         }
       }
@@ -2075,13 +2222,42 @@
           "Catalog"
         ],
         "summary": "Find courses by name",
-        "description": "Catalog courses carry their id; other hits carry details to send back when adding the course.",
+        "description": "Searches stored courses by default. Use source=external to explicitly search beyond the catalog. Catalog courses carry their id; other hits carry details to send back when adding the course.",
         "security": [
           {
             "ClerkSession": []
           }
         ],
         "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "nullable": true,
+              "enum": [
+                "catalog",
+                "external",
+                null
+              ],
+              "description": "Defaults to catalog (stored courses only). Request external explicitly to discover courses beyond the catalog."
+            },
+            "required": false,
+            "description": "Defaults to catalog (stored courses only). Request external explicitly to discover courses beyond the catalog.",
+            "name": "source",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "nullable": true,
+              "minimum": 1,
+              "maximum": 2147483647,
+              "description": "Page number, starting at 1. Defaults to 1; each page contains at most 10 hits."
+            },
+            "required": false,
+            "description": "Page number, starting at 1. Defaults to 1; each page contains at most 10 hits.",
+            "name": "page",
+            "in": "query"
+          },
           {
             "schema": {
               "type": "string",
@@ -2096,7 +2272,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Up to ten hits, best first.",
+            "description": "An alphabetical page of up to ten hits with the total match count.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2127,6 +2303,16 @@
           },
           "403": {
             "description": "The Clerk account cannot use the app: `username_invalid`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Another member holds the Clerk account's username: `username_taken`. Choose a different username.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2225,6 +2411,16 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Another member holds the Clerk account's username: `username_taken`. Choose a different username.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
           }
         }
       }
@@ -2293,6 +2489,16 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Another member holds the Clerk account's username: `username_taken`. Choose a different username.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
           }
         }
       }
@@ -2354,6 +2560,16 @@
           },
           "404": {
             "description": "No such member, or not a friend: `member_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Another member holds the Clerk account's username: `username_taken`. Choose a different username.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2464,6 +2680,16 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Another member holds the Clerk account's username: `username_taken`. Choose a different username.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
           }
         }
       }
@@ -2535,6 +2761,16 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Another member holds the Clerk account's username: `username_taken`. Choose a different username.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
           }
         }
       }
@@ -2574,6 +2810,16 @@
           },
           "403": {
             "description": "The Clerk account cannot use the app: `username_invalid`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Another member holds the Clerk account's username: `username_taken`. Choose a different username.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2659,6 +2905,16 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Another member holds the Clerk account's username: `username_taken`. Choose a different username.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
           }
         }
       },
@@ -2710,6 +2966,16 @@
           },
           "404": {
             "description": "No such member: `member_not_found`; nothing between the two: `friendship_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Another member holds the Clerk account's username: `username_taken`. Choose a different username.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2778,6 +3044,16 @@
           },
           "404": {
             "description": "No such member, or not a friend: `member_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Another member holds the Clerk account's username: `username_taken`. Choose a different username.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2863,6 +3139,16 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Another member holds the Clerk account's username: `username_taken`. Choose a different username.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
           }
         }
       },
@@ -2929,6 +3215,16 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Another member holds the Clerk account's username: `username_taken`. Choose a different username.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
           }
         }
       }
@@ -2968,6 +3264,16 @@
           },
           "403": {
             "description": "The Clerk account cannot use the app: `username_invalid`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Another member holds the Clerk account's username: `username_taken`. Choose a different username.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3052,6 +3358,16 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Another member holds the Clerk account's username: `username_taken`. Choose a different username.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
           }
         }
       }
@@ -3129,6 +3445,16 @@
           },
           "403": {
             "description": "The Clerk account cannot use the app: `username_invalid`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Another member holds the Clerk account's username: `username_taken`. Choose a different username.",
             "content": {
               "application/json": {
                 "schema": {

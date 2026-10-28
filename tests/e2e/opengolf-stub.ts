@@ -23,6 +23,12 @@ const courses: StubCourse[] = [
   { id: "0e5f1c2a-7b1d-4c55-9a51-000000000004", name: "Fallback Test Links", city: "Detroit", state: "MI", country: "USA" },
 ];
 
+courses.push(...Array.from({ length: 13 }, (_, index) => ({
+  id: `cccccccc-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
+  name: `External Pagination ${String(13 - index).padStart(2, "0")}`,
+  city: "Rochester", state: "MI", country: "USA",
+})));
+
 const csv = () =>
   ["id,name,city,state,country"]
     .concat(courses.map((c) => [c.id, c.name, c.city, c.state, c.country].join(",")))
@@ -46,7 +52,9 @@ createServer((request, response) => {
     }
     const matches = courses.filter((course) => course.name.toLowerCase().includes(query));
     response.writeHead(200, { "content-type": "application/json" });
-    response.end(JSON.stringify({ courses: matches }));
+    const offset = Number(url.searchParams.get("offset") ?? 0);
+    const limit = Number(url.searchParams.get("limit") ?? 50);
+    response.end(JSON.stringify({ courses: matches.slice(offset, offset + limit), total: matches.length }));
     return;
   }
   if (url.pathname === "/opengolfapi-us.csv") {

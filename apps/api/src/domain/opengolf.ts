@@ -39,6 +39,12 @@ export function extractCourses(value: unknown): RawCourse[] {
   return z.array(rawSchema).parse(candidates.find(Array.isArray) ?? []);
 }
 
+/** The upstream total counts all matches, before its limit/offset pagination. */
+export function extractCoursePage(value: unknown): { courses: RawCourse[]; total: number | null } {
+  const metadata = z.object({ total: z.number().int().nonnegative().nullish() });
+  return { courses: extractCourses(value), total: Array.isArray(value) ? null : metadata.parse(value).total ?? null };
+}
+
 /**
  * Parse an RFC 4180 style CSV document into records keyed by the header row.
  * Handles quoted fields, doubled-quote escapes and CRLF line endings; blank

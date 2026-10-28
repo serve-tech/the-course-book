@@ -8,8 +8,34 @@ export interface VerifiedSession {
   claims: Record<string, unknown>;
 }
 
-/** Verifies the bearer token on a request; null when it is not acceptable. */
-export type SessionVerifier = (request: Request) => Promise<VerifiedSession | null>;
+/** Reasons the API adds to Clerk's own when it rejects a token. */
+export enum SessionRejection {
+  /** The Authorization header is not `Bearer <token>`; Clerk is not called. */
+  NotBearer = "not-bearer",
+  /** Clerk verified the token, but its session is pending or names no user. */
+  NoActiveSession = "no-active-session",
+  /** The token's `azp` is not one of the web origins (`isAuthorizedParty`). */
+  UnauthorizedParty = "unauthorized-party",
+}
+
+/**
+ * The outcome of verifying a request's token.
+ *
+ * A rejection carries its reason and, only when the `azp` claim was the
+ * reason, that claim. The reason is a `SessionRejection` or Clerk's reason
+ * (`token-invalid-signature`, `jwk-kid-mismatch`, …). Clerk declares its
+ * reasons as literal unions but composes values outside them, e.g.
+ * `session-token-expired-refresh-non-eligible-no-refresh-cookie` for an
+ * expired token, so `reason` is typed as the string it really is. A
+ * rejection never carries the token, other claims or Clerk's message, which
+ * can quote claim values.
+ */
+export type SessionVerification =
+  | { ok: true; session: VerifiedSession }
+  | { ok: false; reason: string; azp?: unknown };
+
+/** Verifies the bearer token on a request. */
+export type SessionVerifier = (request: Request) => Promise<SessionVerification>;
 
 export interface ClerkVerifierOptions {
   secretKey: string;
@@ -32,8 +58,10 @@ export interface ClerkVerifierOptions {
  * native tokens without `azp` are accepted.
  *
  * Note:
- *     Call it only when an Authorization header is present. Without one,
- *     Clerk follows its cookie flow, which a bearer-only API never wants.
+ *     Call it only for an `Authorization: Bearer <token>` header
+ *     (`isBearerHeader`). Otherwise Clerk takes a bare value as a token and
+ *     follows its cookie flow for anything else, which a bearer-only API
+ *     never wants.
  */
 export function createClerkSessionVerifier(options: ClerkVerifierOptions): SessionVerifier {
   const clerk = createClerkClient({
@@ -46,12 +74,13 @@ export function createClerkSessionVerifier(options: ClerkVerifierOptions): Sessi
       acceptsToken: "session_token",
       ...(options.jwtKey ? { jwtKey: options.jwtKey } : {}),
     });
-    if (!state.isAuthenticated) return null;
+    if (!state.isAuthenticated) return { ok: false, reason: state.reason };
     // Typed as signed in, but a pending session (sts: "pending") yields a
     // signed-out object because treatPendingAsSignedOut defaults to true.
     const auth: SignedInAuthObject | SignedOutAuthObject = state.toAuth();
-    if (!auth.userId) return null;
-    if (!isAuthorizedParty(auth.sessionClaims["azp"], options.webOrigins)) return null;
-    return { clerkId: auth.userId, claims: auth.sessionClaims };
+    if (!auth.userId) return { ok: false, reason: SessionRejection.NoActiveSession };
+    const azp = auth.sessionClaims["azp"];
+    if (!isAuthorizedParty(azp, options.webOrigins)) return { ok: false, reason: SessionRejection.UnauthorizedParty, azp };
+    return { ok: true, session: { clerkId: auth.userId, claims: auth.sessionClaims } };
   };
 }

@@ -64,6 +64,16 @@ export interface TimelineRound {
   rank: number;
 }
 
+/**
+ * How many rounds a member logged in one month of their timeline, counted
+ * over all their rounds, so a month split across pages shows its full total.
+ */
+export interface TimelineMonthCount {
+  /** "YYYY-MM"; null for the member's rounds without a date. */
+  month: string | null;
+  rounds: number;
+}
+
 /** What a feed item reports. */
 export enum FeedItemType {
   /** A friend logged a round. */

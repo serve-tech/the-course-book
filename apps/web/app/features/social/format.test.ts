@@ -74,20 +74,38 @@ describe("dates", () => {
     expect(dayOfMonth(null)).toBe("–");
   });
 
-  it("groups consecutive rounds by month, undated last", () => {
-    const groups = groupByMonth([
-      round("a", "2026-09-27"),
-      round("b", "2026-09-02"),
-      round("c", "2026-08-30"),
-      round("d", "2015-08-01"),
-      round("e", null),
+  it("groups consecutive rounds by month, undated last, with the API's totals", () => {
+    const groups = groupByMonth(
+      [round("a", "2026-09-27"), round("b", "2026-09-02"), round("c", "2026-08-30"), round("d", "2015-08-01"), round("e", null)],
+      [
+        { month: "2026-09", rounds: 2 },
+        { month: "2026-08", rounds: 1 },
+        { month: "2015-08", rounds: 1 },
+        { month: null, rounds: 1 },
+      ],
+    );
+    expect(groups.map((group) => [group.label, group.rounds.map((r) => r.id), group.total])).toEqual([
+      ["September 2026", ["a", "b"], 2],
+      ["August 2026", ["c"], 1],
+      ["August 2015", ["d"], 1],
+      ["Date not recorded", ["e"], 1],
     ]);
-    expect(groups.map((group) => [group.label, group.rounds.map((r) => r.id)])).toEqual([
-      ["September 2026", ["a", "b"]],
-      ["August 2026", ["c"]],
-      ["August 2015", ["d"]],
-      ["Date not recorded", ["e"]],
+  });
+
+  it("shows a month's full total when a page cuts it off", () => {
+    // The first page ends two rounds into a five-round September.
+    const groups = groupByMonth([round("a", "2026-10-01"), round("b", "2026-09-20"), round("c", "2026-09-10")], [
+      { month: "2026-10", rounds: 1 },
+      { month: "2026-09", rounds: 5 },
     ]);
+    expect(groups.map((group) => [group.key, group.rounds.length, group.total])).toEqual([
+      ["2026-10", 1, 1],
+      ["2026-09", 2, 5],
+    ]);
+  });
+
+  it("counts the rounds loaded for a month the API sent no total for", () => {
+    expect(groupByMonth([round("a", "2026-09-27"), round("b", "2026-09-02")], []).map((group) => group.total)).toEqual([2]);
   });
 });
 

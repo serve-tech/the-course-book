@@ -1,13 +1,14 @@
-import { useEffect, useRef, useState } from "react";
-import { Link, NavLink, useNavigate } from "react-router";
+import { useCallback, useRef, useState } from "react";
+import { NavLink, useNavigate } from "react-router";
 import { ProfileRelationship, type Profile } from "@coursebook/domain/social/types";
 import { cx } from "../../shared/lib/cx";
 import { useActionFetcher } from "../../shared/lib/use-action-fetcher";
+import { useDismiss } from "../../shared/lib/use-dismiss";
 import type { FriendReply } from "../../routes/friends";
 import { replyMessage } from "../journal/use-journal-fetcher";
 import { FriendIntent, UnfriendReason } from "../friends/friend-actions";
 import { Avatar } from "./Avatar";
-import { displayName, logPath, profilePath } from "./paths";
+import { displayName, profilePath } from "./paths";
 import { AvatarSize } from "./sizes";
 import { monthLabel } from "./format";
 import profileStyles from "./profile.module.css";
@@ -20,8 +21,9 @@ import styles from "./social.module.css";
  *
  * @param profile - Whose profile.
  * @param notify - Shows a toast.
+ * @param onLog - Opens the Log a round dialog over the profile.
  */
-export function ProfileHeader({ profile, notify }: { profile: Profile; notify: (message: string) => void }) {
+export function ProfileHeader({ profile, notify, onLog }: { profile: Profile; notify: (message: string) => void; onLog: () => void }) {
   const self = profile.relationship === ProfileRelationship.Self;
   const name = displayName(profile.member);
   const { stats } = profile;
@@ -40,9 +42,9 @@ export function ProfileHeader({ profile, notify }: { profile: Profile; notify: (
           </div>
           <div className={profileStyles.heroActions}>
             {self ? (
-              <Link className={[styles.button, styles.buttonSolid].join(" ")} to={logPath(profile.member.username)}>
+              <button type="button" className={[styles.button, styles.buttonSolid].join(" ")} onClick={onLog}>
                 + Log a round
-              </Link>
+              </button>
             ) : (
               <FriendMenu username={profile.member.username} name={name} notify={notify} />
             )}
@@ -99,21 +101,11 @@ function FriendMenu({ username, name, notify }: { username: string; name: string
     if (!reply.error) void navigate("/friends", { replace: true });
   });
 
-  useEffect(() => {
-    if (!open) return;
-    const close = (event: Event) => {
-      if (event instanceof KeyboardEvent ? event.key === "Escape" : !wrap.current?.contains(event.target as Node)) {
-        setOpen(false);
-        setConfirming(false);
-      }
-    };
-    document.addEventListener("pointerdown", close);
-    document.addEventListener("keydown", close);
-    return () => {
-      document.removeEventListener("pointerdown", close);
-      document.removeEventListener("keydown", close);
-    };
-  }, [open]);
+  const close = useCallback(() => {
+    setOpen(false);
+    setConfirming(false);
+  }, []);
+  useDismiss(open, wrap, close);
 
   return (
     <div className={profileStyles.menuWrap} ref={wrap}>

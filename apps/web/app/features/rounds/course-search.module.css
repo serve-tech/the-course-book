@@ -1,0 +1,34 @@
+.pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding-top: 12px;
+}
+
+.summary {
+  flex: 1 0 100%;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.discovery {
+  margin-top: 14px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.discovery p {
+  margin: 0 0 8px;
+}
+
+.pagination button,
+.discovery button {
+  min-height: 44px;
+}
+
+.pagination button:disabled,
+.discovery button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
