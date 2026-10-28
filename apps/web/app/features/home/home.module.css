@@ -1,11 +1,12 @@
 /*
  * Home (course-first preview): one focal point, the member's progress on the
- * list Home tracks, holding the page's only solid gold action; then their
- * lists (a strip of quiet cards that pick the tracked list), Up next on that
+ * list Home tracks, holding the page's only solid gold action. The card opens
+ * with the member's lists as raised toggle buttons that pick the list it
+ * tracks, so the control sits above what it changes. Then Up next on that
  * list, friends' rounds from the member's side and their top four. Gold stays
- * on the hero and the tracked card so nothing else competes with it (decision
- * 2026-10-27). Two columns below the strip from 900 px; one column, with a
- * scrolling strip, on phones.
+ * on the hero so nothing else competes with it (decision 2026-10-27). Two
+ * columns below the hero from 900 px; one column, with a dropdown in place
+ * of the list buttons, on phones.
  */
 
 /* minmax(0, 1fr): without it the phone's sideways list strip widens the whole page to its scroll width. */
@@ -17,15 +18,19 @@
 
 .hero {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: end;
-  gap: 22px 40px;
-  padding: 28px 30px 26px;
+  gap: 22px;
+  padding: 22px 30px 26px;
   border: 1px solid rgba(199, 170, 107, 0.32);
   border-radius: 16px;
   background:
     linear-gradient(135deg, rgba(199, 170, 107, 0.13), rgba(199, 170, 107, 0.02) 60%),
     var(--panel);
+}
+.progress {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 22px 40px;
 }
 .goal {
   display: grid;
@@ -104,70 +109,131 @@
   transition: opacity 0.15s;
 }
 
-/* Your lists: one card per list; the tracked one is pressed. */
-.choices {
+/* The list picker: solid, raised buttons with a radio mark; the tracked one is pressed. */
+.picker {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 10px;
+  gap: 12px;
+  min-width: 0;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--line);
+}
+.pickerHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+  color: var(--gold);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+.pickerHead a {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-decoration: none;
+  text-transform: none;
+}
+.pickerHead a:hover {
+  color: var(--cream);
+}
+.choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 .choice {
-  display: grid;
-  gap: 6px;
-  min-width: 0;
-  padding: 12px 14px 14px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.02);
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 40px;
+  padding: 8px 14px 8px 11px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 10px;
+  background: #1a3828;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 2px 6px rgba(0, 0, 0, 0.3);
   color: var(--cream);
   font: inherit;
   text-align: left;
   cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
 }
 .choice:hover {
-  border-color: rgba(199, 170, 107, 0.45);
+  border-color: rgba(199, 170, 107, 0.55);
+  background: #214632;
+}
+.choice:active {
+  transform: translateY(1px);
 }
 .choice:focus-visible {
   outline: 2px solid var(--gold);
   outline-offset: 2px;
 }
 .choice[aria-pressed="true"] {
-  border-color: rgba(199, 170, 107, 0.6);
-  background: rgba(199, 170, 107, 0.07);
+  border-color: var(--gold);
+  background: #353d26;
   cursor: default;
+  transform: none;
+}
+.radio {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--muted);
+  border-radius: 50%;
+}
+.choice[aria-pressed="true"] .radio {
+  border-color: var(--gold);
+  background: radial-gradient(circle, var(--gold) 0 3px, transparent 3.5px);
 }
 .choiceTitle {
-  overflow: hidden;
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 600;
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 .choiceCount {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 12.5px;
   font-variant-numeric: tabular-nums;
 }
 .choiceCount b {
   color: var(--cream);
-  font:
-    600 20px "Playfair Display",
-    Georgia,
-    serif;
+  font-weight: 700;
 }
-.choiceBar {
-  height: 4px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
+/* Phones get a dropdown instead of the buttons (see the media query below). */
+.choiceSelect {
+  display: none;
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 40px 10px 14px;
+  border: 1px solid rgba(199, 170, 107, 0.6);
+  border-radius: 10px;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23c7aa6b' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")
+      right 14px center / 18px no-repeat,
+    #1a3828;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 2px 6px rgba(0, 0, 0, 0.3);
+  color: var(--cream);
+  font: 600 15px "DM Sans", Arial, sans-serif;
+  appearance: none;
+  cursor: pointer;
 }
-.choiceBar span {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: var(--muted);
+.choiceSelect:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
 }
-.choice[aria-pressed="true"] .choiceBar span {
-  background: var(--gold);
+.choiceSelect option {
+  background: var(--panel);
+  color: var(--cream);
 }
 
 .columns {
@@ -272,26 +338,19 @@
     gap: 28px;
   }
   .hero {
+    padding: 18px;
+  }
+  .progress {
     grid-template-columns: minmax(0, 1fr);
-    padding: 20px 18px 18px;
   }
   .goalTitle {
     font-size: 21px;
   }
-  /* Five cards do not fit across a phone: scroll them sideways instead of stacking. */
+  /* Five buttons do not fit across a phone, and a sideways-scrolling row hid most of them: use the dropdown. */
   .choices {
-    grid-template-columns: none;
-    grid-auto-columns: 148px;
-    grid-auto-flow: column;
-    overflow-x: auto;
-    margin: 0 -16px;
-    padding: 2px 16px 6px;
-    scroll-padding-inline: 16px;
-    scroll-snap-type: x proximity;
-    scrollbar-color: var(--line) transparent;
-    scrollbar-width: thin;
+    display: none;
   }
-  .choice {
-    scroll-snap-align: start;
+  .choiceSelect {
+    display: block;
   }
 }

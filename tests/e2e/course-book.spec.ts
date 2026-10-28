@@ -238,7 +238,7 @@ test.describe("signed in", () => {
     await expect(progressHome(page)).toBeVisible();
     await expect(page.getByRole("link", { name: "Home", exact: true })).toHaveAttribute("aria-current", "page");
     const hero = page.getByRole("region", { name: "Best in Michigan", exact: true });
-    await expect(hero).toContainText("Your home state");
+    await expect(hero.getByRole("group", { name: "Your lists" })).toBeVisible();
     await expect(hero.getByRole("progressbar", { name: "Best in Michigan played" })).toHaveAttribute("aria-valuenow", "1");
     await expect(hero).toContainText(friend.displayName + " has played 1.");
     const friends = page.getByRole("region", { name: /From your friends/ });
@@ -282,7 +282,7 @@ test.describe("signed in", () => {
     await expect(progressHome(page)).toBeVisible();
   });
 
-  test("Home's Up next saves Want to play and logs, and members can track another list", async ({ page }) => {
+  test("Home's Up next saves Want to play and logs, and members can track another list", async ({ page }, testInfo) => {
     test.skip(!previewEnabled, "The layout preview is disabled in this build");
     const { owner, friend } = members();
     const [crystalDowns, oaklandHills, dunesClub] = [
@@ -319,17 +319,27 @@ test.describe("signed in", () => {
     expect(await roundDates(db, owner.id, oaklandHills)).toEqual(["2026-05-01"]);
 
     // Tracking another list puts it on Home and remembers it on this browser.
-    const lists = page.getByRole("region", { name: /Your lists/ });
-    await expect(lists.getByRole("button", { name: /^Track Best in Michigan/ })).toHaveAttribute("aria-pressed", "true");
-    await lists.getByRole("button", { name: /^Track USA Top 100/ }).click();
+    // Desktop picks with the buttons at the top of the hero; phones with its dropdown.
+    const lists = page.getByRole("group", { name: "Your lists" });
+    const dropdown = lists.getByRole("combobox", { name: "Track a list" });
+    const phone = testInfo.project.name === "mobile";
+    if (phone) {
+      await expect(lists.getByRole("button", { name: /^Track / })).toHaveCount(0);
+      await expect(dropdown).toHaveValue("state-mi");
+      await dropdown.selectOption("usa");
+    } else {
+      await expect(dropdown).toBeHidden();
+      await expect(lists.getByRole("button", { name: /^Track Best in Michigan/ })).toHaveAttribute("aria-pressed", "true");
+      await lists.getByRole("button", { name: /^Track USA Top 100/ }).click();
+    }
     await expect(page.getByRole("heading", { level: 1, name: "USA Top 100" })).toBeVisible();
     await expect(page).toHaveURL(/\/\?goal=usa$/);
-    await expect(page.getByRole("region", { name: "USA Top 100", exact: true })).toContainText("Your pick");
     await expect(page.getByRole("progressbar", { name: "USA Top 100 played" })).toHaveAttribute("aria-valuenow", "2");
     await expect(page.getByRole("list", { name: "Up next on USA Top 100" })).toBeVisible();
     await page.goto("/");
     await expect(page.getByRole("heading", { level: 1, name: "USA Top 100" })).toBeVisible();
-    await expect(lists.getByRole("button", { name: /^Track USA Top 100/ })).toHaveAttribute("aria-pressed", "true");
+    if (phone) await expect(dropdown).toHaveValue("usa");
+    else await expect(lists.getByRole("button", { name: /^Track USA Top 100/ })).toHaveAttribute("aria-pressed", "true");
   });
 
   test("course details moves, count editing and confirmed final-round removal work", async ({ page }) => {

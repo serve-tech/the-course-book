@@ -1,6 +1,6 @@
 import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { createMemoryRouter, Outlet, RouterProvider } from "react-router";
+import { createMemoryRouter, Outlet, RouterProvider, type LoaderFunction } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { courseSchema, type Course } from "@coursebook/domain/catalog/course";
 import type { ListEntry } from "@coursebook/domain/journal/types";
@@ -79,7 +79,11 @@ afterEach(() => {
   for (const router of routers.splice(0)) router.dispose();
 });
 
-function openHome(props: Partial<Props> = {}) {
+/**
+ * Render Home under the shell outlet. `loader` lets a test hold Home's reload,
+ * as when the member switches lists.
+ */
+function openHome(props: Partial<Props> = {}, loader?: LoaderFunction) {
   const lists = props.standings ?? standings;
   const homeState = props.homeState ?? "MI";
   const element = (
@@ -95,7 +99,7 @@ function openHome(props: Partial<Props> = {}) {
     />
   );
   const router = createMemoryRouter(
-    [{ element: <Outlet context={shell} />, children: [{ path: "/", element }] }],
+    [{ element: <Outlet context={shell} />, children: [{ path: "/", element, ...(loader ? { loader } : {}) }] }],
     { initialEntries: ["/"] },
   );
   routers.push(router);
@@ -108,7 +112,6 @@ describe("progress home", () => {
     openHome();
     const hero = screen.getByRole("region", { name: "Best in Michigan" });
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Best in Michigan");
-    expect(hero).toHaveTextContent("Your home state");
     expect(hero).toHaveTextContent("13of 100 played · 87 to go");
     expect(within(hero).getByRole("progressbar", { name: "Best in Michigan played" })).toHaveAttribute("aria-valuenow", "13");
     expect(hero).toHaveTextContent("Dan Whitaker has played 20.");
@@ -117,9 +120,16 @@ describe("progress home", () => {
     expect(shell.openLog).toHaveBeenCalledOnce();
   });
 
+  it("puts the lists that choose the tracked list at the top of the hero, above the progress they change", () => {
+    openHome();
+    const hero = screen.getByRole("region", { name: "Best in Michigan" });
+    const lists = within(hero).getByRole("group", { name: "Your lists" });
+    expect(lists.compareDocumentPosition(within(hero).getByRole("heading", { level: 1 }))).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
   it("shows every national list and the home state's, with the tracked one pressed", () => {
     openHome();
-    const lists = screen.getByRole("region", { name: /Your lists/ });
+    const lists = screen.getByRole("group", { name: "Your lists" });
     expect(within(lists).getAllByRole("button").map((button) => button.getAttribute("aria-label"))).toEqual([
       "Track World Top 100, 5 of 100 played",
       "Track USA Top 100, 7 of 100 played",
@@ -130,12 +140,35 @@ describe("progress home", () => {
     expect(within(lists).getByRole("link", { name: "All lists" })).toHaveAttribute("href", "/u/golfer/lists");
   });
 
+  it("offers the same lists as a dropdown for phones, with the tracked one selected", () => {
+    const router = openHome();
+    const dropdown = screen.getByRole("combobox", { name: "Track a list" });
+    expect(within(dropdown).getAllByRole("option").map((option) => option.textContent)).toEqual([
+      "World Top 100 · 5/100",
+      "USA Top 100 · 7/100",
+      "Best in Michigan · 13/100",
+    ]);
+    expect(dropdown).toHaveValue("state-mi");
+    fireEvent.change(dropdown, { target: { value: "usa" } });
+    expect(localStorage.getItem(HOME_GOAL_LIST_KEY)).toBe("usa");
+    expect(router.state.location.search).toBe("?goal=usa");
+  });
+
   it("tracks another list: remembers it on this browser and shows it through the URL", () => {
     const router = openHome();
     fireEvent.click(screen.getByRole("button", { name: /^Track USA Top 100/ }));
     expect(localStorage.getItem(HOME_GOAL_LIST_KEY)).toBe("usa");
     expect(router.state.location.search).toBe("?goal=usa");
     expect(shell.notify).not.toHaveBeenCalled();
+  });
+
+  it("selects the list being switched to while Home reloads its progress", async () => {
+    // Home's reload never finishes, so the page stays mid-switch.
+    openHome({}, ({ request }) => (new URL(request.url).searchParams.has("goal") ? new Promise(() => undefined) : null));
+    fireEvent.click(await screen.findByRole("button", { name: /^Track USA Top 100/ }));
+    expect(await screen.findByRole("button", { name: /^Track USA Top 100/, pressed: true })).toBeVisible();
+    expect(screen.getByRole("button", { name: /^Track Best in Michigan/ })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("combobox", { name: "Track a list" })).toHaveValue("usa");
   });
 
   it("says so when the choice cannot be remembered, and still shows it", () => {
@@ -208,6 +241,7 @@ describe("progress home", () => {
     fireEvent.click(screen.getByRole("button", { name: "+ Log a round" }));
     expect(shell.openLog).toHaveBeenCalledOnce();
     expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
-    expect(screen.queryByRole("region", { name: /Your lists/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Your lists" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Track a list" })).not.toBeInTheDocument();
   });
 });
