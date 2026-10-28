@@ -9,8 +9,8 @@ import { useShell } from "../shared/ui/shell";
 
 /**
  * The Ranking tab. On the viewer's own profile it is their ranking, with drag
- * to rank, the details dialog and logging; `?log=1` (the Log a round buttons)
- * opens the Log dialog. On a friend's profile it is their ranking, read-only.
+ * to rank and the details dialog. On a friend's profile it is their ranking,
+ * read-only.
  * Both share the Courses page's layout.
  */
 export default function ProfileRanking() {

@@ -1,5 +1,5 @@
 import { getToken } from "@clerk/react-router";
-import { redirect, useRouteLoaderData } from "react-router";
+import { useRouteLoaderData } from "react-router";
 import type { Route } from "./+types/home";
 import type { clientLoader as layoutLoader } from "./layout";
 import { chooseGoalList } from "../features/home/goal-list";
@@ -11,7 +11,6 @@ import { readLayoutPreference } from "../features/shell/layout-preference";
 import { ActivityFeed } from "../features/social/ActivityFeed";
 import { loadFeed } from "../features/social/load-feed";
 import { feedKey } from "../features/social/format";
-import { logPath } from "../features/social/paths";
 import { fromFeedItem, fromMyCourse, fromTopListDetail, fromTopListProgress } from "../lib/api/mappers";
 import { HOME_GOAL_LIST_KEY, preferences, SELECTED_STATE_KEY } from "../shared/lib/storage";
 import { RouteError } from "../shared/ui/RouteError";
@@ -37,24 +36,19 @@ function storedPreference(key: string): string | null {
  * loads the member's progress on every published list, chooses the list Home
  * tracks (`?goal=`, else the one picked on this device, else the rules in
  * `chooseGoalList`) and loads that list's courses; the newest feed items and
- * the member's ranking load alongside. A `?log=1` link opens the Log dialog
- * on the member's own Ranking in either layout.
+ * the member's ranking load alongside. (`?log=1` links open the Log dialog
+ * over Home; the layout handles them.)
  */
 export async function clientLoader({
   request,
 }: Pick<Route.ClientLoaderArgs, "request">) {
   const layout = readLayoutPreference();
   if (!(await getToken())) return { signedIn: false as const };
-  const url = new URL(request.url);
-  if (url.searchParams.get("log") === "1") {
-    const me = unwrap(await api.GET("/v1/me"));
-    throw redirect(logPath(me.username));
-  }
   if (layout === LayoutMode.Classic)
     return { signedIn: true as const, layout, ...(await loadFeed()) };
 
   const homeState = (storedPreference(SELECTED_STATE_KEY) ?? "").toUpperCase();
-  const chosen = url.searchParams.get("goal") ?? storedPreference(HOME_GOAL_LIST_KEY);
+  const chosen = new URL(request.url).searchParams.get("goal") ?? storedPreference(HOME_GOAL_LIST_KEY);
   const tracked = api
     .GET("/v1/top-lists")
     .then(unwrap)
@@ -102,7 +96,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
         key={feedKey(loaderData.first)}
         first={loaderData.first}
         hasFriends={loaderData.hasFriends}
-        me={me}
+        onLog={shell.openLog}
         home
       />
     );

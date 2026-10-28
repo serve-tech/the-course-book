@@ -56,7 +56,7 @@ Option 2, in the course-first preview only.
   3. otherwise the unfinished started list with the largest share played (ties go to more played, then display order);
   4. otherwise the home-state list even if unstarted;
   5. otherwise the first list.
-- **Your lists.** Under the hero, a strip of cards shows progress on every national list and the home state's, plus the tracked list if it is another state's (`goalChoices`). Tapping a card tracks that list. It is saved through `SafeStorage` and shown through `?goal=`, so a failed save still shows the pick and tells the member it won't be remembered. The pick is per browser; an account-level goal would need an additive API field. On phones the strip scrolls sideways.
+- **Your lists.** Under the hero, a strip of cards shows progress on every national list and the home state's, plus the tracked list if it is another state's (`goalChoices`). Tapping a card tracks that list. It is saved through `SafeStorage` and shown through `?goal=`, so a failed save still shows the pick and tells the member it won't be remembered. The pick is per browser; an account-level goal would need an additive API field. On phones the strip scrolls sideways. *Amended 2026-10-28 (maintainer feedback: the control sat below what it changed, the cards did not look clickable, the "Your pick" label was poor, and sideways scrolling on phones was not intuitive): the lists moved to the top of the hero card as solid toggle buttons with a radio mark, a dropdown on phones; the reason eyebrow ("Your pick", "Your home state" …) was removed, and the list being switched to shows as selected while Home reloads.*
 - **Up next.** The tracked list's first three unplayed courses, Want to play first (`upNext`). They use the Courses page's `CourseRow` and `CourseActions`, so members can save Want to play or log from Home; the Log dialog opens in place. "See the list" opens `/courses?list=<slug>`. A finished list says so and points to the strip.
 - **Friend comparison.** Shown as company ("Dan Whitaker has played 20"), not as a gap. Strava's 2024 Weekly Snapshot drew complaints for making comparisons feel like failure.
 - **Friends' rounds.** Three at distinct courses, from `newFromFriends`, which skips backfills. The note is "Your #n" when the course is on the member's list, else the course's first published rank (`friendNote`). It never says "not played": the match is by course id, and the API resolves equivalent course rows on some reads.
@@ -65,7 +65,7 @@ Option 2, in the course-first preview only.
   - Desktop: Home, My ranking, My lists, Courses, Activity, Friends.
   - Phones: Home, My ranking, Log a round, Courses, Friends. That is five slots. Home links to Activity and to the member's lists, so those two are desktop-only.
   - All six desktop links fit at the 901px breakpoint.
-- **Log links.** `/?log=1` redirects to the own-profile Ranking dialog in both layouts.
+- **Log links.** `/?log=1` redirects to the own-profile Ranking dialog in both layouts. *Superseded 2026-10-28: Log a round opens over the current page ([decision](2026-10-28-log-a-round-opens-over-the-current-page.md)).*
 - **Coming soon cards removed app-wide:** Activity and Classic Home's sidebar, the Profile timeline, Stats, and member Lists. This also changes Classic.
 - **Reads.** Home reads `/v1/top-lists`, then the tracked list's detail (`/v1/top-lists/{type}/{scope}`), alongside the newest 12 feed items and `/v1/me/courses`. There are no API, contract, schema, auth or infrastructure changes.
 

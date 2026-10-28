@@ -71,7 +71,7 @@ export default function ProfileRoute({ loaderData }: Route.ComponentProps) {
     );
   return (
     <div className={profileStyles.page}>
-      <ProfileHeader profile={loaderData.profile} notify={shell.notify} />
+      <ProfileHeader profile={loaderData.profile} notify={shell.notify} onLog={shell.openLog} />
       <Outlet context={shell} />
     </div>
   );

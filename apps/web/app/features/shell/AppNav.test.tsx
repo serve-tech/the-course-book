@@ -29,6 +29,7 @@ describe.each([
     layout = LayoutMode.CourseFirst,
   ) {
     const onSignIn = vi.fn();
+    const onLog = vi.fn();
     const router = createMemoryRouter(
       [
         {
@@ -39,6 +40,7 @@ describe.each([
               member={user}
               incomingRequests={2}
               onSignIn={onSignIn}
+              onLog={onLog}
               onSignOut={vi.fn()}
               onNavigate={vi.fn()}
             />
@@ -52,6 +54,7 @@ describe.each([
     return {
       nav: within(screen.getByRole("navigation", { name: "Main" })),
       onSignIn,
+      onLog,
     };
   }
 
@@ -69,10 +72,7 @@ describe.each([
       nav.queryByRole("link", { name: "My lists" }),
     ).not.toBeInTheDocument();
     if (Bar === TabBar)
-      expect(nav.getByRole("link", { name: "Log a round" })).toHaveAttribute(
-        "href",
-        "/u/golfer/ranking?log=1",
-      );
+      expect(nav.getByRole("button", { name: "Log a round" })).toBeInTheDocument();
   });
 
   it("leads with Home, then the member's ranking, with friends one tap away", () => {
@@ -81,7 +81,7 @@ describe.each([
       nav.getAllByRole("link").map((link) => link.getAttribute("href")),
     ).toEqual(
       Bar === TabBar
-        ? ["/", "/u/golfer/ranking", "/u/golfer/ranking?log=1", "/courses", "/friends"]
+        ? ["/", "/u/golfer/ranking", "/courses", "/friends"]
         : ["/", "/u/golfer/ranking", "/u/golfer/lists", "/courses", "/activity", "/friends"],
     );
     expect(nav.getByRole("link", { name: "Home" })).toHaveAttribute(
@@ -113,6 +113,21 @@ describe.each([
       expect(nav.getByRole("link", { name: "My ranking" })).not.toHaveAttribute(
         "aria-current",
       );
+    },
+  );
+
+  it.runIf(Bar === TabBar).each([LayoutMode.Classic, LayoutMode.CourseFirst])(
+    "opens Log a round over the current page in %s, and sign-in for visitors",
+    (layout) => {
+      const signedIn = openNav(member, "/courses", layout);
+      fireEvent.click(signedIn.nav.getByRole("button", { name: "Log a round" }));
+      expect(signedIn.onLog).toHaveBeenCalledOnce();
+      expect(signedIn.onSignIn).not.toHaveBeenCalled();
+      cleanup();
+      const visitor = openNav(null, "/courses", layout);
+      fireEvent.click(visitor.nav.getByRole("button", { name: "Log a round" }));
+      expect(visitor.onSignIn).toHaveBeenCalledOnce();
+      expect(visitor.onLog).not.toHaveBeenCalled();
     },
   );
 

@@ -29,7 +29,7 @@ Use option 2 for this temporary rollout. This amends the default-release policy 
 ## Consequences
 
 - Test both navigation variants, Classic and preview loading, live edits carried between layouts, refresh persistence, switch-back, cross-tab consistency, and storage failure. Keep these checks while the preview exists.
-- The existing own-profile editor is shared with the preview Home; do not fork application data or business rules. Shared Log links target the own-profile Ranking in both modes. Only the preview Home's Log action uses `/?log=1`, which redirects to the profile dialog after switching back to Classic.
+- The existing own-profile editor is shared with the preview Home; do not fork application data or business rules. Shared Log links target the own-profile Ranking in both modes. Only the preview Home's Log action uses `/?log=1`, which redirects to the profile dialog after switching back to Classic. *Superseded 2026-10-28: every Log a round button opens the dialog over the current page ([decision](2026-10-28-log-a-round-opens-over-the-current-page.md)).*
 - A future default switch should follow feedback and passing checks. Once the maintainer accepts the new default and the fallback is no longer needed, remove the Classic branch, preview control and preference together rather than accumulating permanent layout variants.
 - Revisit a managed flag service when multiple flags, cohorts, shared account-level preferences or a central no-deploy shutoff justify it.
 

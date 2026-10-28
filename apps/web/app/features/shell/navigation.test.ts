@@ -30,15 +30,20 @@ describe("layout destinations", () => {
     ).toEqual(labels);
   });
 
-  it("keeps Classic profile and Log links attached to the member", () => {
+  it("keeps the Classic profile link attached to the member", () => {
     const links = mainDestinations(LayoutMode.Classic, "a golfer", true);
-    expect(links.find((item) => item.log)?.to).toBe(
-      "/u/a%20golfer/ranking?log=1",
-    );
     expect(links.at(-1)?.to).toBe("/u/a%20golfer");
   });
 
-  it("points the preview's ranking, lists and Log at the member's profile", () => {
+  it.each([LayoutMode.Classic, LayoutMode.CourseFirst])(
+    "gives Log a round no URL in %s, so it opens over the current page",
+    (layout) => {
+      const log = mainDestinations(layout, "golfer", true).find((item) => item.log);
+      expect(log).toMatchObject({ label: "Log a round", to: null });
+    },
+  );
+
+  it("points the preview's ranking and lists at the member's profile", () => {
     const urls = (mobile: boolean) =>
       Object.fromEntries(
         mainDestinations(LayoutMode.CourseFirst, "a golfer", mobile).map(
@@ -52,7 +57,6 @@ describe("layout destinations", () => {
     });
     expect(urls(true)).toMatchObject({
       "My ranking": "/u/a%20golfer/ranking",
-      "Log a round": "/u/a%20golfer/ranking?log=1",
     });
   });
 

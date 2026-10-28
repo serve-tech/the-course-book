@@ -1,10 +1,11 @@
-import { logPath, profilePath } from "../social/paths";
+import { profilePath } from "../social/paths";
 import { LayoutMode } from "./layout-preview";
 
 export interface NavDestination {
   label: string;
   to: string | null;
   icon: string;
+  /** Log a round has no URL: it opens the Log dialog over the current page. */
   log?: boolean;
 }
 
@@ -24,7 +25,7 @@ export function mainDestinations(
   const home = { label: "Home", to: "/", icon: "M3 11 12 4l9 7v9h-6v-6H9v6H3z" };
   const log = {
     label: "Log a round",
-    to: username ? logPath(username) : null,
+    to: null,
     icon: "M12 5v14M5 12h14",
     log: true,
   };
