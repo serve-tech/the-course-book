@@ -3,11 +3,11 @@
 **Date:** 2026-11-03
 **Status:** Accepted
 
-Amends the product direction in [Social redesign](2026-09-29-social-redesign-top-lists-profiles-timelines-and-star-ratings.md) and replaces Home in [Progress-first preview Home](2026-10-27-progress-first-preview-home.md). Ends the rollout in [Opt-in layout preview](2026-10-19-opt-in-layout-preview-in-production.md) when the new Home ships. Keeps [Friends-only visibility](2026-09-29-friends-only-visibility-with-mutual-friend-requests.md).
+Amends the product direction in [Social redesign](2026-09-29-social-redesign-top-lists-profiles-timelines-and-star-ratings.md) and replaces Home in [Progress-first preview Home](2026-10-27-progress-first-preview-home.md). Ends the rollout in [Opt-in layout preview](2026-10-19-opt-in-layout-preview-in-production.md) when the new Home ships. [Friends-only visibility](2026-09-29-friends-only-visibility-with-mutual-friend-requests.md) stays for everything except the share link below, whose model is still open.
 
 ## Context
 
-After a brainstorm with the product owners, the maintainer gave the corrected vision: the app answers "What are my top N courses?" across geographies and categories. The ranking is the main focus. The owners do not need an app to track playing activity, rounds or reviews; the main actions are ranking, re-ranking and moving courses in or out of a Top N.
+After a brainstorm with the product owners, the maintainer gave the corrected vision: the app answers "What are my top N courses?" across geographies and categories. The ranking is the main focus. What the owners most want is to share a link to their rankings, and to add every course they have ever played without pain, with courses "naturally appearing" as on Letterboxd. Rounds should matter so little that the app would barely change without them. The owners do not need activity tracking or reviews.
 
 The two earlier Homes were deliberately rough things to put in front of the owners so they could say more about what they want. They are not evidence against another redesign. The owners called both "perfect" at first and changed their minds after thinking about them, so first approval is provisional.
 
@@ -16,7 +16,9 @@ Code findings that shape this decision:
 - Every way the web app adds a course also logs a round. Deleting a course's last round, or setting its count to zero, removes it from the list (`services/journal.ts`).
 - `user_courses.personal_rank` is NOT NULL and contiguous, so a new course must land somewhere: the frustration behind this work.
 - Region tabs on the Ranking page are read-only by choice. The drag code already computes the target against the full order (`features/journal/MyRanking.tsx`).
-- The catalog has no public/private field and no coordinates. The feed is derived from rounds, with no event table.
+- Another member's ranking is a 404 for anyone but their accepted friends. Signed-out visitors get a sign-in prompt (`routes/profile.tsx`).
+- The web app is one static `index.html`, so every shared link would show the same preview in messaging apps.
+- The catalog has no course type and no coordinates. Measurements of the likely source are in [the research](../research/2026-11-03-course-data-and-golf-integrations.md).
 
 ## Options Considered
 
@@ -36,35 +38,46 @@ Option 1.
 
 - **Ranking model.** Each member has one ordered ranking. A Top N is that ranking filtered by geography or category, cut at N, and numbered within the view. It is computed on read, never stored.
 - **Reordering in a view.** Dropping A next to B puts A directly next to B in the master ranking. This is the only placement consistent with the order: if A beats B, A also beats whatever B beats. Removing a course from a Top N means moving it below N.
-- **Unranked courses.** A course added without a position is unranked, and shows in its own section at the top of the ranking until the member places it or leaves it there.
-- **Rounds are optional.** A course can be on a member's list with no rounds. Existing rounds stay; nothing is deleted.
-- **Home.** Home leads with the member's Top N and a view picker, with the unranked section above it when it has courses.
+- **Share links are the headline feature.** A member can send a link to their ranking or to a view of it. The access model is open; see Open below.
+- **Played and Ranked are two valid states.** A member's course is Played, Ranked or neither. Played is not a to-do: nothing nags a member to rank it, and friends see both states.
+- **Rounds barely matter.** The test: every screen works for a member with no rounds. Existing rounds stay; nothing is deleted. What the course details dialog shows about rounds stays as it is for now, because the maintainer does not mind either way.
+- **Adding courses works like Letterboxd's "watched".** One tap marks a course Played, with no date and no dialog. Courses to tap come from home state first, then nearby courses and others at the same resort, then published lists and friends. Letterboxd's own FAQ calls its dateless "watched" mark the best way to back-fill.
+- **Home.** Home leads with the member's Top N, a view picker and Share. Played courses sit in a collapsed line above the ranking, so a long list cannot bury it.
 - **Classic is retired** with the new Home, along with the preview control and preference. The new Home is the default for everyone.
-- **Categories.** Start with public vs private only, read as course type rather than who can see a ranking. Later candidates are course style, architect, length, and rating, slope or par. OpenGolfAPI's schema has `type`, `architect` and `par` fields, with tee yardage, rating and slope behind a separate endpoint, and nothing for style. Its coverage has not been measured.
-- **Activity.** Friends' ranking changes appear in an Activity tab that is deliberately de-emphasized. Those changes are recorded as events, because they cannot be derived or backfilled.
+- **Categories.** Start with public vs private only, read as course type rather than who can see a ranking. Later candidates are course style, architect, length, and rating, slope or par. OpenGolfAPI's data has type at 93%, but architect and total yardage at 3% and no style.
+- **Activity shows people's ranking updates and is de-emphasized**, outside the main navigation. A `ranked_at` timestamp on the course, set when a member places or moves it, is enough: "Josh ranked Pine Valley #4". This replaces the event table first considered. The tradeoff is that only the latest change per course shows, with no "moved from #12 to #4".
 
 Build order, proposed by Claude and not objected to; the maintainer can reorder it:
 
-1. Unranked section, adding a course without a round, and recording ranking events
-2. Top N Home with geography views and in-place reordering, retiring Classic
-3. "Better or worse?" placement, with drag kept
-4. First-run home state and state checklist, plus catalog expansion
-5. Public/private data and a share image
+1. Share links, with previews, on today's ranking
+2. Played and Ranked, with one-tap adding and no round required
+3. Home as the ranking with Share; Classic retired; Activity and Timeline out of the main navigation
+4. Course data merge, for coverage, coordinates and the public/private filter
+5. First-run adding, with courses appearing by geography and resort
+6. "Better or worse?" placement, with drag kept
 
 Deferred on the same terms:
 
 - **GHIN and 18Birdies sync.** USGA's Golfer Product Access form lists a $6,000 annual fee and a signed agreement, is primarily for handicap integration, and asks for iOS and Android app locations. No public 18Birdies API was found. Members' GHIN passwords will not be collected.
-- **Map.** It needs coordinates and a map tile source. A state checklist solves the same typing problem first.
+- **Map.** It needs a map tile source. The state list solves the same typing problem first.
 - **Photos and logos.** Waiting on the 2026-10-19 research questions.
 
 Dropped from the plan: star ratings, reviews, undated rounds (a course no longer needs a round) and member-made lists.
 
+## Open
+
+- **Share link access.** Proposed: a member's ranking stays private until they first press Share, then anyone with the link can see it until they turn it off. Awaiting the maintainer's answer. When decided, record it here and amend the friends-only decision.
+- **Licensing.** Whether a merged catalog that member rankings point to counts as an ODbL derivative database, and what would have to be published. Needs a human read before step 4.
+
 ## Consequences
 
-- **Data rules change.** These rules in `docs/architecture.md` and `AGENTS.md` are replaced when the first slice ships: the "deleting the last round deletes the membership" rule; zero count removing a course; ranks being contiguous over all memberships (they become contiguous over ranked memberships).
-- **Schema.** `personal_rank` becomes nullable, which is backward-compatible while the previous release serves as long as it never reads a null it cannot handle. `ranking_events` is new. `courses` gains an access column in slice 5.
-- **Contract.** Grows only. `MyCourse.rank` and the add and log responses require an integer, so existing operations keep returning ranked courses and adding through them keeps its behavior; unranked courses get new operations and an additive field. `FeedItem.type` already allows new values, and the web skips an item with no round.
+- **Data rules change.** These rules in `docs/architecture.md` and `AGENTS.md` are replaced when step 2 ships: the "deleting the last round deletes the membership" rule; zero count removing a course; ranks being contiguous over all memberships (they become contiguous over ranked memberships). Friends-only text changes with step 1.
+- **Schema.** `personal_rank` becomes nullable and `ranked_at` is added, both backward-compatible while the previous release serves as long as it never reads a null it cannot handle. `courses` gains a type column and coordinates in step 4.
+- **Contract.** Grows only. `MyCourse.rank` and the add and log responses require an integer, so existing operations keep returning ranked courses and adding through them keeps its behavior; Played courses get new operations and an additive field. `FeedItem.type` already allows new values, and the web skips an item with no round.
+- **Public exposure is new.** The share page needs an anonymous API operation, must show the member's display name (a full name from Clerk), and must leave out email, ids and round details. The API has no rate limiting today.
+- **The API serves some HTML.** Link previews need per-link HTML that a static site cannot produce. The likely route is a Render rewrite from a share path to the API. Render's docs allow a full URL as a rewrite destination but do not describe proxy behavior, so test it first. This is a narrow exception to the JSON-only API.
 - **Data quality becomes visible.** The Glen Club's wrong location and the 13 duplicate catalog pairs were left alone under the [import decision](2026-09-28-import-supabase-member-data-1-for-1.md). They now affect the headline feature and need the maintainer's decision.
-- **ODbL.** Expanding the catalog from OpenGolfAPI needs a read of its share-alike terms and the attribution it requires.
-- **Production.** Retiring Classic changes what all members see. Each slice ships through a normal PR, and the owners should live with a slice before the next one builds on it.
+- **The data merge is its own project.** OpenGolfAPI adds rows and coordinates but is missing the whole Bandon Dunes resort, has messy names and duplicates, and must not rename catalog rows. About 270 catalog courses would need coordinates from elsewhere. It also requires a specific credit wherever the data appears. Today the app only says "Showing results from OpenGolfAPI." in the search dialog, even though Search more courses can already store its data.
+- **"People who played X also played Y" waits.** With 12 members and 282 list entries (2026-10-28) there is too little data.
+- **Production.** Retiring Classic changes what all members see. Each step ships through a normal PR, and the owners should live with a step before the next one builds on it.
 - **Length, rating and slope are per tee**, not per course, and an architect list can have several names. Each needs its own modelling decision before it becomes a category.
