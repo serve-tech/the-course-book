@@ -176,6 +176,17 @@ export const MemberCourseSchema = z
   })
   .openapi("MemberCourse");
 
+export const PublicRankingCourseSchema = z
+  .object({ course: CourseSchema, rank })
+  .openapi("PublicRankingCourse");
+
+export const PublicRankingSchema = z
+  .object({
+    member: MemberSchema,
+    courses: z.array(PublicRankingCourseSchema).openapi({ description: "The member's ranking in rank order." }),
+  })
+  .openapi("PublicRanking");
+
 export const MemberListSchema = z
   .object({ member: MemberSchema, courses: z.array(MemberCourseSchema) })
   .openapi("MemberList");

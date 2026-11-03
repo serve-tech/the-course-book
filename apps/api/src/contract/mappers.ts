@@ -1,6 +1,6 @@
 import type { Course, RankedCourse } from "@coursebook/domain/catalog/course";
 import type { SearchResult } from "@coursebook/domain/catalog/search-results";
-import type { MemberList, MemberListRow } from "@coursebook/domain/friends/types";
+import type { MemberList, MemberListRow, PublicRanking } from "@coursebook/domain/friends/types";
 import type { FeedItem, Profile, TimelineMonthCount, TimelineRound, TopListDetail, TopListStanding, WantToPlayEntry } from "@coursebook/domain/social/types";
 import type { ListEntry, RoundEntry } from "@coursebook/domain/journal/types";
 import { UNKNOWN_LOCATION } from "../domain/course-view";
@@ -92,6 +92,13 @@ export function toMemberCourse(row: MemberListRow) {
 
 export function toMemberList(list: MemberList) {
   return { member: list.member, courses: list.rows.map(toMemberCourse) };
+}
+
+export function toPublicRanking(ranking: PublicRanking) {
+  return {
+    member: ranking.member,
+    courses: ranking.rows.map((row) => ({ course: toContractCourse(row.course), rank: row.rank })),
+  };
 }
 
 export function toTimelineRound(round: TimelineRound) {

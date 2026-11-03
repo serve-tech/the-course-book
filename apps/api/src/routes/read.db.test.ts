@@ -9,6 +9,7 @@ import {
   MemberListSchema,
   MembersSchema,
   MyCoursesSchema,
+  PublicRankingSchema,
   RankingsSchema,
   RoundsSchema,
   SearchResultsSchema,
@@ -283,6 +284,68 @@ describe("members", () => {
     expect(result.status).toBe(404);
     expect(ApiErrorSchema.parse(result.body).error.code).toBe("member_not_found");
     expect(JSON.stringify(result.body)).not.toContain("usa1");
+  });
+});
+
+describe("GET /v1/members/{username}/ranking", () => {
+  beforeEach(async () => {
+    await member("user_1", "golfer_1");
+    await member("user_2", "Bravo");
+  });
+
+  it("gives a signed-out visitor the ranking in order, matching usernames case-insensitively", async () => {
+    const t = createTestApp(db);
+    const [a, b] = [await seeded("usa1"), await seeded("usa2")];
+    await logRounds(db, "user_2", { courseId: a }, 1);
+    await logRounds(db, "user_2", { courseId: b }, 1);
+    const result = await t.get("/v1/members/bravo/ranking");
+    expect(result.status).toBe(200);
+    const body = PublicRankingSchema.parse(result.body);
+    expect(body.member).toEqual({ username: "Bravo", displayName: "Bravo Name" });
+    expect(body.courses.map((row) => [row.course.id, row.rank])).toEqual([
+      [a, 1],
+      [b, 2],
+    ]);
+  });
+
+  it("carries no rounds, email or member id, even when rounds exist", async () => {
+    const t = createTestApp(db);
+    await logRounds(db, "user_2", { courseId: await seeded("usa1") }, 3, "2026-06-01");
+    const result = await t.get("/v1/members/Bravo/ranking");
+    const text = JSON.stringify(result.body);
+    for (const secret of ["example.com", "user_2", "2026-06-01", "played", "lastPlayedOn"]) expect(text).not.toContain(secret);
+    const [row] = PublicRankingSchema.parse(result.body).courses;
+    expect(Object.keys(row ?? {}).sort()).toEqual(["course", "rank"]);
+  });
+
+  it("lets a signed-in member who is not a friend read it, while the member's other reads stay friends-only", async () => {
+    const t = createTestApp(db);
+    await logRounds(db, "user_2", { courseId: await seeded("usa1") }, 1);
+    const viewer = t.bearer("user_1", "golfer_1");
+    expect((await t.get("/v1/members/Bravo/ranking", viewer)).status).toBe(200);
+    for (const path of ["/v1/members/Bravo", "/v1/members/Bravo/profile", "/v1/members/Bravo/rounds", "/v1/members/Bravo/want-to-play"])
+      expect((await t.get(path, viewer)).status).toBe(404);
+  });
+
+  it("answers an empty ranking for a member with no courses", async () => {
+    const t = createTestApp(db);
+    expect(PublicRankingSchema.parse((await t.get("/v1/members/Bravo/ranking")).body).courses).toEqual([]);
+  });
+
+  it("answers member_not_found for an unknown member and a deleted account", async () => {
+    const t = createTestApp(db);
+    await db.update(users).set({ deletedAt: new Date() }).where(eq(users.id, "user_2"));
+    for (const username of ["nobody", "Bravo"]) {
+      const result = await t.get(`/v1/members/${username}/ranking`);
+      expect(result.status).toBe(404);
+      expect(ApiErrorSchema.parse(result.body).error.code).toBe("member_not_found");
+    }
+  });
+
+  it("is not stored by shared caches, so a re-rank shows on the next load", async () => {
+    const t = createTestApp(db);
+    const response = await t.app.request("/v1/members/Bravo/ranking");
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
   });
 });
 

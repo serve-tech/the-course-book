@@ -25,6 +25,7 @@ import {
   PageQuerySchema,
   PlayCountSchema,
   ProfileSchema,
+  PublicRankingSchema,
   RankingsSchema,
   RoundIdParamsSchema,
   RoundsSchema,
@@ -164,6 +165,23 @@ export const getMemberList = createRoute({
     403: forbidden,
     404: failure("No such member, or not a friend: `member_not_found`."),
     409: usernameTaken,
+  },
+});
+
+export const getPublicRanking = createRoute({
+  method: "get",
+  path: "/v1/members/{username}/ranking",
+  operationId: "getPublicRanking",
+  tags: ["Members"],
+  summary: "Any member's ranking, for anyone",
+  description:
+    "Public: needs no session and works for every active member. Carries the member and each course's rank, never rounds. " +
+    "Usernames match case-insensitively. Send no Authorization header.",
+  security: PUBLIC,
+  request: { params: UsernameParamsSchema },
+  responses: {
+    200: json(PublicRankingSchema, "The member and their ranking."),
+    404: failure("No active member with that username: `member_not_found`."),
   },
 });
 
