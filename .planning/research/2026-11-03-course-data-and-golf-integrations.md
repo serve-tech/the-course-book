@@ -63,6 +63,14 @@ Source: `opengolfapi-us.csv` from github.com/opengolfapi/data (the API's `OPENGO
 
 No public API was found (independent profile, not 18Birdies' own statement). Its help center says playing data cannot be exported to a spreadsheet. GDPR or CCPA requests and emailed scorecards are the only ways out.
 
+## Tall ranking image
+
+- **Screenshot gesture.** Sources found say page JavaScript cannot detect or handle a screenshot, because the capture belongs to the operating system. A native wrapper can get an iOS screenshot event. No official Apple or browser-vendor source was read for this.
+- **Canvas limit.** A 2022 blog reports iOS Safari caps canvas area at 16,777,216 pixels, and other reports say limits vary by device and fail silently. No current Apple specification was found. At 1080 wide that allows about 15,500 px of height. Test on real devices.
+- **Sharing a file.** web.dev lists file sharing as Chrome 128, Edge 93, Safari 12.1 and Firefox behind a flag. Check `navigator.canShare()` with the file, and fall back to a download. Mobile support was not confirmed against MDN or caniuse.
+- **Not confirmed.** Which fantasy football app the owner showed, and whether the behavior is the app's or his phone's own scrolling screenshot. No RuneLite feature that stitches all bank tabs into one tall image was found; the nearest is the Bank Value History plugin's optional bank screenshot.
+- **Not tested.** How much messaging apps compress a very tall image, and whether it stays readable.
+
 ## Share link previews
 
 Render static sites allow a rewrite destination that is "a full, publicly accessible URL" ([docs](https://render.com/docs/redirects-rewrites)), but the docs do not describe how the proxy treats headers or responses. Test before relying on it.

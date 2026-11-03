@@ -3,7 +3,7 @@
 **Date:** 2026-11-03
 **Status:** Accepted
 
-Amends the product direction in [Social redesign](2026-09-29-social-redesign-top-lists-profiles-timelines-and-star-ratings.md) and replaces Home in [Progress-first preview Home](2026-10-27-progress-first-preview-home.md). Ends the rollout in [Opt-in layout preview](2026-10-19-opt-in-layout-preview-in-production.md) when the new Home ships. [Friends-only visibility](2026-09-29-friends-only-visibility-with-mutual-friend-requests.md) stays for everything except the share link below, whose model is still open.
+Amends the product direction in [Social redesign](2026-09-29-social-redesign-top-lists-profiles-timelines-and-star-ratings.md) and replaces Home in [Progress-first preview Home](2026-10-27-progress-first-preview-home.md). Ends the rollout in [Opt-in layout preview](2026-10-19-opt-in-layout-preview-in-production.md) when the new Home ships. [Friends-only visibility](2026-09-29-friends-only-visibility-with-mutual-friend-requests.md) stays for everything except rankings, which become public.
 
 ## Context
 
@@ -38,7 +38,8 @@ Option 1.
 
 - **Ranking model.** Each member has one ordered ranking. A Top N is that ranking filtered by geography or category, cut at N, and numbered within the view. It is computed on read, never stored.
 - **Reordering in a view.** Dropping A next to B puts A directly next to B in the master ranking. This is the only placement consistent with the order: if A beats B, A also beats whatever B beats. Removing a course from a Top N means moving it below N.
-- **Share links are the headline feature.** A member can send a link to their ranking or to a view of it. The access model is open; see Open below.
+- **Rankings are public, and sharing is the headline feature.** Anyone with the link can open a member's ranking, signed in or not, with no off switch (maintainer, 2026-11-03). A member can send a link to their ranking or to a view of it. Proposed, awaiting confirmation: only the ranking and display name are public; Timeline, Stats, Want to play and friends stay friends-only; pages stay out of search results for now.
+- **Tall ranking image.** One owner wants what his fantasy football app does: a full-height image rather than what fits on screen. A Share menu offers Save image alongside Copy link. The image holds every course in the current view, however long, with the member's name, the view and the link. A web page cannot intercept the screenshot gesture, so it is a button; a native app could offer it after a screenshot later. The browser draws it on a canvas from a pure layout function, with no new dependency and no server load, and it is capped under iOS Safari's reported 16.7 MP canvas limit because over-limit canvases fail silently. Server rendering can come later if native apps or previews need it.
 - **Played and Ranked are two valid states.** A member's course is Played, Ranked or neither. Played is not a to-do: nothing nags a member to rank it, and friends see both states.
 - **Rounds barely matter.** The test: every screen works for a member with no rounds. Existing rounds stay; nothing is deleted. What the course details dialog shows about rounds stays as it is for now, because the maintainer does not mind either way.
 - **Adding courses works like Letterboxd's "watched".** One tap marks a course Played, with no date and no dialog. Courses to tap come from home state first, then nearby courses and others at the same resort, then published lists and friends. Letterboxd's own FAQ calls its dateless "watched" mark the best way to back-fill.
@@ -49,11 +50,11 @@ Option 1.
 
 Build order, proposed by Claude and not objected to; the maintainer can reorder it:
 
-1. Share links, with previews, on today's ranking
+1. Public rankings with Copy link and Save image, on today's ranking; rich link previews follow once the Render rewrite is tested
 2. Played and Ranked, with one-tap adding and no round required
 3. Home as the ranking with Share; Classic retired; Activity and Timeline out of the main navigation
-4. Course data merge, for coverage, coordinates and the public/private filter
-5. First-run adding, with courses appearing by geography and resort
+4. Course data merge, for coverage, coordinates and the public/private filter (on hold; see Open)
+5. First-run adding, with courses appearing by geography and resort (catalog only, without nearby courses, until step 4)
 6. "Better or worse?" placement, with drag kept
 
 Deferred on the same terms:
@@ -66,15 +67,15 @@ Dropped from the plan: star ratings, reviews, undated rounds (a course no longer
 
 ## Open
 
-- **Share link access.** Proposed: a member's ranking stays private until they first press Share, then anyone with the link can see it until they turn it off. Awaiting the maintainer's answer. When decided, record it here and amend the friends-only decision.
-- **Licensing.** Whether a merged catalog that member rankings point to counts as an ODbL derivative database, and what would have to be published. Needs a human read before step 4.
+- **Licensing, tabled by the maintainer on 2026-11-03.** Whether a merged catalog that member rankings point to counts as an ODbL derivative database, and what would have to be published. Step 4 waits for a human read, so nearby courses and the OpenGolfAPI-sourced public/private filter wait too.
 
 ## Consequences
 
 - **Data rules change.** These rules in `docs/architecture.md` and `AGENTS.md` are replaced when step 2 ships: the "deleting the last round deletes the membership" rule; zero count removing a course; ranks being contiguous over all memberships (they become contiguous over ranked memberships). Friends-only text changes with step 1.
 - **Schema.** `personal_rank` becomes nullable and `ranked_at` is added, both backward-compatible while the previous release serves as long as it never reads a null it cannot handle. `courses` gains a type column and coordinates in step 4.
 - **Contract.** Grows only. `MyCourse.rank` and the add and log responses require an integer, so existing operations keep returning ranked courses and adding through them keeps its behavior; Played courses get new operations and an additive field. `FeedItem.type` already allows new values, and the web skips an item with no round.
-- **Public exposure is new.** The share page needs an anonymous API operation, must show the member's display name (a full name from Clerk), and must leave out email, ids and round details. The API has no rate limiting today.
+- **Public exposure is new.** The public page needs an anonymous API operation, shows the member's display name (a full name from Clerk), and must leave out email, ids and round details. The API has no rate limiting today.
+- **A promise to members changes.** The privacy page says only friends see a member's list, and current members joined under that rule. The page changes in the same PR as public rankings, and members should hear before it ships.
 - **The API serves some HTML.** Link previews need per-link HTML that a static site cannot produce. The likely route is a Render rewrite from a share path to the API. Render's docs allow a full URL as a rewrite destination but do not describe proxy behavior, so test it first. This is a narrow exception to the JSON-only API.
 - **Data quality becomes visible.** The Glen Club's wrong location and the 13 duplicate catalog pairs were left alone under the [import decision](2026-09-28-import-supabase-member-data-1-for-1.md). They now affect the headline feature and need the maintainer's decision.
 - **The data merge is its own project.** OpenGolfAPI adds rows and coordinates but is missing the whole Bandon Dunes resort, has messy names and duplicates, and must not rename catalog rows. About 270 catalog courses would need coordinates from elsewhere. It also requires a specific credit wherever the data appears. Today the app only says "Showing results from OpenGolfAPI." in the search dialog, even though Search more courses can already store its data.
