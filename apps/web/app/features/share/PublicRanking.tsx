@@ -1,0 +1,179 @@
+import { useMemo, useState } from "react";
+import { RegionFilter } from "@coursebook/domain/catalog/course";
+import type { PublicRanking as Ranking } from "@coursebook/domain/friends/types";
+import { coursesLabel, rankingRows } from "../journal/ranking";
+import { RankingFilters } from "../journal/RankingFilters";
+import { Avatar } from "../social/Avatar";
+import { displayName } from "../social/paths";
+import profileStyles from "../social/profile.module.css";
+import { AvatarSize } from "../social/sizes";
+import socialStyles from "../social/social.module.css";
+import { placeCounts } from "../social/stats";
+import { CourseRow } from "../top-lists/CourseRow";
+import listStyles from "../top-lists/top-lists.module.css";
+import type { RankingImageContent } from "./ranking-image";
+import { ShareActions } from "./ShareActions";
+import { imageFileName, sharePath, shareViewTitle, TOP_CHOICES, viewRows, type ShareView } from "./share-view";
+import styles from "./share.module.css";
+
+/** Lists longer than this offer a search. */
+const SEARCH_FROM = 10;
+
+/**
+ * A member's ranking as anyone sees it, signed in or not, and the place to
+ * share it from: what you see here is what the link and the image show. Its
+ * stats come from the courses alone, because a public ranking carries no
+ * rounds (decision 2026-11-03, ranking-first product).
+ *
+ * @param ranking - The member and their whole ranking in order.
+ * @param view - The view in the link.
+ * @param onView - Changes the view, which the route keeps in the link.
+ * @param signedOut - Whether to invite the visitor to make their own ranking.
+ * @param onJoin - Opens sign-up.
+ * @param notify - Shows a toast.
+ * @param onSearchFocus - Tells the shell when the search gains or loses focus.
+ * @param renderImage - Draws the image; for tests, because jsdom has no canvas.
+ */
+export function PublicRanking({
+  ranking,
+  view,
+  onView,
+  signedOut,
+  onJoin,
+  notify,
+  onSearchFocus,
+  renderImage,
+}: {
+  ranking: Ranking;
+  view: ShareView;
+  onView: (view: ShareView) => void;
+  signedOut: boolean;
+  onJoin: () => void;
+  notify: (message: string) => void;
+  onSearchFocus: (focused: boolean) => void;
+  renderImage?: (content: RankingImageContent) => Promise<Blob>;
+}) {
+  const [query, setQuery] = useState("");
+  const name = displayName(ranking.member);
+  const { username } = ranking.member;
+  const places = useMemo(() => placeCounts(ranking.rows), [ranking.rows]);
+  const { region: shownRegion, top: shownTop } = view;
+  // The state tab names the member's most-played state until another is chosen, so it is never a blank list.
+  const tabState = view.state || (places.topStateCode ?? "");
+  const shownState = shownRegion === RegionFilter.State ? tabState : "";
+  const shown = useMemo<ShareView>(() => ({ region: shownRegion, state: shownState, top: shownTop }), [shownRegion, shownState, shownTop]);
+  const title = shareViewTitle(shown);
+  const rows = useMemo(() => viewRows(ranking.rows, shown), [ranking.rows, shown]);
+  // A short list needs no search, and on a phone that row pushes the courses off the first screen.
+  const searchable = rows.length > SEARCH_FROM;
+  const visible = rankingRows(rows, { region: RegionFilter.All, state: "", query: searchable ? query : "" });
+  const image = useMemo(
+    () => ({
+      memberName: name,
+      title,
+      rows: rows.map((row) => ({ rank: row.rank, name: row.course.name, place: row.course.location })),
+    }),
+    [name, title, rows],
+  );
+
+  return (
+    <section className={listStyles.page} aria-label={name + "'s ranking"}>
+      <div className={profileStyles.hero}>
+        <div className={profileStyles.heroInner}>
+          <Avatar member={ranking.member} size={AvatarSize.Large} />
+          <div className={profileStyles.identity}>
+            <span className={profileStyles.eyebrow}>Course ranking</span>
+            <h1 className={profileStyles.name}>{name}</h1>
+            <span className={profileStyles.handle}>
+              <b>@{username}</b>
+            </span>
+          </div>
+          <div className={profileStyles.heroActions}>
+            <ShareActions
+              path={sharePath(username, shown)}
+              image={image}
+              fileName={imageFileName(username, title)}
+              notify={notify}
+              {...(renderImage ? { render: renderImage } : {})}
+            />
+          </div>
+          <dl className={profileStyles.stats} aria-label="Stats">
+            <Stat value={ranking.rows.length} label="Courses" />
+            <Stat value={places.states} label="States" />
+            <Stat value={places.countries} label="Countries" />
+          </dl>
+        </div>
+      </div>
+
+      <RankingFilters
+        region={shown.region}
+        state={tabState}
+        query={query}
+        onRegion={(region) => {
+          onView({ ...view, region, state: region === RegionFilter.State ? tabState : "" });
+          onSearchFocus(false);
+        }}
+        onState={(state) => {
+          onView({ ...view, state });
+        }}
+        onQuery={setQuery}
+        onSearchFocus={onSearchFocus}
+        searchable={searchable}
+      >
+        <div className={listStyles.filters} role="group" aria-label="How many courses">
+          {[null, ...TOP_CHOICES].map((top) => (
+            <button
+              key={top ?? "all"}
+              type="button"
+              className={listStyles.filter}
+              aria-pressed={view.top === top}
+              onClick={() => {
+                onView({ ...view, top });
+              }}
+            >
+              {top === null ? "All" : "Top " + String(top)}
+            </button>
+          ))}
+        </div>
+      </RankingFilters>
+
+      <h2 className={styles.heading}>{title}</h2>
+      <p className={listStyles.caption} aria-live="polite">
+        <span id="publicRankingCount">{coursesLabel(rows.length)}</span>
+        {places.topState && <> · Most courses in {places.topState}</>}
+      </p>
+
+      {!ranking.rows.length ? (
+        <div className={listStyles.empty}>{name} hasn't ranked any courses yet.</div>
+      ) : !visible.length ? (
+        <div className={listStyles.empty}>No courses here match.</div>
+      ) : (
+        <ol id="ranking" className={listStyles.list} aria-label={name + "'s ranking"}>
+          {visible.map((row) => (
+            <CourseRow key={row.course.id} course={row.course} rank={row.rank} current={null} marks={[]} />
+          ))}
+        </ol>
+      )}
+
+      {signedOut && (
+        <div className={styles.invite}>
+          <p>Played a few courses? Rank them and share your own list.</p>
+          <button type="button" className={[socialStyles.button, socialStyles.buttonSolid].join(" ")} onClick={onJoin}>
+            Make your ranking
+          </button>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function Stat({ value, label }: { value: number; label: string }) {
+  return (
+    <div className={profileStyles.stat}>
+      <dd className={profileStyles.statValue} style={{ margin: 0 }}>
+        {value}
+      </dd>
+      <dt className={profileStyles.statLabel}>{label}</dt>
+    </div>
+  );
+}

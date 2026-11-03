@@ -1,8 +1,9 @@
 import { getToken } from "@clerk/react-router";
 import type { MemberList } from "@coursebook/domain/friends/types";
 import type { Profile } from "@coursebook/domain/social/types";
-import { data, Outlet, useRouteLoaderData, type ShouldRevalidateFunctionArgs } from "react-router";
+import { data, Link, Outlet, useRouteLoaderData, type ShouldRevalidateFunctionArgs } from "react-router";
 import type { Route } from "./+types/profile";
+import { sharePath } from "../features/share/share-view";
 import { displayName } from "../features/social/paths";
 import { ProfileHeader } from "../features/social/ProfileHeader";
 import profileStyles from "../features/social/profile.module.css";
@@ -57,13 +58,14 @@ export function useProfileData(): { profile: Profile; list: MemberList } {
   return { profile: loaded.profile, list: loaded.list };
 }
 
-export default function ProfileRoute({ loaderData }: Route.ComponentProps) {
+export default function ProfileRoute({ loaderData, params }: Route.ComponentProps) {
+  const { username } = params;
   const shell = useShell();
   if (!loaderData.signedIn)
     return (
       <div className={styles.emptyNote} style={{ marginTop: 20 }}>
         <strong>Sign in to see profiles</strong>
-        Profiles are visible to friends only.{" "}
+        Profiles are visible to friends only, but anyone can <Link to={sharePath(username)}>see this member's ranking</Link>.{" "}
         <button type="button" className={[styles.button, styles.buttonSolid].join(" ")} onClick={shell.openAuth} style={{ marginTop: 12 }}>
           Sign in
         </button>

@@ -26,7 +26,7 @@ export default function ProfileRanking() {
         onSearchFocus={shell.searchFocus}
       />
     );
-  return <OwnRanking rows={list.rows} />;
+  return <OwnRanking rows={list.rows} username={profile.member.username} />;
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {

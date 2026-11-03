@@ -1,10 +1,12 @@
 import { Fragment, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { Link } from "react-router";
 import { RegionFilter, type Course } from "@coursebook/domain/catalog/course";
 import { reorder } from "@coursebook/domain/journal/reorder";
 import type { ListEntry } from "@coursebook/domain/journal/types";
 import { cx } from "../../shared/lib/cx";
 import { RoundHistory } from "../rounds/RoundHistory";
+import { sharePath } from "../share/share-view";
 import { CourseSummary, PlayedMarks, type PlayedMark } from "../top-lists/CourseRow";
 import styles from "../top-lists/top-lists.module.css";
 import { CountEditor } from "./CountEditor";
@@ -24,13 +26,18 @@ import { replyMessage, useJournalFetcher } from "./use-journal-fetcher";
  * there are overall ranks, and a drop would land among courses the tab
  * hides. Search keeps editing, because a move renumbers the full list.
  *
+ * Share opens the member's public ranking in the tab they are on, which is
+ * where its link and image are.
+ *
  * @param rows - The member's ranking in rank order.
+ * @param username - The member, for the link to their public ranking.
  * @param onLog - Opens the Log a round dialog over the page (the empty ranking's Log your first round).
  * @param selectedState - The state for Best in State, shared with the Courses page.
  * @param onState - Chooses that state.
  */
 export function MyRanking({
   rows,
+  username,
   onLog,
   selectedState,
   onState,
@@ -38,6 +45,7 @@ export function MyRanking({
   onSearchFocus,
 }: {
   rows: readonly ListEntry[];
+  username: string;
   onLog: () => void;
   selectedState: string;
   onState: (value: string) => void;
@@ -107,7 +115,13 @@ export function MyRanking({
         onState={onState}
         onQuery={setQuery}
         onSearchFocus={onSearchFocus}
-      />
+      >
+        {courses.length > 0 && (
+          <Link className={styles.filter} to={sharePath(username, { region, state: selectedState, top: null })}>
+            Share
+          </Link>
+        )}
+      </RankingFilters>
       {courses.length > 0 && !stateMissing && (
         <p className={styles.caption} aria-live="polite">
           <span id="rankingCount">{coursesLabel(inRegion.length)}</span>
