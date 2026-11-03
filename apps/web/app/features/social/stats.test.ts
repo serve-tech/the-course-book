@@ -1,6 +1,6 @@
 import { courseSchema } from "@coursebook/domain/catalog/course";
 import { describe, expect, it } from "vitest";
-import { nationalProgress, placeStats, type RankedPlay } from "./stats";
+import { nationalProgress, placeCounts, placeStats, type RankedPlay } from "./stats";
 
 const row = (id: string, played: number, place: Record<string, unknown>): RankedPlay => ({
   course: courseSchema.parse({ id, name: "Course " + id, location: "", ...place }),
@@ -33,5 +33,11 @@ describe("profile stats", () => {
 
   it("has nothing to say about an empty ranking", () => {
     expect(placeStats([])).toEqual({ states: 0, countries: 0, topState: null, mostPlayed: null });
+  });
+
+  it("counts places from courses alone, with the top state's code for a default view", () => {
+    const courses = rows.map(({ course }) => ({ course }));
+    expect(placeCounts(courses)).toEqual({ states: 2, countries: 3, topState: "Michigan", topStateCode: "MI" });
+    expect(placeCounts([])).toEqual({ states: 0, countries: 0, topState: null, topStateCode: null });
   });
 });

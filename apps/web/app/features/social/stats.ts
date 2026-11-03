@@ -33,35 +33,47 @@ export function nationalProgress(rows: readonly RankedPlay[]): NationalProgress[
   ];
 }
 
-export interface PlaceStats {
+/** Where a member has played, from the courses alone: nothing here needs a round. */
+export interface PlaceCounts {
   /** Distinct U.S. states with at least one course. */
   states: number;
   /** Distinct countries, the USA included. */
   countries: number;
   /** The U.S. state with the most courses, e.g. "Michigan"; null without U.S. courses. */
   topState: string | null;
+  /** That state's two-letter code; null without U.S. courses. */
+  topStateCode: string | null;
+}
+
+export interface PlaceStats extends Omit<PlaceCounts, "topStateCode"> {
   /** The course with the most rounds; null for an empty ranking. Ties go to the higher rank. */
   mostPlayed: RankedPlay | null;
 }
 
-/** Where a member has played, from their ranking (in rank order). */
-export function placeStats(rows: readonly RankedPlay[]): PlaceStats {
+/** Where a member has played, from any list of their courses. */
+export function placeCounts(rows: readonly { course: Course }[]): PlaceCounts {
   const states = new Map<string, number>();
   const countries = new Set<string>();
-  let mostPlayed: RankedPlay | null = null;
   for (const row of rows) {
     const country = row.course.country.trim().toUpperCase();
     if (country) countries.add(country === "UK" ? "UNITED KINGDOM" : country);
     const state = row.course.state.trim().toUpperCase();
     if (country === "USA" && state) states.set(state, (states.get(state) ?? 0) + 1);
-    if (!mostPlayed || row.played > mostPlayed.played) mostPlayed = row;
   }
-  let topState: string | null = null;
+  let topStateCode: string | null = null;
   let topCount = 0;
   for (const [state, count] of states)
     if (count > topCount) {
-      topState = state;
+      topStateCode = state;
       topCount = count;
     }
-  return { states: states.size, countries: countries.size, topState: topState ? stateName(topState) : null, mostPlayed };
+  return { states: states.size, countries: countries.size, topState: topStateCode ? stateName(topStateCode) : null, topStateCode };
+}
+
+/** Where a member has played and what they played most, from their ranking (in rank order). */
+export function placeStats(rows: readonly RankedPlay[]): PlaceStats {
+  const { states, countries, topState } = placeCounts(rows);
+  let mostPlayed: RankedPlay | null = null;
+  for (const row of rows) if (!mostPlayed || row.played > mostPlayed.played) mostPlayed = row;
+  return { states, countries, topState, mostPlayed };
 }
