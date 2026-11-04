@@ -12,9 +12,9 @@ import { placeCounts } from "../social/stats";
 import { CourseRow } from "../top-lists/CourseRow";
 import listStyles from "../top-lists/top-lists.module.css";
 import type { RankingImageContent } from "./ranking-image";
-import { ShareActions } from "./ShareActions";
-import { imageFileName, sharePath, shareViewTitle, TOP_CHOICES, viewRows, type ShareView } from "./share-view";
+import { viewRows, type ShareView } from "./share-view";
 import styles from "./share.module.css";
+import { TopChoices, ViewHeader } from "./ViewHeader";
 
 /** Lists longer than this offer a search. */
 const SEARCH_FROM = 10;
@@ -62,19 +62,10 @@ export function PublicRanking({
   const tabState = view.state || (places.topStateCode ?? "");
   const shownState = shownRegion === RegionFilter.State ? tabState : "";
   const shown = useMemo<ShareView>(() => ({ region: shownRegion, state: shownState, top: shownTop }), [shownRegion, shownState, shownTop]);
-  const title = shareViewTitle(shown);
   const rows = useMemo(() => viewRows(ranking.rows, shown), [ranking.rows, shown]);
   // A short list needs no search, and on a phone that row pushes the courses off the first screen.
   const searchable = rows.length > SEARCH_FROM;
   const visible = rankingRows(rows, { region: RegionFilter.All, state: "", query: searchable ? query : "" });
-  const image = useMemo(
-    () => ({
-      memberName: name,
-      title,
-      rows: rows.map((row) => ({ rank: row.rank, name: row.course.name, place: row.course.location })),
-    }),
-    [name, title, rows],
-  );
 
   return (
     <section className={listStyles.page} aria-label={name + "'s ranking"}>
@@ -87,15 +78,6 @@ export function PublicRanking({
             <span className={profileStyles.handle}>
               <b>@{username}</b>
             </span>
-          </div>
-          <div className={profileStyles.heroActions}>
-            <ShareActions
-              path={sharePath(username, shown)}
-              image={image}
-              fileName={imageFileName(username, title)}
-              notify={notify}
-              {...(renderImage ? { render: renderImage } : {})}
-            />
           </div>
           <dl className={profileStyles.stats} aria-label="Stats">
             <Stat value={ranking.rows.length} label="Courses" />
@@ -120,28 +102,18 @@ export function PublicRanking({
         onSearchFocus={onSearchFocus}
         searchable={searchable}
       >
-        <div className={listStyles.filters} role="group" aria-label="How many courses">
-          {[null, ...TOP_CHOICES].map((top) => (
-            <button
-              key={top ?? "all"}
-              type="button"
-              className={listStyles.filter}
-              aria-pressed={view.top === top}
-              onClick={() => {
-                onView({ ...view, top });
-              }}
-            >
-              {top === null ? "All" : "Top " + String(top)}
-            </button>
-          ))}
-        </div>
+        <TopChoices
+          top={view.top}
+          onTop={(top) => {
+            onView({ ...view, top });
+          }}
+        />
       </RankingFilters>
 
-      <h2 className={styles.heading}>{title}</h2>
-      <p className={listStyles.caption} aria-live="polite">
+      <ViewHeader username={username} memberName={name} view={shown} rows={rows} notify={notify} render={renderImage}>
         <span id="publicRankingCount">{coursesLabel(rows.length)}</span>
         {places.topState && <> · Most courses in {places.topState}</>}
-      </p>
+      </ViewHeader>
 
       {!ranking.rows.length ? (
         <div className={listStyles.empty}>{name} hasn't ranked any courses yet.</div>

@@ -700,7 +700,7 @@ test.describe("public ranking", () => {
     await expect(page.getByRole("alert")).toContainText("This ranking isn't available");
   });
 
-  test("a member shares from their own ranking and copies the link", async ({ page, context, browserName }) => {
+  test("a member copies the link and saves the image from their own ranking", async ({ page, context, browserName }, testInfo) => {
     test.skip(browserName !== "chromium", "Clipboard permissions are Chromium-only in Playwright");
     const { owner } = members();
     await context.grantPermissions(["clipboard-read", "clipboard-write"]);
@@ -709,14 +709,27 @@ test.describe("public ranking", () => {
     await expectSignedInAs(page, owner.username);
     await openRanking(page, owner);
     await page.getByRole("tab", { name: "USA" }).click();
-    await page.getByRole("link", { name: "Share", exact: true }).click();
-    await expect(page).toHaveURL(new RegExp(`/r/${owner.username}\\?view=usa$`));
-    await expect(page.getByRole("heading", { level: 2, name: "Best in the USA" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Make your ranking" })).toHaveCount(0);
+    await page.getByRole("button", { name: "Top 5" }).click();
+    await expect(page.getByRole("heading", { level: 2, name: "Top 5 in the USA" })).toBeVisible();
+
+    const save = page.getByRole("button", { name: "Save image" });
+    await expect(save).toBeEnabled();
+    const [download] = await Promise.all([page.waitForEvent("download"), save.click()]);
+    expect(download.suggestedFilename()).toMatch(/-top-5-in-the-usa\.png$/);
+    const saved = testInfo.outputPath("own-ranking.png");
+    await download.saveAs(saved);
+    expect((await pngSize(saved)).width).toBe(1080);
 
     await page.getByRole("button", { name: "Copy link" }).click();
     await expect(page.getByText("Link copied")).toBeVisible();
-    expect(await page.evaluate(() => navigator.clipboard.readText())).toMatch(new RegExp(`/r/${owner.username}\\?view=usa$`));
+    const link = await page.evaluate(() => navigator.clipboard.readText());
+    expect(link).toMatch(new RegExp(`/r/${owner.username}\\?view=usa&top=5$`));
+
+    // What was shared opens as the same view.
+    await page.goto(link);
+    await expect(page.getByRole("heading", { level: 2, name: "Top 5 in the USA" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Make your ranking" })).toHaveCount(0);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   });
 
   test("a re-rank shows on the public page", async ({ page }) => {

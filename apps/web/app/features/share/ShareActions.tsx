@@ -6,9 +6,10 @@ import type { RankingImageContent } from "./ranking-image";
 import { renderRankingImage } from "./render-ranking-image";
 import styles from "./share.module.css";
 
-/** The prepared image for one view; `key` tells a current image from a stale one. */
+/** A drawn image and what it was drawn from, which tells a current image from a stale one. */
 interface PreparedImage {
-  key: string;
+  image: Omit<RankingImageContent, "link">;
+  path: string;
   blob: Blob | null;
   error: string | null;
 }
@@ -41,7 +42,6 @@ export function ShareActions({
   render?: (content: RankingImageContent) => Promise<Blob>;
 }) {
   const [prepared, setPrepared] = useState<PreparedImage | null>(null);
-  const key = path + "|" + fileName;
   const hasRows = image.rows.length > 0;
 
   useEffect(() => {
@@ -49,19 +49,20 @@ export function ShareActions({
     let active = true;
     render({ ...image, link: window.location.host + path }).then(
       (blob) => {
-        if (active) setPrepared({ key, blob, error: null });
+        if (active) setPrepared({ image, path, blob, error: null });
       },
       (error: unknown) => {
         console.warn("Could not draw the ranking image", error);
-        if (active) setPrepared({ key, blob: null, error: errorMessage(error) });
+        if (active) setPrepared({ image, path, blob: null, error: errorMessage(error) });
       },
     );
     return () => {
       active = false;
     };
-  }, [hasRows, image, key, path, render]);
+  }, [hasRows, image, path, render]);
 
-  const current = prepared?.key === key ? prepared : null;
+  // A reorder keeps the same link but changes the image, so the link alone cannot say this one is current.
+  const current = prepared?.image === image && prepared.path === path ? prepared : null;
 
   const onCopy = () => {
     const url = window.location.origin + path;
@@ -94,7 +95,7 @@ export function ShareActions({
       </button>
       <button
         type="button"
-        className={[socialStyles.button, socialStyles.buttonGhost].join(" ")}
+        className={socialStyles.button}
         disabled={!hasRows || !current}
         onClick={onSave}
       >
