@@ -1,7 +1,7 @@
 # Progress-first preview Home
 
 **Date:** 2026-10-27
-**Status:** Accepted
+**Status:** Superseded by [Ranking-first product](2026-11-03-ranking-first-product-one-master-ranking-with-derived-top-n-views.md)
 
 Amends the Home and navigation parts of [Course-first Home and direct list navigation](2026-10-19-course-first-home-and-direct-list-navigation.md). The [opt-in layout preview](2026-10-19-opt-in-layout-preview-in-production.md) rollout is unchanged: Classic stays the default.
 

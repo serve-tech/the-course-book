@@ -20,14 +20,14 @@ function renderMenu() {
 describe("AccountMenu", () => {
   afterEach(cleanup);
 
-  it("opens under the avatar with who is signed in, Profile, Account and Sign out", () => {
+  it("opens under the avatar with who is signed in, Profile, Activity, Account and Sign out", () => {
     const { button } = renderMenu();
     expect(screen.queryByRole("menu")).toBeNull();
     fireEvent.click(button);
     expect(button).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByText("Joshua Linneburg")).toBeInTheDocument();
     expect(screen.getByText("@jlinneburg")).toBeInTheDocument();
-    expect(screen.getAllByRole("menuitem").map((item) => item.textContent)).toEqual(["Profile", "Account", "Sign out"]);
+    expect(screen.getAllByRole("menuitem").map((item) => item.textContent)).toEqual(["Profile", "Activity", "Account", "Sign out"]);
     expect(screen.getByRole("menuitem", { name: "Profile" })).toHaveAttribute("href", "/u/jlinneburg");
     expect(screen.getByRole("menuitem", { name: "Account" })).toHaveAttribute("href", "/account");
   });

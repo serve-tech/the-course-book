@@ -1,72 +1,33 @@
 import { describe, expect, it } from "vitest";
-import { LayoutMode } from "./layout-preview";
 import { mainDestinations } from "./navigation";
 
-describe("layout destinations", () => {
+describe("mainDestinations", () => {
   it.each([
-    {
-      layout: LayoutMode.Classic,
-      mobile: false,
-      labels: ["Home", "Courses", "Friends", "Profile"],
-    },
-    {
-      layout: LayoutMode.Classic,
-      mobile: true,
-      labels: ["Home", "Courses", "Log a round", "Friends", "Profile"],
-    },
-    {
-      layout: LayoutMode.CourseFirst,
-      mobile: false,
-      labels: ["Home", "My ranking", "My lists", "Courses", "Activity", "Friends"],
-    },
-    {
-      layout: LayoutMode.CourseFirst,
-      mobile: true,
-      labels: ["Home", "My ranking", "Log a round", "Courses", "Friends"],
-    },
-  ])("$layout, mobile=$mobile", ({ layout, mobile, labels }) => {
-    expect(
-      mainDestinations(layout, "golfer", mobile).map((item) => item.label),
-    ).toEqual(labels);
+    { mobile: false, labels: ["Home", "Courses", "Friends", "Profile"] },
+    { mobile: true, labels: ["Home", "Courses", "Log a round", "Friends", "Profile"] },
+  ])("mobile=$mobile", ({ mobile, labels }) => {
+    expect(mainDestinations("golfer", mobile).map((item) => item.label)).toEqual(labels);
   });
 
-  it("keeps the Classic profile link attached to the member", () => {
-    const links = mainDestinations(LayoutMode.Classic, "a golfer", true);
-    expect(links.at(-1)?.to).toBe("/u/a%20golfer");
+  it.each([false, true])("keeps Activity and Timeline out, mobile=%s", (mobile) => {
+    const labels = mainDestinations("golfer", mobile).map((item) => item.label);
+    expect(labels).not.toContain("Activity");
+    expect(labels).not.toContain("Timeline");
   });
 
-  it.each([LayoutMode.Classic, LayoutMode.CourseFirst])(
-    "gives Log a round no URL in %s, so it opens over the current page",
-    (layout) => {
-      const log = mainDestinations(layout, "golfer", true).find((item) => item.log);
-      expect(log).toMatchObject({ label: "Log a round", to: null });
-    },
-  );
-
-  it("points the preview's ranking and lists at the member's profile", () => {
-    const urls = (mobile: boolean) =>
-      Object.fromEntries(
-        mainDestinations(LayoutMode.CourseFirst, "a golfer", mobile).map(
-          (item) => [item.label, item.to],
-        ),
-      );
-    expect(urls(false)).toMatchObject({
-      Home: "/",
-      "My ranking": "/u/a%20golfer/ranking",
-      "My lists": "/u/a%20golfer/lists",
-    });
-    expect(urls(true)).toMatchObject({
-      "My ranking": "/u/a%20golfer/ranking",
-    });
+  it("links Home to the ranking's page and Profile to the member", () => {
+    const destinations = mainDestinations("golfer", false);
+    expect(destinations.find((item) => item.label === "Home")?.to).toBe("/");
+    expect(destinations.find((item) => item.label === "Profile")?.to).toBe("/u/golfer");
   });
 
-  it.each([LayoutMode.Classic, LayoutMode.CourseFirst])(
-    "offers sign-in for private destinations in %s",
-    (layout) => {
-      const links = mainDestinations(layout, null, true);
-      expect(links[0]?.label).toBe("Home");
-      expect(links.some((item) => item.to === null)).toBe(true);
-      expect(links.some((item) => item.to?.startsWith("/u/"))).toBe(false);
-    },
-  );
+  it("sends a visitor's Profile to sign-in instead of a private page", () => {
+    expect(mainDestinations(null, false).find((item) => item.label === "Profile")?.to).toBeNull();
+  });
+
+  it("opens Log a round in place, with no URL", () => {
+    const log = mainDestinations("golfer", true).find((item) => item.label === "Log a round");
+    expect(log?.to).toBeNull();
+    expect(log?.log).toBe(true);
+  });
 });

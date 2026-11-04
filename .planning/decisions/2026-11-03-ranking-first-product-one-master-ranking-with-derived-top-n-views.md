@@ -43,12 +43,12 @@ Option 1.
 - **Played and Ranked are two valid states.** A member's course is Played, Ranked or neither. Played is not a to-do: nothing nags a member to rank it, and friends see both states.
 - **Rounds barely matter.** The test: every screen works for a member with no rounds. Existing rounds stay; nothing is deleted. What the course details dialog shows about rounds stays as it is for now, because the maintainer does not mind either way.
 - **Adding courses works like Letterboxd's "watched".** One tap marks a course Played, with no date and no dialog. Courses to tap come from home state first, then nearby courses and others at the same resort, then published lists and friends. Letterboxd's own FAQ calls its dateless "watched" mark the best way to back-fill.
-- **Home.** Home leads with the member's Top N, a view picker and Share. Played courses sit in a collapsed line above the ranking, so a long list cannot bury it.
+- **Home.** Home leads with the member's Top N, a view picker and Copy link and Save image. It opens on the Top 10 once a member has more than ten courses, else every course. Once Played exists, Played courses sit in a collapsed line above the ranking, so a long list cannot bury it.
 - **Classic is retired** with the new Home, along with the preview control and preference. The new Home is the default for everyone.
 - **Categories.** Start with public vs private only, read as course type rather than who can see a ranking. Later candidates are course style, architect, length, and rating, slope or par. OpenGolfAPI's data has type at 93%, but architect and total yardage at 3% and no style.
 - **Activity shows people's ranking updates and is de-emphasized**, outside the main navigation. A `ranked_at` timestamp on the course, set when a member places or moves it, is enough: "Josh ranked Pine Valley #4". This replaces the event table first considered. The tradeoff is that only the latest change per course shows, with no "moved from #12 to #4".
 
-Build order, proposed by Claude and not objected to; the maintainer can reorder it:
+Build order, proposed by Claude. On 2026-11-04 the maintainer moved Home ahead of Played and Ranked, so step 3 ships first, without the Played line, and step 2 adds it:
 
 1. Public rankings with Copy link and Save image, on today's ranking; rich link previews follow once the Render rewrite is tested
 2. Played and Ranked, with one-tap adding and no round required
