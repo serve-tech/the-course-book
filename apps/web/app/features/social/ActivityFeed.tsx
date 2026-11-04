@@ -11,6 +11,7 @@ import { PersonalRank } from "./PersonalRank";
 import { newFromFriends, relativeDay, shortDate, visitLabel, type FeedFirstPage } from "./format";
 import { displayName, profilePath } from "./paths";
 import { AvatarSize, TileSize } from "./sizes";
+import { PageHeader } from "../../shared/ui/PageHeader";
 import feedStyles from "./feed.module.css";
 import styles from "./social.module.css";
 
@@ -26,7 +27,7 @@ const STRIP = 4;
  * @param hasFriends - Whether the member has any friends (chooses the empty state).
  * @param onLog - Opens the Log a round dialog over this page.
  */
-export function ActivityFeed({ first, hasFriends, onLog, home = false }: { first: FeedFirstPage; hasFriends: boolean; onLog: () => void; home?: boolean }) {
+export function ActivityFeed({ first, hasFriends, onLog }: { first: FeedFirstPage; hasFriends: boolean; onLog: () => void }) {
   const [more, setMore] = useState<{ items: FeedItem[]; cursor: string | null } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -65,10 +66,7 @@ export function ActivityFeed({ first, hasFriends, onLog, home = false }: { first
 
   return (
     <>
-      <div className={feedStyles.head}>
-        <span className={feedStyles.eyebrow}>{home ? "Home" : "Activity"}</span>
-        <h1 className={feedStyles.title}>Where your friends are playing</h1>
-      </div>
+      <PageHeader eyebrow="Activity" title="Where your friends are playing" />
       <div className={feedStyles.columns}>
         <div className={feedStyles.main}>
           {picks.length > 0 && (

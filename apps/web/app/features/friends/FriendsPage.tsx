@@ -12,6 +12,7 @@ import { displayName, profilePath } from "../social/paths";
 import { AvatarSize } from "../social/sizes";
 import socialStyles from "../social/social.module.css";
 import { FriendIntent, UnfriendReason, relationshipButton, toRelationship } from "./friend-actions";
+import { PageHeader } from "../../shared/ui/PageHeader";
 import styles from "./friends.module.css";
 
 const SEARCH_MIN_LENGTH = 3;
@@ -102,11 +103,11 @@ export function FriendsPage({
 
   return (
     <section id="friends" className={styles.page}>
-      <div className={styles.head}>
-        <span className={styles.eyebrow}>Golfing with friends</span>
-        <h1 className={styles.title}>Friends</h1>
-        <p className={styles.lede}>Friends see each other&apos;s rounds, rankings and profiles. Nobody else does.</p>
-      </div>
+      <PageHeader
+        eyebrow="Golfing with friends"
+        title="Friends"
+        lede={<>Friends see each other&apos;s rounds, rankings and profiles. Nobody else does.</>}
+      />
 
       {!signedIn ? (
         <div className={socialStyles.emptyNote}>

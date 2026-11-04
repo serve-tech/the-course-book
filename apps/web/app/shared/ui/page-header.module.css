@@ -1,0 +1,49 @@
+/*
+ * The one page header: small gold label, large cream title, muted subtitle,
+ * with an optional panel on the right. Every page title and section title takes
+ * its look from here, so they cannot drift apart. These classes set no outer
+ * spacing of their own: the group below does, so a page composing them can lay
+ * them out without overriding anything.
+ */
+
+.head { margin-bottom: 26px; }
+.withAside {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 340px);
+  gap: 20px 28px;
+  align-items: end;
+}
+.group { display: grid; gap: 8px; }
+
+.eyebrow {
+  margin: 0;
+  color: var(--gold);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+.title {
+  margin: 0;
+  font: 600 clamp(34px, 5vw, 52px) / 1 "Playfair Display", Georgia, serif;
+  letter-spacing: -1px;
+  color: var(--cream);
+}
+.lede {
+  margin: 4px 0 0;
+  max-width: 58ch;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+/* A section's title under the page's: sans, because Playfair's old-style figures make "Top 10" read as "Top IO". */
+.sectionTitle {
+  margin: 0;
+  font: 600 22px / 1.2 "DM Sans", Arial, sans-serif;
+  color: var(--cream);
+}
+
+@media (max-width: 760px) {
+  .head { margin-bottom: 18px; }
+  .withAside { grid-template-columns: minmax(0, 1fr); }
+}

@@ -5,6 +5,7 @@ import { api, expectOk } from "../lib/api";
 import { errorMessage } from "../shared/lib/errors";
 import { Modal } from "../shared/ui/Modal";
 import { useShell } from "../shared/ui/shell";
+import { PageHeader } from "../shared/ui/PageHeader";
 
 export const meta: Route.MetaFunction = () => [{ title: "Account · The Course Book" }];
 
@@ -42,16 +43,10 @@ export default function Account() {
 
   return (
     <section id="account" className="page active">
-      <div className="listhead">
-        <div>
-          <div className="eyebrow">Your account</div>
-          <h2>Account</h2>
-          <p>Sign-in details are managed by the sign-in dialog. Here you can delete your account.</p>
-        </div>
-      </div>
+      <PageHeader eyebrow="Your account" title="Account" lede="Sign-in details are managed by the sign-in dialog. Here you can delete your account." />
       {isSignedIn ? (
         <div className="prose">
-          <h3>Delete your account</h3>
+          <h2>Delete your account</h2>
           <p>
             Deleting your account removes your list, your rounds, your friends and friend requests, your name and your
             email address, and deletes your sign-in. Courses you added by hand stay in the shared catalog without your name. This cannot be undone.
@@ -71,7 +66,7 @@ export default function Account() {
         </div>
       ) : (
         <div className="empty">
-          <h3>Sign in to manage your account</h3>
+          <h2>Sign in to manage your account</h2>
           <button className="primary" onClick={shell.openAuth}>
             Sign in
           </button>
