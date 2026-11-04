@@ -1,0 +1,39 @@
+.viewHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px 20px;
+  margin: 18px 0 12px;
+}
+.viewTitle { flex: 1 1 240px; min-width: 0; }
+.heading {
+  margin: 0;
+  /* Sans, because Playfair's old-style figures make "Top 10" read as "Top IO". */
+  font: 600 22px / 1.2 "DM Sans", Arial, sans-serif;
+  color: var(--cream);
+}
+.caption { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+
+.actions { display: flex; gap: 8px; }
+
+.invite {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 22px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--cream);
+}
+.invite p { margin: 0; }
+
+@media (max-width: 760px) {
+  /* Two equal tap targets under the title. */
+  .actions { flex: 1 1 100%; }
+  .actions > button { flex: 1 1 0; justify-content: center; }
+}

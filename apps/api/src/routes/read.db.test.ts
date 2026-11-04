@@ -9,10 +9,12 @@ import {
   MemberListSchema,
   MembersSchema,
   MyCoursesSchema,
+  PublicRankingSchema,
   RankingsSchema,
   RoundsSchema,
   SearchResultsSchema,
 } from "../contract/schemas";
+import { createDatabase } from "../db/client";
 import { courseRankings, courses, friendships, users } from "../db/schema";
 import { FriendshipStatus } from "../domain/friendship";
 import { CLIENT_CLOSED_REQUEST } from "../http/errors";
@@ -286,10 +288,147 @@ describe("members", () => {
   });
 });
 
+describe("GET /v1/members/{username}/ranking", () => {
+  beforeEach(async () => {
+    await member("user_1", "golfer_1");
+    await member("user_2", "Bravo");
+  });
+
+  it("gives a signed-out visitor the ranking in order, matching usernames case-insensitively", async () => {
+    const t = createTestApp(db);
+    const [a, b] = [await seeded("usa1"), await seeded("usa2")];
+    await logRounds(db, "user_2", { courseId: a }, 1);
+    await logRounds(db, "user_2", { courseId: b }, 1);
+    const result = await t.get("/v1/members/bravo/ranking");
+    expect(result.status).toBe(200);
+    const body = PublicRankingSchema.parse(result.body);
+    expect(body.member).toEqual({ username: "Bravo", displayName: "Bravo Name" });
+    expect(body.courses.map((row) => [row.course.id, row.rank])).toEqual([
+      [a, 1],
+      [b, 2],
+    ]);
+  });
+
+  it("carries no rounds, email or member id, even when rounds exist", async () => {
+    const t = createTestApp(db);
+    await logRounds(db, "user_2", { courseId: await seeded("usa1") }, 3, "2026-06-01");
+    const result = await t.get("/v1/members/Bravo/ranking");
+    const text = JSON.stringify(result.body);
+    for (const secret of ["example.com", "user_2", "2026-06-01", "played", "lastPlayedOn"]) expect(text).not.toContain(secret);
+    const [row] = PublicRankingSchema.parse(result.body).courses;
+    expect(Object.keys(row ?? {}).sort()).toEqual(["course", "rank"]);
+  });
+
+  it("lets a signed-in member who is not a friend read it, while the member's other reads stay friends-only", async () => {
+    const t = createTestApp(db);
+    await logRounds(db, "user_2", { courseId: await seeded("usa1") }, 1);
+    const viewer = t.bearer("user_1", "golfer_1");
+    expect((await t.get("/v1/members/Bravo/ranking", viewer)).status).toBe(200);
+    for (const path of ["/v1/members/Bravo", "/v1/members/Bravo/profile", "/v1/members/Bravo/rounds", "/v1/members/Bravo/want-to-play"])
+      expect((await t.get(path, viewer)).status).toBe(404);
+  });
+
+  it("answers an empty ranking for a member with no courses", async () => {
+    const t = createTestApp(db);
+    expect(PublicRankingSchema.parse((await t.get("/v1/members/Bravo/ranking")).body).courses).toEqual([]);
+  });
+
+  it("answers member_not_found for an unknown member and a deleted account", async () => {
+    const t = createTestApp(db);
+    await db.update(users).set({ deletedAt: new Date() }).where(eq(users.id, "user_2"));
+    for (const username of ["nobody", "Bravo"]) {
+      const result = await t.get(`/v1/members/${username}/ranking`);
+      expect(result.status).toBe(404);
+      expect(ApiErrorSchema.parse(result.body).error.code).toBe("member_not_found");
+    }
+  });
+
+  it("is not stored by shared caches, so a re-rank shows on the next load", async () => {
+    const t = createTestApp(db);
+    const response = await t.app.request("/v1/members/Bravo/ranking");
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+  });
+});
+
 describe("GET /v1/client-config", () => {
   it("is public", async () => {
     const t = createTestApp(db);
     const result = await t.get("/v1/client-config");
     expect(ClientConfigSchema.parse(result.body)).toEqual(TEST_CLIENT_CONFIG);
+  });
+});
+
+describe("GET /r/* (shared ranking links)", () => {
+  beforeEach(async () => {
+    await member("user_2", "Bravo");
+  });
+
+  /** A shared link's response as text, as a messaging app reads it. */
+  const open = async (t: ReturnType<typeof createTestApp>, path: string) => {
+    const response = await t.app.request(path);
+    return { response, html: await response.text() };
+  };
+
+  it("answers with the web app's page and a card for that member and view", async () => {
+    const t = createTestApp(db);
+    await logRounds(db, "user_2", { courseId: await seeded("usa1") }, 1);
+    const { response, html } = await open(t, "/r/bravo?view=usa&top=5");
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/html");
+    expect(html).toContain("<body>app</body>");
+    expect(html).toContain('<meta property="og:title" content="Bravo Name&#39;s Top 5 in the USA">');
+    expect(html).toContain('<meta property="og:url" content="https://coursebook.golf/r/Bravo?view=usa&amp;top=5">');
+  });
+
+  it("stays out of search results, lets the app load and is not cached", async () => {
+    const t = createTestApp(db);
+    const { response, html } = await open(t, "/r/Bravo");
+    expect(response.headers.get("x-robots-tag")).toBe("noindex");
+    expect(html).toContain('<meta name="robots" content="noindex">');
+    expect(response.headers.get("content-security-policy")).toBeNull();
+    expect(response.headers.get("cache-control")).toBe("no-cache");
+    // Every other response keeps the API's lockdown.
+    expect((await t.app.request("/healthz")).headers.get("content-security-policy")).toContain("default-src 'none'");
+  });
+
+  it("carries no rounds, email or member id", async () => {
+    const t = createTestApp(db);
+    await logRounds(db, "user_2", { courseId: await seeded("usa1") }, 3, "2026-06-01");
+    const { html } = await open(t, "/r/Bravo");
+    for (const secret of ["example.com", "user_2", "2026-06-01", "round"]) expect(html).not.toContain(secret);
+  });
+
+  it.each(["/r/nobody", "/r/", "/r/%E0%A4%A", "/r/Bravo-deleted"])("gives %s the app's page with a generic card", async (path) => {
+    const t = createTestApp(db);
+    const { response, html } = await open(t, path);
+    expect(response.status).toBe(200);
+    expect(html).toContain('<meta property="og:title" content="The Course Book">');
+    expect(t.errors).toEqual([]);
+  });
+
+  it("does not name a deleted member", async () => {
+    const t = createTestApp(db);
+    await db.update(users).set({ deletedAt: new Date() }).where(eq(users.id, "user_2"));
+    const { html } = await open(t, "/r/Bravo");
+    expect(html).not.toContain("Bravo Name");
+  });
+
+  it("still opens the app with a generic card when the card cannot be built, and logs it", async () => {
+    const unreachable = createDatabase("postgres://nobody@127.0.0.1:1/nothing");
+    const t = createTestApp(unreachable.db);
+    const { response, html } = await open(t, "/r/Bravo");
+    await unreachable.pool.end();
+    expect(response.status).toBe(200);
+    expect(html).toContain("<body>app</body>");
+    expect(html).toContain('<meta property="og:title" content="The Course Book">');
+    expect(t.errors.map((entry) => entry.message)).toEqual(["Could not build a share card"]);
+  });
+
+  it("answers 503 with the card when the web app's page has never been read", async () => {
+    const t = createTestApp(db, { webShell: { read: () => Promise.resolve(null) } });
+    const { response, html } = await open(t, "/r/Bravo");
+    expect(response.status).toBe(503);
+    expect(html).toContain('<meta property="og:title" content="Bravo Name&#39;s course ranking">');
+    expect(html).toContain("couldn't load right now");
   });
 });

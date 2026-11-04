@@ -2,11 +2,12 @@ import type { OpenAPIHono } from "@hono/zod-openapi";
 import type { ZodType } from "zod";
 import type { AppDependencies } from "../app";
 import { requireUser } from "../auth/middleware";
-import { toMemberList, toProfile, toTimelineMonth, toTimelineRound } from "../contract/mappers";
+import { toMemberList, toProfile, toPublicRanking, toTimelineMonth, toTimelineRound } from "../contract/mappers";
 import {
   befriendMember,
   getMemberList,
   getMemberProfile,
+  getPublicRanking,
   listFriendRequests,
   listMemberRounds,
   listMembers,
@@ -37,10 +38,19 @@ export function pageCursor<T>(text: string | null | undefined, schema: ZodType<T
 
 /**
  * Friends, their lists, member search and friend requests. Every operation
- * acts for the token's member; a member sees only their own and their
- * accepted friends' lists (decision 2026-09-29, friends-only visibility).
+ * but the public ranking acts for the token's member; a member sees only
+ * their own and their accepted friends' lists (decision 2026-09-29,
+ * friends-only visibility). Anyone may read a ranking without its rounds
+ * (decision 2026-11-03, ranking-first product).
  */
 export function registerMemberRoutes(app: OpenAPIHono<AppEnv>, deps: AppDependencies): void {
+  app.openapi(guarded(getPublicRanking), async (c) => {
+    const { username } = c.req.valid("param");
+    const ranking = await friends.publicRanking(deps.db, username);
+    if (!ranking) throw new AppError(404, ErrorCode.MemberNotFound, "No member with that username.");
+    return c.json(toPublicRanking(ranking), 200);
+  });
+
   app.openapi(guarded(listMembers), async (c) => {
     const user = await requireUser(c, deps.provisioner);
     const { cursor, limit } = c.req.valid("query");

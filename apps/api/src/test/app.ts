@@ -61,6 +61,8 @@ export function createTestApp(db: Database, overrides: Partial<AppDependencies> 
     },
     webOrigins: [WEB_ORIGIN],
     clientConfig: TEST_CLIENT_CONFIG,
+    webUrl: "https://coursebook.golf",
+    webShell: { read: () => Promise.resolve("<html><head><title>The Course Book</title></head><body>app</body></html>") },
     logger,
     ...overrides,
   });

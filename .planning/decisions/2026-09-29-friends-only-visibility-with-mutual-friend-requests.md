@@ -3,6 +3,8 @@
 **Date:** 2026-09-29
 **Status:** Accepted
 
+**Amended 2026-11-03:** rankings become public when [Ranking-first product](2026-11-03-ranking-first-product-one-master-ranking-with-derived-top-n-views.md) ships them. Friendships and everything else here stand.
+
 ## Context
 
 Issue #11. Every signed-in member could page through the whole member directory (`GET /v1/members`) and open any member's list (`GET /v1/members/{username}`), as in the retired app; Clerk sign-up is public, so anyone who signed up could read every member's list. The maintainer requires that members see and edit only their own list and see (not edit) their friends' lists, before launch on 2026-09-30.

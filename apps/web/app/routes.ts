@@ -18,6 +18,7 @@ export default [
       route("lists/:list", "routes/profile.top-list.tsx"),
       route("stats", "routes/profile.stats.tsx"),
     ]),
+    route("r/:username", "routes/public-ranking.tsx"),
     route("friends", "routes/friends.tsx"),
     route("friends/:username", "routes/friend-redirect.tsx"),
     route("account", "routes/account.tsx"),

@@ -63,6 +63,8 @@ describe("published contract", () => {
       search: { search: () => Promise.resolve([]) },
       webOrigins: [],
       clientConfig: { minimumVersions: { ios: "0.0.0", android: "0.0.0" }, privacyUrl: "https://coursebook.golf/privacy", accountDeletionUrl: "https://coursebook.golf/account" },
+      webUrl: "https://coursebook.golf",
+      webShell: { read: () => Promise.resolve(null) },
     });
     const response = await app.request("/v1/openapi.json");
     expect(await response.json()).toEqual(committed);
@@ -117,6 +119,8 @@ describe("published contract", () => {
       search: { search: () => Promise.reject(new Error("must not be reached")) },
       webOrigins: [],
       clientConfig: { minimumVersions: { ios: "0.0.0", android: "0.0.0" }, privacyUrl: "https://coursebook.golf/privacy", accountDeletionUrl: "https://coursebook.golf/account" },
+      webUrl: "https://coursebook.golf",
+      webShell: { read: () => Promise.resolve(null) },
     });
     const samples: Record<string, string> = {
       courseId: "11111111-1111-4111-8111-111111111111",

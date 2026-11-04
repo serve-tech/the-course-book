@@ -26,9 +26,11 @@ export default function Privacy() {
         </p>
         <h3>Who sees it</h3>
         <p>
-          Signed-in members can find you by username and see your username and display name. Only your friends (members
-          whose friend request you accepted, or who accepted yours) see your list and its order. No one else sees your
-          email address. Nothing is sold or used for advertising.
+          Your ranking is public: anyone with its link can see your display name, username, the courses on your list
+          and their order, without signing in. We ask search engines not to list it. Signed-in members can also find
+          you by username. Only your friends (members whose friend request you accepted, or who accepted yours) see the
+          rounds you log, their dates and your Want to play list. No one else sees your email address. Nothing is sold
+          or used for advertising.
         </p>
         <h3>Service providers</h3>
         <p>Sign-in is provided by Clerk. The app and its database run on Render in the United States.</p>

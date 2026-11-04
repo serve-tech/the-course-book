@@ -221,7 +221,8 @@ export default function Layout({ loaderData }: Route.ComponentProps) {
   return (
     <div className={cx("app", navStyles.shell)}>
       <TopBar layout={layout} member={user} incomingRequests={requests} onSignIn={openAuthDialog} onLog={openLog} onSignOut={signOut} onNavigate={navigate} />
-      <LayoutPreview layout={layout} />
+      {/* Someone opening a shared ranking came to see the ranking, not to try a layout. */}
+      {!pathname.startsWith("/r/") && <LayoutPreview layout={layout} />}
       {problem && (
         <p className="error-text" id="authProblem" role="alert">
           {problem}
