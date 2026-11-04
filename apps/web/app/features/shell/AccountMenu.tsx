@@ -56,6 +56,9 @@ export function AccountMenu({ member, onSignOut, onNavigate }: AccountMenuProps)
             <Link role="menuitem" to={profilePath(member.username)} className={styles.menuItem} onClick={go}>
               Profile
             </Link>
+            <Link role="menuitem" to="/activity" className={styles.menuItem} onClick={go}>
+              Activity
+            </Link>
             <Link role="menuitem" to="/account" className={styles.menuItem} onClick={go}>
               Account
             </Link>

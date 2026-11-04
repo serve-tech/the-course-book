@@ -58,9 +58,6 @@ export function ProfileHeader({ profile, notify, onLog }: { profile: Profile; no
         </div>
       </div>
       <nav className={profileStyles.tabs} aria-label="Profile sections">
-        <NavLink end className={cx(profileStyles.tab)} to={profilePath(profile.member.username)}>
-          Timeline
-        </NavLink>
         <NavLink className={cx(profileStyles.tab)} to={profilePath(profile.member.username, "ranking")}>
           Ranking
         </NavLink>
@@ -69,6 +66,9 @@ export function ProfileHeader({ profile, notify, onLog }: { profile: Profile; no
         </NavLink>
         <NavLink className={cx(profileStyles.tab)} to={profilePath(profile.member.username, "stats")}>
           Stats
+        </NavLink>
+        <NavLink className={cx(profileStyles.tab)} to={profilePath(profile.member.username, "timeline")}>
+          Timeline
         </NavLink>
       </nav>
     </>

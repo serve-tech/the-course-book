@@ -14,7 +14,7 @@ export const meta: Route.MetaFunction = () => [
   { title: "Activity · The Course Book" },
 ];
 
-/** Activity is available in both layouts. */
+/** The friends feed, reached from the account menu rather than the main navigation. */
 export async function clientLoader() {
   if (!(await getToken())) return { signedIn: false as const };
   return { signedIn: true as const, ...(await loadFeed()) };

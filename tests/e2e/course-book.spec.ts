@@ -6,7 +6,6 @@ import { FriendshipStatus } from "@coursebook/api/domain/friendship";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { and, eq } from "drizzle-orm";
 import { clerk } from "@clerk/testing/playwright";
-import { isLayoutPreviewEnabled, LAYOUT_PREFERENCE_KEY, LayoutMode } from "../../apps/web/app/features/shell/layout-preview";
 import { authAvailable, clerkAvailable, signInAs } from "./auth";
 import {
   addHiddenCourse,
@@ -38,7 +37,6 @@ const members = (): { owner: TestMember; friend: TestMember } => {
 };
 
 const { db, pool } = connect();
-const previewEnabled = isLayoutPreviewEnabled();
 
 test.afterAll(async () => {
   await pool.end();
@@ -82,7 +80,7 @@ async function openRanking(page: Page, member: TestMember): Promise<void> {
   await expect(page.getByRole("tablist", { name: "Ranking regions" })).toBeVisible();
 }
 
-/** Open the Log dialog from the page's own Log a round button (Home, Activity or the profile header). */
+/** Open the Log dialog from the page's own Log a round button (Home or the profile header). */
 const openLog = (page: Page) => page.getByRole("main").getByRole("button", { name: "+ Log a round" }).click();
 
 /** The Friends destination; its name gains the request count when there are requests. */
@@ -91,12 +89,8 @@ const friendsLink = (page: Page) => page.getByRole("link", { name: /^Friends\b/ 
 /** The signed-out Home page. */
 const welcome = (page: Page) => page.getByRole("heading", { name: /Every course you.ve played/ });
 
-/**
- * The preview Home's focal point. Every test sets Michigan as the chosen
- * state, so Home leads with Best in Michigan unless a list elsewhere is
- * started and Michigan is not.
- */
-const progressHome = (page: Page) => page.getByRole("heading", { level: 1, name: "Best in Michigan" });
+/** The signed-in Home: the member's ranking. */
+const homeRanking = (page: Page) => page.getByRole("heading", { level: 1, name: "Your ranking" });
 
 /**
  * How far Clerk's card sits inside the auth dialog's content box on each side,
@@ -197,17 +191,13 @@ test.describe("signed in", () => {
     const { owner, friend } = members();
     await resetScenario(db, owner, friend);
     await page.goto("/");
-    if (previewEnabled) {
-      await page.getByRole("button", { name: "Try the new layout" }).click();
-      await expect(page.getByRole("button", { name: "Use classic layout" })).toBeEnabled();
-    }
   });
 
   test("sign-in shows the stored order and logging preserves it", async ({ page }) => {
     const { owner } = members();
     await signInAs(page, owner);
     await expectSignedInAs(page, owner.username);
-    if (previewEnabled) await expect(progressHome(page)).toBeVisible();
+    await expect(homeRanking(page)).toBeVisible();
     await openRanking(page, owner);
     await expect(page.locator("#rankingCount")).toHaveText("2 courses");
     await expect.poll(() => rankingOrder(page)).toEqual(["Test Beta Links", "Test Alpha Links"]);
@@ -229,45 +219,40 @@ test.describe("signed in", () => {
     await expect(welcome(page)).toBeVisible();
   });
 
-  test("Home leads with list progress, then friends' rounds and the top four", async ({ page }, testInfo) => {
-    test.skip(!previewEnabled, "The layout preview is disabled in this build");
+  test("Home is the member's ranking, with its share buttons, and everyone gets it", async ({ page }, testInfo) => {
     const { owner, friend } = members();
-    await addPlayed(db, owner, await catalogCourse(db, "usa15")); // Crystal Downs, Michigan #1
-    await addPlayed(db, friend, await catalogCourse(db, "usa20")); // Oakland Hills South, Michigan #2
     await signInAs(page, owner);
-
-    await expect(progressHome(page)).toBeVisible();
+    await expect(homeRanking(page)).toBeVisible();
     await expect(page.getByRole("link", { name: "Home", exact: true })).toHaveAttribute("aria-current", "page");
-    const hero = page.getByRole("region", { name: "Best in Michigan", exact: true });
-    await expect(hero.getByRole("group", { name: "Your lists" })).toBeVisible();
-    await expect(hero.getByRole("progressbar", { name: "Best in Michigan played" })).toHaveAttribute("aria-valuenow", "1");
-    await expect(hero).toContainText(friend.displayName + " has played 1.");
-    const friends = page.getByRole("region", { name: /From your friends/ });
-    await expect(friends.getByRole("listitem").filter({ hasText: fixtureCourses.alpha.name })).toContainText("Your #2");
-    const topFour = page.getByRole("region", { name: /Top four/ });
-    await expect(topFour.getByRole("img")).toHaveCount(3);
+    await expect.poll(() => rankingOrder(page)).toEqual(["Test Beta Links", "Test Alpha Links"]);
+    await expect(page.getByRole("button", { name: "Copy link" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Save image" })).toBeEnabled();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-    await page.screenshot({ path: testInfo.outputPath("progress-home.png"), fullPage: true, scale: "css" });
+    await page.screenshot({ path: testInfo.outputPath("home.png"), fullPage: true, scale: "css" });
 
-    await page.getByRole("region", { name: /Up next on Best in Michigan/ }).getByRole("link", { name: "See the list" }).click();
-    await expect(page).toHaveURL(/\/courses\?list=state-mi$/);
-    await expect(page.getByRole("tab", { name: "Best in Michigan" })).toHaveAttribute("aria-selected", "true");
+    // The old layouts and their control are gone.
+    await expect(page.getByRole("region", { name: "Layout preview" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Try the new layout" })).toHaveCount(0);
 
-    await page.getByRole("link", { name: "Home", exact: true }).click();
-    await topFour.getByRole("link", { name: "Your ranking" }).click();
-    await expect(page).toHaveURL(new RegExp(`/u/${owner.username}/ranking$`));
-    await expect(page.getByRole("link", { name: "My ranking", exact: true })).toHaveAttribute("aria-current", "page");
-    await expect.poll(() => rankingOrder(page)).toEqual(["Test Beta Links", "Test Alpha Links", "Crystal Downs Country Club"]);
+    // A view on Home is a real view: it changes the title and what is shared.
+    await page.getByRole("tab", { name: "Best in Michigan" }).click();
+    await page.getByRole("button", { name: "Top 5" }).click();
+    await expect(page.getByRole("heading", { level: 2, name: "Top 5 in Michigan" })).toBeVisible();
+    const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Save image" }).click()]);
+    expect(download.suggestedFilename()).toMatch(/-top-5-in-michigan\.png$/);
 
-    await page.getByRole("link", { name: "Home", exact: true }).click();
-    await friends.getByRole("link", { name: "All activity" }).click();
-    await expect(page.getByRole("heading", { name: "Where your friends are playing" })).toBeVisible();
-    await expect(page.getByRole("main")).toContainText(friend.displayName);
+    // Re-ranking on Home persists, and shows wherever the ranking does.
+    await page.getByRole("tab", { name: "All", exact: true }).click();
+    await page.getByRole("button", { name: "All", exact: true }).click();
+    await openDetails(page, "Test Alpha Links");
+    await page.locator("#moveTop").click();
+    await expect.poll(() => rankingOrder(page)).toEqual(["Test Alpha Links", "Test Beta Links"]);
+    expect(await listOrder(db, owner.id)).toEqual([fixtureCourses.alpha.id, fixtureCourses.beta.id]);
 
-    // Log a round opens over the page the member is on; nothing navigates.
+    // Log a round opens over Home; nothing navigates.
     await openLog(page);
     await expect(page.locator("#modal")).toBeVisible();
-    await expect(page).toHaveURL(/\/activity$/);
+    await expect(page).toHaveURL(/\/$/);
     await page.getByRole("button", { name: "Close" }).click();
     if (testInfo.project.name === "mobile") {
       await page.getByRole("link", { name: "Courses", exact: true }).click();
@@ -280,67 +265,26 @@ test.describe("signed in", () => {
     await page.goto("/?log=1");
     await expect(page.locator("#modal")).toBeVisible();
     await expect(page).toHaveURL(/\/$/);
-    await expect(progressHome(page)).toBeVisible();
-  });
+    await expect(homeRanking(page)).toBeVisible();
+    await page.getByRole("button", { name: "Close" }).click();
 
-  test("Home's Up next saves Want to play and logs, and members can track another list", async ({ page }, testInfo) => {
-    test.skip(!previewEnabled, "The layout preview is disabled in this build");
-    const { owner, friend } = members();
-    const [crystalDowns, oaklandHills, dunesClub] = [
-      await catalogCourse(db, "usa15"), // Michigan #1, USA #15
-      await catalogCourse(db, "usa20"), // Michigan #2, USA #20
-      await catalogCourse(db, "michigan100"), // Michigan #3
-    ];
-    await addPlayed(db, owner, crystalDowns);
-    await addPlayed(db, friend, oaklandHills);
-    await signInAs(page, owner);
-    await expect(progressHome(page)).toBeVisible();
+    // Activity and Timeline are out of the main navigation, and still reachable.
+    const main = page.getByRole("navigation", { name: "Main" });
+    await expect(main.getByRole("link", { name: "Activity", exact: true })).toHaveCount(0);
+    await expect(main.getByRole("link", { name: "Timeline", exact: true })).toHaveCount(0);
+    await accountMenuButton(page).click();
+    await page.getByRole("menuitem", { name: "Activity" }).click();
+    await expect(page.getByRole("heading", { name: "Where your friends are playing" })).toBeVisible();
+    await expect(page.getByRole("main")).toContainText(friend.displayName);
 
-    const upNext = page.getByRole("list", { name: "Up next on Best in Michigan" });
-    // The rows' own items: rank pills and friends are nested lists of their own.
-    const rows = (list: Locator) => list.locator(":scope > li[data-course]");
-    const courseOrder = (list: Locator) => rows(list).evaluateAll((items) => items.map((item) => item.getAttribute("data-course")));
-    await expect.poll(() => courseOrder(upNext)).toEqual(["Oakland Hills Country Club: South", "Dunes Club", "Kingsley Club"]);
-    await expect(rows(upNext).first()).toContainText(friend.displayName);
-
-    // Want to play moves a course to the front of Up next.
-    await upNext.getByRole("button", { name: "Want to play Dunes Club" }).click();
-    await expect.poll(() => wantedIds(db, owner.id)).toEqual([dunesClub]);
-    await expect.poll(() => courseOrder(upNext)).toEqual(["Dunes Club", "Oakland Hills Country Club: South", "Kingsley Club"]);
-    await expect(rows(upNext).first()).toContainText("On your Want to play");
-
-    // Logging from Up next counts on the hero and takes the course off Up next.
-    await upNext.getByRole("button", { name: "Log a round at Oakland Hills Country Club: South" }).click();
-    await expect(page.locator("#selectedCourseCard")).toContainText("Oakland Hills Country Club: South");
-    await page.locator("#playedOn").fill("2026-05-01");
-    await page.locator("#confirmLog").click();
-    await expect(page.locator("#modal")).toHaveCount(0);
-    await expect(page.getByRole("progressbar", { name: "Best in Michigan played" })).toHaveAttribute("aria-valuenow", "2");
-    await expect.poll(() => courseOrder(upNext)).toEqual(["Dunes Club", "Kingsley Club", "Arcadia Bluffs Golf Club"]);
-    expect(await roundDates(db, owner.id, oaklandHills)).toEqual(["2026-05-01"]);
-
-    // Tracking another list puts it on Home and remembers it on this browser.
-    // Desktop picks with the buttons at the top of the hero; phones with its dropdown.
-    const lists = page.getByRole("group", { name: "Your lists" });
-    const dropdown = lists.getByRole("combobox", { name: "Track a list" });
-    const phone = testInfo.project.name === "mobile";
-    if (phone) {
-      await expect(lists.getByRole("button", { name: /^Track / })).toHaveCount(0);
-      await expect(dropdown).toHaveValue("state-mi");
-      await dropdown.selectOption("usa");
-    } else {
-      await expect(dropdown).toBeHidden();
-      await expect(lists.getByRole("button", { name: /^Track Best in Michigan/ })).toHaveAttribute("aria-pressed", "true");
-      await lists.getByRole("button", { name: /^Track USA Top 100/ }).click();
-    }
-    await expect(page.getByRole("heading", { level: 1, name: "USA Top 100" })).toBeVisible();
-    await expect(page).toHaveURL(/\/\?goal=usa$/);
-    await expect(page.getByRole("progressbar", { name: "USA Top 100 played" })).toHaveAttribute("aria-valuenow", "2");
-    await expect(page.getByRole("list", { name: "Up next on USA Top 100" })).toBeVisible();
-    await page.goto("/");
-    await expect(page.getByRole("heading", { level: 1, name: "USA Top 100" })).toBeVisible();
-    if (phone) await expect(dropdown).toHaveValue("usa");
-    else await expect(lists.getByRole("button", { name: /^Track USA Top 100/ })).toHaveAttribute("aria-pressed", "true");
+    // A profile opens on the ranking; its other tabs stay.
+    await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Profile", exact: true }).click();
+    await expect(page).toHaveURL(new RegExp(`/u/${owner.username}/ranking$`));
+    await expect.poll(() => rankingOrder(page)).toEqual(["Test Alpha Links", "Test Beta Links"]);
+    await page.getByRole("navigation", { name: "Profile sections" }).getByRole("link", { name: "Stats" }).click();
+    await expect(page).toHaveURL(new RegExp(`/u/${owner.username}/stats$`));
+    await page.getByRole("navigation", { name: "Profile sections" }).getByRole("link", { name: "Timeline" }).click();
+    await expect(page).toHaveURL(new RegExp(`/u/${owner.username}/timeline$`));
   });
 
   test("course details moves, count editing and confirmed final-round removal work", async ({ page }) => {
@@ -386,10 +330,8 @@ test.describe("signed in", () => {
     await signInAs(page, owner);
     await friendsLink(page).click();
     await page.locator(`[data-friend="${friend.username}"]`).click();
-    await expect(page).toHaveURL(new RegExp(`/u/${friend.username}$`));
-    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-    await page.getByRole("link", { name: "Ranking", exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`/u/${friend.username}/ranking$`));
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     const rows = page.locator("#ranking > li[data-course]");
     await expect(rows).toHaveCount(2);
     await expect(page.getByRole("button", { name: "All (2)", exact: true })).toBeVisible();
@@ -454,7 +396,7 @@ test.describe("signed in", () => {
     await expect(page.locator("#roundmodal")).toHaveCount(0);
     await expect(augustaRow).toHaveAttribute("data-played", "false");
 
-    await page.goto(`/u/${owner.username}`);
+    await page.goto(`/u/${owner.username}/timeline`);
     // A personal rank always says whose ranking it is.
     await expect(page.locator('[data-round="Test Beta Links"] [data-personal-rank="1"]')).toHaveText("#1Your ranking");
     page.once("dialog", (dialog) => void dialog.accept());
@@ -468,7 +410,7 @@ test.describe("signed in", () => {
     const march = Array.from({ length: 30 }, (_, day) => `2026-03-${String(day + 1).padStart(2, "0")}`);
     await addRounds(db, owner, fixtureCourses.alpha.id, march);
     await signInAs(page, owner);
-    await page.goto(`/u/${owner.username}`);
+    await page.goto(`/u/${owner.username}/timeline`);
     const month = page.locator('[data-month="2026-03"]');
     await expect(month.getByRole("heading", { name: /^March 2026/ })).toContainText("30 rounds");
     // The first page cut March off, yet its header already counts every round.
@@ -506,7 +448,7 @@ test.describe("signed in", () => {
     await friendsLink(page).click();
     await expect(page.locator("#friendsList")).toContainText("No friends yet");
     await page.goto(`/friends/${friend.username}`);
-    await expect(page).toHaveURL(new RegExp(`/u/${friend.username}$`));
+    await expect(page).toHaveURL(new RegExp(`/u/${friend.username}/ranking$`));
     await expect(page.getByRole("alert")).toContainText("This profile isn't available");
 
     await friendsLink(page).click();
@@ -639,13 +581,6 @@ test.describe("signed in", () => {
   });
 });
 
-/** Coordinate real network responses without depending on timing delays. */
-function signal() {
-  let resolve: () => void = () => { throw new Error("signal not initialized"); };
-  const promise = new Promise<void>((complete) => { resolve = complete; });
-  return { promise, resolve };
-}
-
 test.describe("public ranking", () => {
   test.skip(!authAvailable, "Clerk development instance keys or test users are not configured");
 
@@ -763,150 +698,6 @@ test.describe("public ranking", () => {
     await page.goto(`/r/${owner.username}`);
     await expect.poll(() => rankingOrder(page)).toEqual(["Test Alpha Links", "Test Beta Links"]);
   });
-});
-
-test.describe("layout preview", () => {
-  test.skip(!previewEnabled, "The layout preview is disabled in this build");
-  test.skip(
-    !authAvailable,
-    "Clerk development instance keys or test users are not configured",
-  );
-  test.beforeEach(async () => {
-    const { owner, friend } = members();
-    await resetScenario(db, owner, friend);
-  });
-
-  test("Classic is the default, and members can switch both ways without losing their edits", async ({
-    page,
-  }, testInfo) => {
-    const { owner } = members();
-    await signInAs(page, owner);
-    await expect(
-      page.getByRole("heading", { name: "Where your friends are playing" }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("link", { name: "Profile", exact: true }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("link", { name: "My lists", exact: true }),
-    ).toHaveCount(0);
-    await page.screenshot({
-      path: testInfo.outputPath("classic-home.png"),
-      fullPage: true,
-      scale: "css",
-    });
-
-    // Classic logs into the same ranking from Home, without leaving it.
-    await openLog(page);
-    await page.locator("#modalsearch").fill("Test Alpha");
-    await page
-      .locator(".result")
-      .filter({ hasText: "Test Alpha Links" })
-      .click();
-    await page.locator("#confirmLog").click();
-    await expect(page.locator("#modal")).toHaveCount(0);
-    await expect(page).toHaveURL(/\/$/);
-    await expect(
-      page.getByRole("heading", { name: "Where your friends are playing" }),
-    ).toBeVisible();
-
-    await page.getByRole("button", { name: "Try the new layout" }).click();
-    await expect(progressHome(page)).toBeVisible();
-    await page.getByRole("link", { name: "My ranking", exact: true }).click();
-    await expect(row(page, "Test Alpha Links")).toContainText("2 rounds");
-    await page.reload();
-    await expect(
-      page.getByRole("link", { name: "My ranking", exact: true }),
-    ).toBeVisible();
-    await openDetails(page, "Test Alpha Links");
-    await page.locator("#moveTop").click();
-    await expect
-      .poll(() => rankingOrder(page))
-      .toEqual(["Test Alpha Links", "Test Beta Links"]);
-    await page.getByRole("link", { name: "Home", exact: true }).click();
-    await expect(
-      page.getByRole("region", { name: /Top four/ }).getByRole("img").first(),
-    ).toHaveAttribute("aria-label", /^Test Alpha Links/);
-
-    await page.getByRole("button", { name: "Use classic layout" }).click();
-    await expect(
-      page.getByRole("heading", { name: "Where your friends are playing" }),
-    ).toBeVisible();
-    await page.reload();
-    await expect(
-      page.getByRole("link", { name: "Profile", exact: true }),
-    ).toBeVisible();
-    await openRanking(page, owner);
-    await expect
-      .poll(() => rankingOrder(page))
-      .toEqual(["Test Alpha Links", "Test Beta Links"]);
-    await expect(row(page, "Test Alpha Links")).toContainText("2 rounds");
-    expect(await listOrder(db, owner.id)).toEqual([
-      fixtureCourses.alpha.id,
-      fixtureCourses.beta.id,
-    ]);
-    await page.goto("/?log=1");
-    await expect(page.locator("#modal")).toBeVisible();
-    await expect(page).toHaveURL(/\/$/);
-  });
-
-  test("layout changes stay consistent across tabs, including one still loading", async ({
-    page,
-    context,
-  }) => {
-    const { owner } = members();
-    await signInAs(page, owner);
-    const second = await context.newPage();
-    const requested = signal();
-    const release = signal();
-    // Hold a real API response so the initial shell cannot mount its listener
-    // until after the first tab changes the preference.
-    await second.route(
-      "**/v1/me",
-      async (route) => {
-        const response = await route.fetch();
-        requested.resolve();
-        await release.promise;
-        await route.fulfill({ response });
-      },
-      { times: 1 },
-    );
-    const opening = second.goto("/");
-    await requested.promise;
-    await page.getByRole("button", { name: "Try the new layout" }).click();
-    await expect(progressHome(page)).toBeVisible();
-    release.resolve();
-    await opening;
-    await expect(progressHome(second)).toBeVisible();
-    await expect(
-      second.getByRole("link", { name: "My ranking", exact: true }),
-    ).toBeVisible();
-    await second.getByRole("button", { name: "Use classic layout" }).click();
-    await expect(
-      page.getByRole("heading", { name: "Where your friends are playing" }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("link", { name: "Home", exact: true }),
-    ).toBeVisible();
-    await second.close();
-  });
-});
-
-test("disabled preview keeps Classic even with a saved opt-in", async ({ page }) => {
-  test.skip(previewEnabled, "The layout preview is enabled in this build");
-  test.skip(!authAvailable, "Clerk development instance keys or test users are not configured");
-  const { owner, friend } = members();
-  await resetScenario(db, owner, friend);
-  await page.addInitScript(({ key, value }) => { localStorage.setItem(key, value); }, {
-    key: LAYOUT_PREFERENCE_KEY,
-    value: LayoutMode.CourseFirst,
-  });
-  await signInAs(page, owner);
-  await expect(page.getByRole("heading", { name: "Where your friends are playing" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Home", exact: true })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Profile", exact: true })).toBeVisible();
-  await expect(page.getByRole("region", { name: "Layout preview" })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "My lists", exact: true })).toHaveCount(0);
 });
 
 test.describe("account deletion", () => {

@@ -6,6 +6,9 @@ import { ShareActions } from "./ShareActions";
 import { imageFileName, sharePath, shareViewTitle, TOP_CHOICES, type ShareView } from "@coursebook/domain/sharing/view";
 import styles from "./share.module.css";
 
+/** Views with this many courses or fewer need no search, and on a phone it pushes the courses off the first screen. */
+export const SEARCH_FROM = 10;
+
 /**
  * The buttons that cut a ranking to its top courses.
  *

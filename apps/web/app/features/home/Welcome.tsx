@@ -11,8 +11,8 @@ export function Welcome({ onSignIn }: { onSignIn: () => void }) {
         Every course you&apos;ve played, <em>ranked.</em>
       </h1>
       <p className={feedStyles.lede}>
-        Log your rounds, rank the courses you love, work through the Top 100
-        lists and see where your friends are playing.
+        Rank the courses you love, pull out your Top 5 in Michigan or Top 10 in
+        the USA, and share it with a link.
       </p>
       <div className={feedStyles.welcomeActions}>
         <button
@@ -32,15 +32,15 @@ export function Welcome({ onSignIn }: { onSignIn: () => void }) {
       <div className={feedStyles.features}>
         <div className={feedStyles.feature}>
           <b>Your ranking</b>
-          <p>Drag your courses into order. Your top four lead your profile.</p>
+          <p>Drag your courses into order. Every Top 5 and Top 10 comes from it.</p>
         </div>
         <div className={feedStyles.feature}>
-          <b>Top lists</b>
-          <p>Tick off the World, USA, Public and state Top 100s.</p>
+          <b>Share it</b>
+          <p>Send a link to any view, or save it all as one tall image.</p>
         </div>
         <div className={feedStyles.feature}>
           <b>Friends</b>
-          <p>See where friends played and how your rankings compare.</p>
+          <p>See how your rankings compare with your friends&apos;.</p>
         </div>
       </div>
     </div>

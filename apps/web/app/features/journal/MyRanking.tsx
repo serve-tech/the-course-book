@@ -35,6 +35,8 @@ import { replyMessage, useJournalFetcher } from "./use-journal-fetcher";
  * @param onLog - Opens the Log a round dialog over the page (the empty ranking's Log your first round).
  * @param selectedState - The state for Best in State, shared with the Courses page.
  * @param onState - Chooses that state.
+ * @param initialTop - The Top N the page opens on; null opens on every course.
+ * @param searchFrom - Views with this many courses or fewer offer no search. Defaults to always offering it.
  * @param renderImage - Draws the saved image; for tests, because jsdom has no canvas.
  */
 export function MyRanking({
@@ -46,6 +48,8 @@ export function MyRanking({
   onState,
   notify,
   onSearchFocus,
+  initialTop = null,
+  searchFrom = 0,
   renderImage,
 }: {
   rows: readonly ListEntry[];
@@ -56,11 +60,13 @@ export function MyRanking({
   onState: (value: string) => void;
   notify: (message: string) => void;
   onSearchFocus: (focused: boolean) => void;
+  initialTop?: number | null;
+  searchFrom?: number;
   renderImage?: (content: RankingImageContent) => Promise<Blob>;
 }) {
   const [query, setQuery] = useState(""),
     [region, setRegion] = useState(RegionFilter.All),
-    [top, setTop] = useState<number | null>(null),
+    [top, setTop] = useState(initialTop),
     [details, setDetails] = useState<Course | null>(null),
     [history, setHistory] = useState<Course | null>(null),
     [editing, setEditing] = useState<string | null>(null);
@@ -91,7 +97,8 @@ export function MyRanking({
     [region, selectedState, top],
   );
   const viewed = useMemo(() => viewRows(courses, shown), [courses, shown]);
-  const visible = rankingRows(viewed, { region: RegionFilter.All, state: "", query });
+  const searchable = viewed.length > searchFrom;
+  const visible = rankingRows(viewed, { region: RegionFilter.All, state: "", query: searchable ? query : "" });
   const stateMissing = region === RegionFilter.State && !selectedState;
 
   const { drag, start, suppressClick } = useCourseDrag(!readOnly && !move.busy, (id, target, after) => {
@@ -129,6 +136,7 @@ export function MyRanking({
         onState={onState}
         onQuery={setQuery}
         onSearchFocus={onSearchFocus}
+        searchable={searchable}
       >
         {courses.length > 0 && <TopChoices top={top} onTop={setTop} />}
       </RankingFilters>

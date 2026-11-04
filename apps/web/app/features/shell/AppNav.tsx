@@ -1,7 +1,6 @@
 import { Link, NavLink } from "react-router";
 import { BrandMark } from "../../shared/ui/Brand";
 import { AccountMenu } from "./AccountMenu";
-import type { LayoutMode } from "./layout-preview";
 import { mainDestinations } from "./navigation";
 import { cx } from "../../shared/lib/cx";
 import styles from "./nav.module.css";
@@ -14,7 +13,6 @@ export interface NavMember {
 }
 
 interface NavProps {
-  layout: LayoutMode;
   member: NavMember | null;
   /** Pending friend requests to the member, shown as a badge on Friends. */
   incomingRequests: number;
@@ -25,9 +23,8 @@ interface NavProps {
   onNavigate: () => void;
 }
 
-/** Classic and preview share the shell; only their destinations change. */
+/** The header: brand, main destinations and the account menu. */
 export function TopBar({
-  layout,
   member,
   incomingRequests,
   onSignIn,
@@ -50,7 +47,6 @@ export function TopBar({
       </Link>
       <nav className={styles.links} aria-label="Main">
         <Destinations
-          layout={layout}
           member={member}
           incomingRequests={incomingRequests}
           onSignIn={onSignIn}
@@ -81,9 +77,8 @@ export function TopBar({
   );
 }
 
-/** Classic keeps its central Log action; the preview exposes ranking and lists directly. */
+/** The phone's tab bar, with Log a round in the middle. */
 export function TabBar({
-  layout,
   member,
   incomingRequests,
   onSignIn,
@@ -93,7 +88,6 @@ export function TabBar({
   return (
     <nav className={styles.tabbar} aria-label="Main">
       <Destinations
-        layout={layout}
         member={member}
         incomingRequests={incomingRequests}
         onSignIn={onSignIn}
@@ -106,7 +100,6 @@ export function TabBar({
 }
 
 function Destinations({
-  layout,
   member,
   incomingRequests,
   onSignIn,
@@ -114,7 +107,7 @@ function Destinations({
   onNavigate,
   mobile,
 }: Omit<NavProps, "onSignOut"> & { mobile: boolean }) {
-  return mainDestinations(layout, member?.username ?? null, mobile).map(
+  return mainDestinations(member?.username ?? null, mobile).map(
     ({ label, to, icon, log }) => {
       const content = log ? (
         <span className={styles.plus}>
