@@ -90,6 +90,13 @@ describe("HomeRanking", () => {
     expect(screen.getByRole("searchbox", { name: "Search this ranking" })).toBeInTheDocument();
   });
 
+  it("leaves out round counts, and draws its header like the other pages", () => {
+    show(ranking(3));
+    expect(screen.queryByText(/\d round/)).not.toBeInTheDocument();
+    expect(screen.getByText("Your course book")).toBeInTheDocument();
+    expect(screen.getByText("Every course you've played, best first.")).toBeInTheDocument();
+  });
+
   it("logs a round over Home", () => {
     show(ranking(3));
     fireEvent.click(screen.getByRole("button", { name: "+ Log a round" }));

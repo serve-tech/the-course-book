@@ -32,14 +32,14 @@ export function ProfileHeader({ profile, notify, onLog }: { profile: Profile; no
       <div className={profileStyles.hero}>
         <div className={profileStyles.heroInner}>
           <Avatar member={profile.member} size={AvatarSize.Large} />
-          <div className={profileStyles.identity}>
-            <span className={profileStyles.eyebrow}>{self ? "Your profile" : "Friend"}</span>
+          <hgroup className={profileStyles.identity}>
+            <p className={profileStyles.eyebrow}>{self ? "Your profile" : "Friend"}</p>
             <h1 className={profileStyles.name}>{name}</h1>
-            <span className={profileStyles.handle}>
+            <p className={profileStyles.handle}>
               <b>@{profile.member.username}</b>
               {profile.friendsSince && <> · friends since {monthLabel(profile.friendsSince)}</>}
-            </span>
-          </div>
+            </p>
+          </hgroup>
           <div className={profileStyles.heroActions}>
             {self ? (
               <button type="button" className={[styles.button, styles.buttonSolid].join(" ")} onClick={onLog}>

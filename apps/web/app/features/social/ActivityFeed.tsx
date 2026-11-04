@@ -11,6 +11,7 @@ import { PersonalRank } from "./PersonalRank";
 import { newFromFriends, relativeDay, shortDate, visitLabel, type FeedFirstPage } from "./format";
 import { displayName, profilePath } from "./paths";
 import { AvatarSize, TileSize } from "./sizes";
+import { PageHeader } from "../../shared/ui/PageHeader";
 import feedStyles from "./feed.module.css";
 import styles from "./social.module.css";
 
@@ -65,10 +66,7 @@ export function ActivityFeed({ first, hasFriends, onLog }: { first: FeedFirstPag
 
   return (
     <>
-      <div className={feedStyles.head}>
-        <span className={feedStyles.eyebrow}>Activity</span>
-        <h1 className={feedStyles.title}>Where your friends are playing</h1>
-      </div>
+      <PageHeader eyebrow="Activity" title="Where your friends are playing" />
       <div className={feedStyles.columns}>
         <div className={feedStyles.main}>
           {picks.length > 0 && (

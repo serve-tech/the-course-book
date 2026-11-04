@@ -8,9 +8,10 @@ import styles from "./home.module.css";
 import { openingTop } from "./opening-top";
 
 /**
- * Home: the member's ranking and its share buttons, with no profile header
- * above them, so on a phone the courses are on the first screen. Answers "what
- * are my top courses?" (decision 2026-11-03, ranking-first product).
+ * Home: the member's ranking under the same header as the Courses page, with
+ * the view and its share buttons in the panel beside the title. Answers "what
+ * are my top courses?" (decision 2026-11-03, ranking-first product), so rows
+ * leave out round counts, which rounds' own screens still show.
  *
  * @param rows - The member's ranking in rank order.
  * @param member - The signed-in member.
@@ -18,20 +19,23 @@ import { openingTop } from "./opening-top";
  */
 export function HomeRanking({ rows, member, onLog }: { rows: readonly ListEntry[]; member: PublicMember; onLog: () => void }) {
   return (
-    <div className={styles.page}>
-      <div className={styles.head}>
-        <h1 className={styles.title}>Your ranking</h1>
-        <button type="button" className={[socialStyles.button, socialStyles.buttonGhost].join(" ")} onClick={onLog}>
-          + Log a round
-        </button>
-      </div>
-      <OwnRanking
-        rows={rows}
-        username={member.username}
-        name={displayName(member)}
-        initialTop={openingTop(rows.length)}
-        searchFrom={SEARCH_FROM}
-      />
-    </div>
+    <OwnRanking
+      rows={rows}
+      username={member.username}
+      name={displayName(member)}
+      initialTop={openingTop(rows.length)}
+      searchFrom={SEARCH_FROM}
+      showRounds={false}
+      heading={{
+        eyebrow: "Your course book",
+        title: "Your ranking",
+        lede: "Every course you've played, best first.",
+        children: (
+          <button type="button" className={[socialStyles.button, socialStyles.buttonGhost, styles.log].join(" ")} onClick={onLog}>
+            + Log a round
+          </button>
+        ),
+      }}
+    />
   );
 }

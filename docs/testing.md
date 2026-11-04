@@ -64,7 +64,7 @@ Mock external services, not the domain or service logic whose behavior the test 
 | Authorization | Writes affect only the token's member; the public ranking carries no rounds, email or ids and 404s for deleted accounts; everything else about a member is visible only to them and accepted friends (strangers and pending requests get 404); secured operations 401 before validation; web tokens need an allowed `azp`; Authorization values other than `Bearer <token>` 401 without calling Clerk; rejections log a warning (`t.warnings`) without the token; deleted accounts cannot write or be re-provisioned; `DELETE /v1/me` works without provisioning (invalid username, no row); a username another member holds is 409 `username_taken`; no emails anywhere |
 | Logging and errors | Error logs (`t.errors`) go through `loggableError`: no query parameters, Postgres `detail` or emails; a request whose client went away is 499 and its cancellation is not logged, while unrelated server failures still are; security headers and server-generated request ids on every response |
 | Contract | Additive only; `pnpm contract:emit` committed; `contract.test.ts` passes |
-| UI/navigation/styles | Existing flows at desktop/mobile sizes, accessible dialog controls, error panels with Retry. Home opens on the member's ranking with no blank state; Activity and Timeline stay out of the main navigation |
+| UI/navigation/styles | Existing flows at desktop/mobile sizes, accessible dialog controls, error panels with Retry. Home opens on the member's ranking with no blank state; Activity and Timeline stay out of the main navigation; every page has one `h1` in the shared style and no skipped heading level |
 
 A bug fix needs a regression that would fail with the bug present.
 
