@@ -667,7 +667,8 @@ test.describe("public ranking", () => {
     await expect(page.getByRole("heading", { level: 1, name: owner.displayName })).toBeVisible();
     await expect.poll(() => rankingOrder(page)).toEqual(["Test Beta Links", "Test Alpha Links"]);
     await expect(page.getByLabel("Stats").getByText("Courses")).toBeVisible();
-    await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", "noindex");
+    // Twice when the page came through the API: its card asks too, for readers that run no script.
+    await expect(page.locator('meta[name="robots"]').first()).toHaveAttribute("content", "noindex");
     // A public ranking says nothing about rounds, though the owner has some.
     await expect(page.locator("#ranking")).not.toContainText("round");
     await expect(page.getByLabel("Stats")).not.toContainText("Rounds");
@@ -730,6 +731,30 @@ test.describe("public ranking", () => {
     await expect(page.getByRole("heading", { level: 2, name: "Top 5 in the USA" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Make your ranking" })).toHaveCount(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  });
+
+  test("a shared link carries a card for that member and view, and still opens the normal page", async ({ page, request }) => {
+    const { owner } = members();
+    const link = `/r/${owner.username}?view=state-mi&top=5`;
+    const response = await request.get(link);
+    expect(response.status()).toBe(200);
+    const html = await response.text();
+    expect(html).toContain(`<meta property="og:title" content="${owner.displayName}&#39;s Top 5 in Michigan">`);
+    expect(html).toContain(`<meta property="og:description" content="1. Test Beta Links · 2. Test Alpha Links">`);
+    expect(html).toContain(`<meta property="og:url" content="${new URL(link, response.url()).href.replaceAll("&", "&amp;")}">`);
+    expect(html).toContain('<meta name="robots" content="noindex">');
+    expect(response.headers()["x-robots-tag"]).toBe("noindex");
+
+    // The card must not disturb the app: no hydration errors, and the page opens as usual.
+    const problems: string[] = [];
+    page.on("console", (message) => {
+      if (message.type() === "error" && /hydrat|did not match/i.test(message.text())) problems.push(message.text());
+    });
+    page.on("pageerror", (error) => problems.push(error.message));
+    await page.goto(link);
+    await expect(page.getByRole("heading", { level: 2, name: "Top 5 in Michigan" })).toBeVisible();
+    await expect.poll(() => rankingOrder(page)).toEqual(["Test Beta Links", "Test Alpha Links"]);
+    expect(problems).toEqual([]);
   });
 
   test("a re-rank shows on the public page", async ({ page }) => {

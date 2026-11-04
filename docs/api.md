@@ -70,4 +70,6 @@ Every failure returns:
 
 `POST` operations are not idempotent: a retry after a lost response logs the rounds again. `PUT` and `DELETE` operations are safe to retry; a `DELETE` retried after success answers 404, except `removeWantToPlay`, which answers 200 with the list.
 
+`GET /r/*` (outside `/v1`, not in the contract) answers shared ranking links with the web app's HTML and a preview card; clients should not call it.
+
 `GET /healthz` (outside `/v1`, not in the contract) answers `{ "ok": true }` after a database round-trip, for Render's health checks.

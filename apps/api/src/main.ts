@@ -10,6 +10,7 @@ import { allCourses, catalog } from "./services/catalog";
 import { apiEnv, clerkEnv, databaseEnv, searchEnv } from "./services/env";
 import { createProvisioner, identityFromClerkUser, provisionUser } from "./services/provisioning";
 import { createCourseSearch } from "./services/search";
+import { createWebShell } from "./services/web-shell";
 
 /**
  * API process entry: validate the environment, migrate, serve.
@@ -61,6 +62,13 @@ const app = createApp({
     privacyUrl: api.PUBLIC_WEB_URL + "/privacy",
     accountDeletionUrl: api.PUBLIC_WEB_URL + "/account",
   },
+  webUrl: api.PUBLIC_WEB_URL,
+  webShell: createWebShell({
+    url: api.PUBLIC_WEB_URL,
+    onError: (error) => {
+      consoleLogger.error("Could not read the web app's page", loggableError(error));
+    },
+  }),
 });
 
 const server = serve({ fetch: app.fetch, port: api.PORT }, (info) => {

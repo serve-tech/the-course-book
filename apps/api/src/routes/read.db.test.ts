@@ -14,6 +14,7 @@ import {
   RoundsSchema,
   SearchResultsSchema,
 } from "../contract/schemas";
+import { createDatabase } from "../db/client";
 import { courseRankings, courses, friendships, users } from "../db/schema";
 import { FriendshipStatus } from "../domain/friendship";
 import { CLIENT_CLOSED_REQUEST } from "../http/errors";
@@ -354,5 +355,80 @@ describe("GET /v1/client-config", () => {
     const t = createTestApp(db);
     const result = await t.get("/v1/client-config");
     expect(ClientConfigSchema.parse(result.body)).toEqual(TEST_CLIENT_CONFIG);
+  });
+});
+
+describe("GET /r/* (shared ranking links)", () => {
+  beforeEach(async () => {
+    await member("user_2", "Bravo");
+  });
+
+  /** A shared link's response as text, as a messaging app reads it. */
+  const open = async (t: ReturnType<typeof createTestApp>, path: string) => {
+    const response = await t.app.request(path);
+    return { response, html: await response.text() };
+  };
+
+  it("answers with the web app's page and a card for that member and view", async () => {
+    const t = createTestApp(db);
+    await logRounds(db, "user_2", { courseId: await seeded("usa1") }, 1);
+    const { response, html } = await open(t, "/r/bravo?view=usa&top=5");
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/html");
+    expect(html).toContain("<body>app</body>");
+    expect(html).toContain('<meta property="og:title" content="Bravo Name&#39;s Top 5 in the USA">');
+    expect(html).toContain('<meta property="og:url" content="https://coursebook.golf/r/Bravo?view=usa&amp;top=5">');
+  });
+
+  it("stays out of search results, lets the app load and is not cached", async () => {
+    const t = createTestApp(db);
+    const { response, html } = await open(t, "/r/Bravo");
+    expect(response.headers.get("x-robots-tag")).toBe("noindex");
+    expect(html).toContain('<meta name="robots" content="noindex">');
+    expect(response.headers.get("content-security-policy")).toBeNull();
+    expect(response.headers.get("cache-control")).toBe("no-cache");
+    // Every other response keeps the API's lockdown.
+    expect((await t.app.request("/healthz")).headers.get("content-security-policy")).toContain("default-src 'none'");
+  });
+
+  it("carries no rounds, email or member id", async () => {
+    const t = createTestApp(db);
+    await logRounds(db, "user_2", { courseId: await seeded("usa1") }, 3, "2026-06-01");
+    const { html } = await open(t, "/r/Bravo");
+    for (const secret of ["example.com", "user_2", "2026-06-01", "round"]) expect(html).not.toContain(secret);
+  });
+
+  it.each(["/r/nobody", "/r/", "/r/%E0%A4%A", "/r/Bravo-deleted"])("gives %s the app's page with a generic card", async (path) => {
+    const t = createTestApp(db);
+    const { response, html } = await open(t, path);
+    expect(response.status).toBe(200);
+    expect(html).toContain('<meta property="og:title" content="The Course Book">');
+    expect(t.errors).toEqual([]);
+  });
+
+  it("does not name a deleted member", async () => {
+    const t = createTestApp(db);
+    await db.update(users).set({ deletedAt: new Date() }).where(eq(users.id, "user_2"));
+    const { html } = await open(t, "/r/Bravo");
+    expect(html).not.toContain("Bravo Name");
+  });
+
+  it("still opens the app with a generic card when the card cannot be built, and logs it", async () => {
+    const unreachable = createDatabase("postgres://nobody@127.0.0.1:1/nothing");
+    const t = createTestApp(unreachable.db);
+    const { response, html } = await open(t, "/r/Bravo");
+    await unreachable.pool.end();
+    expect(response.status).toBe(200);
+    expect(html).toContain("<body>app</body>");
+    expect(html).toContain('<meta property="og:title" content="The Course Book">');
+    expect(t.errors.map((entry) => entry.message)).toEqual(["Could not build a share card"]);
+  });
+
+  it("answers 503 with the card when the web app's page has never been read", async () => {
+    const t = createTestApp(db, { webShell: { read: () => Promise.resolve(null) } });
+    const { response, html } = await open(t, "/r/Bravo");
+    expect(response.status).toBe(503);
+    expect(html).toContain('<meta property="og:title" content="Bravo Name&#39;s course ranking">');
+    expect(html).toContain("couldn't load right now");
   });
 });
