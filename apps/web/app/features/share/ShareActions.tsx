@@ -15,6 +15,14 @@ interface PreparedImage {
 }
 
 /**
+ * How long a view must stay on screen before its image is drawn. Measured in
+ * Chromium (2026-11-04): after several draws in quick succession, `toBlob` can
+ * take about 6.7 s instead of about 30 ms, which left Save image disabled while
+ * a member clicked between views.
+ */
+const DRAW_AFTER_MS = 150;
+
+/**
  * Copy link and Save image for a view of a ranking.
  *
  * The image is drawn before the button is pressed, not after: a phone's share
@@ -47,17 +55,20 @@ export function ShareActions({
   useEffect(() => {
     if (!hasRows) return;
     let active = true;
-    render({ ...image, link: window.location.host + path }).then(
-      (blob) => {
-        if (active) setPrepared({ image, path, blob, error: null });
-      },
-      (error: unknown) => {
-        console.warn("Could not draw the ranking image", error);
-        if (active) setPrepared({ image, path, blob: null, error: errorMessage(error) });
-      },
-    );
+    const drawing = setTimeout(() => {
+      render({ ...image, link: window.location.host + path }).then(
+        (blob) => {
+          if (active) setPrepared({ image, path, blob, error: null });
+        },
+        (error: unknown) => {
+          console.warn("Could not draw the ranking image", error);
+          if (active) setPrepared({ image, path, blob: null, error: errorMessage(error) });
+        },
+      );
+    }, DRAW_AFTER_MS);
     return () => {
       active = false;
+      clearTimeout(drawing);
     };
   }, [hasRows, image, path, render]);
 
