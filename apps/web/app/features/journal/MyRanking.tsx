@@ -6,7 +6,7 @@ import type { ListEntry } from "@coursebook/domain/journal/types";
 import { cx } from "../../shared/lib/cx";
 import { RoundHistory } from "../rounds/RoundHistory";
 import type { RankingImageContent } from "../share/ranking-image";
-import { viewRows, type ShareView } from "../share/share-view";
+import { viewRows, type ShareView } from "@coursebook/domain/sharing/view";
 import { TopChoices, ViewHeader } from "../share/ViewHeader";
 import { CourseSummary, PlayedMarks, type PlayedMark } from "../top-lists/CourseRow";
 import styles from "../top-lists/top-lists.module.css";

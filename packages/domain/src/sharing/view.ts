@@ -1,12 +1,12 @@
-import { RegionFilter, type Course } from "@coursebook/domain/catalog/course";
-import { stateCode, stateName } from "@coursebook/domain/catalog/geography";
-import { rankingRows } from "../journal/ranking";
+import { RegionFilter, type Course } from "../catalog/course";
+import { matchesRegion, stateCode, stateName } from "../catalog/geography";
 
 /**
  * Pure rules for a shareable view of a ranking: what a link's query means, how
  * a view is written back into a link, what it is called and which rows it
  * holds. A view is a filter on the one master ranking and is never stored
- * (decision 2026-11-03, ranking-first product).
+ * (decision 2026-11-03, ranking-first product). The web app shows views and the
+ * API describes them in a shared link's preview card, so both run these rules.
  */
 
 /** Which part of a ranking a link shows. */
@@ -27,7 +27,7 @@ export const TOP_CHOICES: readonly number[] = [5, 10, 25];
 const STATE_VIEW = /^state-([a-z]{2})$/;
 
 /** A positive whole number from a link, or null for anything else. */
-function parseTop(value: string | null): number | null {
+function parseTop(value: string | null | undefined): number | null {
   if (!value || !/^\d+$/.test(value)) return null;
   const top = Number(value);
   return Number.isSafeInteger(top) && top > 0 ? top : null;
@@ -45,7 +45,7 @@ function parseTop(value: string | null): number | null {
  *     The view; the whole ranking when `view` is missing or unknown. An
  *     unknown state code reads as the plain state view.
  */
-export function parseShareView(params: URLSearchParams): ShareView {
+export function parseShareView(params: { get(name: string): string | null | undefined }): ShareView {
   const top = parseTop(params.get("top"));
   const view = (params.get("view") ?? "").trim().toLowerCase();
   if (view === "usa") return { region: RegionFilter.USA, state: "", top };
@@ -56,19 +56,29 @@ export function parseShareView(params: URLSearchParams): ShareView {
   return { ...WHOLE_RANKING, top };
 }
 
-/** The query that means `view`, leaving out defaults so links stay short. */
-export function shareViewParams(view: ShareView): URLSearchParams {
-  const params = new URLSearchParams();
-  if (view.region === RegionFilter.USA) params.set("view", "usa");
-  if (view.region === RegionFilter.World) params.set("view", "international");
-  if (view.region === RegionFilter.State) params.set("view", view.state ? "state-" + view.state.toLowerCase() : "state");
-  if (view.top !== null) params.set("top", String(view.top));
-  return params;
+/** The `view` value in a link; null for the whole ranking, which needs none. */
+function viewParam(view: ShareView): string | null {
+  switch (view.region) {
+    case RegionFilter.All:
+      return null;
+    case RegionFilter.USA:
+      return "usa";
+    case RegionFilter.World:
+      return "international";
+    case RegionFilter.State:
+      return view.state ? "state-" + view.state.toLowerCase() : "state";
+  }
+}
+
+/** The query string that means `view`, leaving out defaults so links stay short. */
+export function shareViewQuery(view: ShareView): string {
+  const where = viewParam(view);
+  return [where && "view=" + encodeURIComponent(where), view.top !== null && "top=" + String(view.top)].filter(Boolean).join("&");
 }
 
 /** The app path of a member's public ranking in `view`. */
 export function sharePath(username: string, view: ShareView = WHOLE_RANKING): string {
-  const query = shareViewParams(view).toString();
+  const query = shareViewQuery(view);
   return "/r/" + encodeURIComponent(username) + (query ? "?" + query : "");
 }
 
@@ -105,7 +115,7 @@ export function shareViewTitle(view: ShareView): string {
  *     cut at `view.top`.
  */
 export function viewRows<T extends { course: Course; rank: number }>(rows: readonly T[], view: ShareView): T[] {
-  const kept = rankingRows(rows, { region: view.region, state: view.state, query: "" });
+  const kept = rows.filter(({ course }) => matchesRegion(course, view.region, view.state));
   const cut = view.top === null ? kept : kept.slice(0, view.top);
   return cut.map((row, index) => ({ ...row, rank: index + 1 }));
 }

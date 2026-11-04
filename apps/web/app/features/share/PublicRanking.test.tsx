@@ -7,7 +7,7 @@ import { courseSchema, RegionFilter, type Course } from "@coursebook/domain/cata
 import type { PublicRanking as Ranking } from "@coursebook/domain/friends/types";
 import { PublicRanking } from "./PublicRanking";
 import type { RankingImageContent } from "./ranking-image";
-import { WHOLE_RANKING, type ShareView } from "./share-view";
+import { WHOLE_RANKING, type ShareView } from "@coursebook/domain/sharing/view";
 
 const course = (id: string, name: string, location: string, state = ""): Course =>
   courseSchema.parse({ id, name, location, state, country: location.endsWith("USA") ? "USA" : "Scotland" });

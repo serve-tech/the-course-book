@@ -3,7 +3,7 @@ import type { MemberList } from "@coursebook/domain/friends/types";
 import type { Profile } from "@coursebook/domain/social/types";
 import { data, Link, Outlet, useRouteLoaderData, type ShouldRevalidateFunctionArgs } from "react-router";
 import type { Route } from "./+types/profile";
-import { sharePath } from "../features/share/share-view";
+import { sharePath } from "@coursebook/domain/sharing/view";
 import { displayName } from "../features/social/paths";
 import { ProfileHeader } from "../features/social/ProfileHeader";
 import profileStyles from "../features/social/profile.module.css";

@@ -3,7 +3,7 @@ import type { Course } from "@coursebook/domain/catalog/course";
 import listStyles from "../top-lists/top-lists.module.css";
 import type { RankingImageContent } from "./ranking-image";
 import { ShareActions } from "./ShareActions";
-import { imageFileName, sharePath, shareViewTitle, TOP_CHOICES, type ShareView } from "./share-view";
+import { imageFileName, sharePath, shareViewTitle, TOP_CHOICES, type ShareView } from "@coursebook/domain/sharing/view";
 import styles from "./share.module.css";
 
 /**

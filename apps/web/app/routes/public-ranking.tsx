@@ -2,7 +2,7 @@ import { getToken } from "@clerk/react-router";
 import { data, useSearchParams } from "react-router";
 import type { Route } from "./+types/public-ranking";
 import { PublicRanking } from "../features/share/PublicRanking";
-import { parseShareView, shareViewParams, type ShareView } from "../features/share/share-view";
+import { parseShareView, shareViewQuery, type ShareView } from "@coursebook/domain/sharing/view";
 import { displayName } from "../features/social/paths";
 import { api, ApiError, unwrap } from "../lib/api";
 import { fromPublicRanking } from "../lib/api/mappers";
@@ -40,7 +40,7 @@ export default function PublicRankingRoute({ loaderData }: Route.ComponentProps)
   const shell = useShell();
   const [params, setParams] = useSearchParams();
   const onView = (view: ShareView) => {
-    setParams(shareViewParams(view), { replace: true });
+    setParams(new URLSearchParams(shareViewQuery(view)), { replace: true });
   };
   return (
     <PublicRanking

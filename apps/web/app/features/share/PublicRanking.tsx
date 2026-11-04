@@ -12,7 +12,7 @@ import { placeCounts } from "../social/stats";
 import { CourseRow } from "../top-lists/CourseRow";
 import listStyles from "../top-lists/top-lists.module.css";
 import type { RankingImageContent } from "./ranking-image";
-import { viewRows, type ShareView } from "./share-view";
+import { viewRows, type ShareView } from "@coursebook/domain/sharing/view";
 import styles from "./share.module.css";
 import { TopChoices, ViewHeader } from "./ViewHeader";
 

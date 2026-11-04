@@ -1,8 +1,20 @@
-import { courseSchema, RegionFilter, type Course } from "@coursebook/domain/catalog/course";
 import { describe, expect, it } from "vitest";
-import { imageFileName, parseShareView, sharePath, shareViewParams, shareViewTitle, viewRows, WHOLE_RANKING, type ShareView } from "./share-view";
+import { courseSchema, RegionFilter, type Course } from "../catalog/course";
+import { imageFileName, parseShareView, sharePath, shareViewQuery, shareViewTitle, viewRows, WHOLE_RANKING, type ShareView } from "./view";
 
-const parse = (query: string) => parseShareView(new URLSearchParams(query));
+/** Query parameters by name; this package has no DOM or Node types, so no URLSearchParams. */
+const parse = (query: string) =>
+  parseShareView(
+    new Map(
+      query
+        .split("&")
+        .filter(Boolean)
+        .map((pair): [string, string] => {
+          const [name = "", value = ""] = pair.split("=");
+          return [name, value];
+        }),
+    ),
+  );
 
 const course = (id: string, location: string, state = ""): Course =>
   courseSchema.parse({ id, name: "Course " + id, location, state, country: location.endsWith("USA") ? "USA" : "Scotland" });
@@ -38,7 +50,7 @@ describe("parseShareView", () => {
   });
 });
 
-describe("shareViewParams", () => {
+describe("shareViewQuery", () => {
   it.each<[ShareView, string]>([
     [WHOLE_RANKING, ""],
     [{ ...WHOLE_RANKING, top: 10 }, "top=10"],
@@ -47,7 +59,7 @@ describe("shareViewParams", () => {
     [{ region: RegionFilter.State, state: "MI", top: 5 }, "view=state-mi&top=5"],
     [{ region: RegionFilter.State, state: "", top: null }, "view=state"],
   ])("writes %j and reads it back", (view, query) => {
-    expect(shareViewParams(view).toString()).toBe(query);
+    expect(shareViewQuery(view)).toBe(query);
     expect(parse(query)).toEqual(view);
   });
 });
