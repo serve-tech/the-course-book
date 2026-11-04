@@ -1,5 +1,6 @@
 import { useMemo, type ReactNode } from "react";
 import type { Course } from "@coursebook/domain/catalog/course";
+import { cx } from "../../shared/lib/cx";
 import listStyles from "../top-lists/top-lists.module.css";
 import type { RankingImageContent } from "./ranking-image";
 import { ShareActions } from "./ShareActions";
@@ -46,6 +47,7 @@ export function TopChoices({ top, onTop }: { top: number | null; onTop: (top: nu
  * @param rows - The view's rows, numbered within it. Memoize them: a new array
  *   draws the image again.
  * @param notify - Shows a toast.
+ * @param panel - Draws it as a panel, for beside a page's title.
  * @param render - Draws the image; a test double in unit tests, because jsdom has no canvas.
  * @param children - The caption under the title.
  */
@@ -55,6 +57,7 @@ export function ViewHeader({
   view,
   rows,
   notify,
+  panel = false,
   render,
   children,
 }: {
@@ -63,6 +66,7 @@ export function ViewHeader({
   view: ShareView;
   rows: readonly { course: Course; rank: number }[];
   notify: (message: string) => void;
+  panel?: boolean;
   render?: ((content: RankingImageContent) => Promise<Blob>) | undefined;
   children: ReactNode;
 }) {
@@ -76,7 +80,7 @@ export function ViewHeader({
     [memberName, title, rows],
   );
   return (
-    <div className={styles.viewHeader}>
+    <div className={cx(styles.viewHeader, panel && styles.panel)}>
       <div className={styles.viewTitle}>
         <h2 className={styles.heading}>{title}</h2>
         <p className={styles.caption} aria-live="polite">

@@ -1,17 +1,6 @@
-.page { display: grid; gap: 14px; }
+.log { margin-top: 14px; }
 
-.head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-.title {
-  margin: 0;
-  font: 700 clamp(26px, 5vw, 34px) / 1.1 "Playfair Display", Georgia, serif;
-  color: var(--cream);
-}
-
+/* The phone's tab bar already has Log a round in the middle. */
 @media (max-width: 760px) {
-  .page { gap: 10px; }
+  .log { display: none; }
 }

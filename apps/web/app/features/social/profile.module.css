@@ -34,23 +34,14 @@
   align-items: center;
   gap: 18px 22px;
 }
-.identity { display: grid; gap: 4px; min-width: 0; flex: 1 1 260px; }
-.eyebrow {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  color: var(--gold);
-}
+.identity { composes: group from "../../shared/ui/page-header.module.css"; min-width: 0; flex: 1 1 260px; }
+.eyebrow { composes: eyebrow from "../../shared/ui/page-header.module.css"; }
 .name {
-  margin: 0;
-  font: 600 clamp(30px, 4.4vw, 46px) / 1.04 "Playfair Display", Georgia, serif;
-  letter-spacing: -0.8px;
-  color: var(--cream);
+  composes: title from "../../shared/ui/page-header.module.css";
   text-wrap: balance;
   overflow-wrap: anywhere;
 }
-.handle { color: var(--muted); font-size: 14px; }
+.handle { margin: 0; color: var(--muted); font-size: 14px; }
 .handle b { color: #cfd3cb; font-weight: 600; }
 .heroActions { display: flex; align-items: center; gap: 8px; }
 

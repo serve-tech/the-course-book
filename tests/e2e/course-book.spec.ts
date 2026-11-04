@@ -249,8 +249,9 @@ test.describe("signed in", () => {
     await expect.poll(() => rankingOrder(page)).toEqual(["Test Alpha Links", "Test Beta Links"]);
     expect(await listOrder(db, owner.id)).toEqual([fixtureCourses.alpha.id, fixtureCourses.beta.id]);
 
-    // Log a round opens over Home; nothing navigates.
-    await openLog(page);
+    // Log a round opens over Home; nothing navigates. A phone's is in the tab bar.
+    if (testInfo.project.name === "mobile") await page.getByRole("navigation", { name: "Main" }).getByRole("button", { name: "Log a round" }).click();
+    else await openLog(page);
     await expect(page.locator("#modal")).toBeVisible();
     await expect(page).toHaveURL(/\/$/);
     await page.getByRole("button", { name: "Close" }).click();
@@ -285,6 +286,32 @@ test.describe("signed in", () => {
     await expect(page).toHaveURL(new RegExp(`/u/${owner.username}/stats$`));
     await page.getByRole("navigation", { name: "Profile sections" }).getByRole("link", { name: "Timeline" }).click();
     await expect(page).toHaveURL(new RegExp(`/u/${owner.username}/timeline$`));
+  });
+
+  test("every page has one h1 in the shared style and no skipped heading level", async ({ page }) => {
+    const { owner } = members();
+    await signInAs(page, owner);
+    await expect(homeRanking(page)).toBeVisible();
+    const profile = `/u/${owner.username}`;
+    const pages = ["/", "/courses", "/friends", "/activity", `${profile}/ranking`, `${profile}/lists`, `${profile}/lists/usa`, `${profile}/stats`, `${profile}/timeline`, `/r/${owner.username}`, "/account", "/privacy"];
+    for (const path of pages) {
+      await page.goto(path);
+      await expect(page.locator("main h1"), path).toHaveCount(1);
+      const { levels, style } = await page.evaluate(() => {
+        const heading = document.querySelector("main h1");
+        const computed = heading ? getComputedStyle(heading) : null;
+        return {
+          levels: [...document.querySelectorAll("main h1, main h2, main h3, main h4")].map((item) => Number(item.tagName[1])),
+          style: computed && { font: computed.fontFamily.split(",")[0], weight: computed.fontWeight, spacing: computed.letterSpacing, size: computed.fontSize },
+        };
+      });
+      expect(style, path).toEqual({ font: '"Playfair Display"', weight: "600", spacing: "-1px", size: style?.size });
+      expect(levels[0], path).toBe(1);
+      levels.reduce((previous, level) => {
+        expect(level - previous, path + " skips a heading level").toBeLessThanOrEqual(1);
+        return level;
+      });
+    }
   });
 
   test("course details moves, count editing and confirmed final-round removal work", async ({ page }) => {

@@ -68,13 +68,13 @@ export function PublicRanking({
       <div className={profileStyles.hero}>
         <div className={profileStyles.heroInner}>
           <Avatar member={ranking.member} size={AvatarSize.Large} />
-          <div className={profileStyles.identity}>
-            <span className={profileStyles.eyebrow}>Course ranking</span>
+          <hgroup className={profileStyles.identity}>
+            <p className={profileStyles.eyebrow}>Course ranking</p>
             <h1 className={profileStyles.name}>{name}</h1>
-            <span className={profileStyles.handle}>
+            <p className={profileStyles.handle}>
               <b>@{username}</b>
-            </span>
-          </div>
+            </p>
+          </hgroup>
           <dl className={profileStyles.stats} aria-label="Stats">
             <Stat value={ranking.rows.length} label="Courses" />
             <Stat value={places.states} label="States" />

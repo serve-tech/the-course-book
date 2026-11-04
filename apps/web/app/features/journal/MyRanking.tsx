@@ -4,6 +4,7 @@ import { RegionFilter, type Course } from "@coursebook/domain/catalog/course";
 import { reorder } from "@coursebook/domain/journal/reorder";
 import type { ListEntry } from "@coursebook/domain/journal/types";
 import { cx } from "../../shared/lib/cx";
+import { PageHeader } from "../../shared/ui/PageHeader";
 import { RoundHistory } from "../rounds/RoundHistory";
 import type { RankingImageContent } from "../share/ranking-image";
 import { viewRows, type ShareView } from "@coursebook/domain/sharing/view";
@@ -16,6 +17,15 @@ import { coursesLabel, rankingRows, roundsLabel } from "./ranking";
 import { RankingFilters } from "./RankingFilters";
 import { useCourseDrag } from "./use-course-drag";
 import { replyMessage, useJournalFetcher } from "./use-journal-fetcher";
+
+/** A page header for the ranking, when it is the whole page. */
+export interface RankingHeading {
+  eyebrow: string;
+  title: string;
+  lede: string;
+  /** Anything else under the subtitle, such as a button. */
+  children?: ReactNode;
+}
 
 /**
  * The member's own Ranking, laid out like the Courses page. Rows come from
@@ -37,6 +47,8 @@ import { replyMessage, useJournalFetcher } from "./use-journal-fetcher";
  * @param onState - Chooses that state.
  * @param initialTop - The Top N the page opens on; null opens on every course.
  * @param searchFrom - Views with this many courses or fewer offer no search. Defaults to always offering it.
+ * @param heading - The page's header, when this is the page rather than a tab: the view's title and share buttons become its panel.
+ * @param showRounds - Whether each row shows its round count. Defaults to true.
  * @param renderImage - Draws the saved image; for tests, because jsdom has no canvas.
  */
 export function MyRanking({
@@ -50,6 +62,8 @@ export function MyRanking({
   onSearchFocus,
   initialTop = null,
   searchFrom = 0,
+  heading,
+  showRounds = true,
   renderImage,
 }: {
   rows: readonly ListEntry[];
@@ -62,6 +76,8 @@ export function MyRanking({
   onSearchFocus: (focused: boolean) => void;
   initialTop?: number | null;
   searchFrom?: number;
+  heading?: RankingHeading | undefined;
+  showRounds?: boolean;
   renderImage?: (content: RankingImageContent) => Promise<Blob>;
 }) {
   const [query, setQuery] = useState(""),
@@ -110,6 +126,7 @@ export function MyRanking({
   const dragged = drag?.active ? byId.get(drag.id) : undefined;
 
   const marks = (course: Course, count: number): PlayedMark[] => {
+    if (!showRounds) return [];
     const label = roundsLabel(count);
     if (readOnly) return [{ label, you: false }];
     return [
@@ -123,8 +140,20 @@ export function MyRanking({
     ];
   };
 
+  const viewHeader = (panel: boolean) =>
+    courses.length > 0 && !stateMissing ? (
+      <ViewHeader username={username} memberName={name} view={shown} rows={viewed} notify={notify} panel={panel} render={renderImage}>
+        <span id="rankingCount">{coursesLabel(viewed.length)}</span>
+      </ViewHeader>
+    ) : null;
+
   return (
     <section className={styles.page} aria-label="Your ranking">
+      {heading && (
+        <PageHeader eyebrow={heading.eyebrow} title={heading.title} lede={heading.lede} aside={viewHeader(true)}>
+          {heading.children}
+        </PageHeader>
+      )}
       <RankingFilters
         region={region}
         state={selectedState}
@@ -140,12 +169,9 @@ export function MyRanking({
       >
         {courses.length > 0 && <TopChoices top={top} onTop={setTop} />}
       </RankingFilters>
+      {!heading && viewHeader(false)}
       {courses.length > 0 && !stateMissing && (
-        <ViewHeader username={username} memberName={name} view={shown} rows={viewed} notify={notify} render={renderImage}>
-          <span id="rankingCount">{coursesLabel(viewed.length)}</span>
-          {" · "}
-          {readOnly ? "Switch to All to reorder." : "Drag a course to change your ranking."}
-        </ViewHeader>
+        <p className={styles.hint}>{readOnly ? "Switch to All to reorder." : "Drag a course to change your ranking."}</p>
       )}
 
       {!courses.length ? (
@@ -244,7 +270,7 @@ export function MyRanking({
             style={{ left: drag.x - 30, top: drag.y - 24, width: drag.width }}
           >
             <RankedCells course={dragged.course} rank={order.indexOf(drag.id) + 1}>
-              <PlayedMarks course={dragged.course} marks={[{ label: roundsLabel(dragged.played), you: false }]} />
+              <PlayedMarks course={dragged.course} marks={showRounds ? [{ label: roundsLabel(dragged.played), you: false }] : []} />
             </RankedCells>
           </div>,
           document.body,

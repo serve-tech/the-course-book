@@ -14,6 +14,7 @@ import { AvatarSize } from "../social/sizes";
 import { CourseActions } from "./CourseActions";
 import { CourseRow } from "./CourseRow";
 import { isCompleteList, ListTab, type TopListRef } from "./lists";
+import { PageHeader } from "../../shared/ui/PageHeader";
 import styles from "./top-lists.module.css";
 
 /** Friends shown on the progress card before "and N more". */
@@ -106,46 +107,43 @@ export function TopListsPage({
 
   return (
     <section className={styles.page} aria-labelledby="topListsTitle">
-      <div className={styles.head}>
-        <div>
-          <div className={styles.eyebrow}>The great courses</div>
-          <h1 id="topListsTitle" className={styles.title}>
-            Top lists
-          </h1>
-          <p className={styles.lede}>
-            Work through the published lists: tick off what you've played, save what you want to play next, and see how your friends are doing.
-          </p>
-        </div>
-        {list && complete && (
-          <div className={styles.progress}>
-            <div className={styles.progressLabel}>{title}</div>
-            <div className={styles.progressLine}>
-              <span>
-                <b>{standing ? standing.mine : entries.length}</b>
-                <small>{standing ? "/ " + String(entries.length) + " played" : "courses"}</small>
-              </span>
-              {standing && <span>{String(entries.length - standing.mine)} to go</span>}
-            </div>
-            {standing && (
-              <div className={styles.bar} role="progressbar" aria-label={title + " played"} aria-valuemin={0} aria-valuemax={entries.length} aria-valuenow={standing.mine}>
-                <span style={{ width: String(entries.length ? (100 * standing.mine) / entries.length : 0) + "%" }} />
+      <PageHeader
+        eyebrow="The great courses"
+        title="Top lists"
+        titleId="topListsTitle"
+        lede="Work through the published lists: tick off what you've played, save what you want to play next, and see how your friends are doing."
+        aside={
+          list && complete ? (
+            <div className={styles.progress}>
+              <h2 className={styles.progressLabel}>{title}</h2>
+              <div className={styles.progressLine}>
+                <span>
+                  <b>{standing ? standing.mine : entries.length}</b>
+                  <small>{standing ? "/ " + String(entries.length) + " played" : "courses"}</small>
+                </span>
+                {standing && <span>{String(entries.length - standing.mine)} to go</span>}
               </div>
-            )}
-            {standing && standing.friends.length > 0 && (
-              <ul className={styles.leaders} aria-label="Friends' progress">
-                {standing.friends.slice(0, LEADERS).map((friend) => (
-                  <li key={friend.member.username} className={styles.leader}>
-                    <Avatar member={friend.member} size={AvatarSize.ExtraSmall} />
-                    {displayName(friend.member)}
-                    <b>{friend.played}</b>
-                  </li>
-                ))}
-                {others > 0 && <li className={styles.leader}>and {others} more {others === 1 ? "friend" : "friends"}</li>}
-              </ul>
-            )}
-          </div>
-        )}
-      </div>
+              {standing && (
+                <div className={styles.bar} role="progressbar" aria-label={title + " played"} aria-valuemin={0} aria-valuemax={entries.length} aria-valuenow={standing.mine}>
+                  <span style={{ width: String(entries.length ? (100 * standing.mine) / entries.length : 0) + "%" }} />
+                </div>
+              )}
+              {standing && standing.friends.length > 0 && (
+                <ul className={styles.leaders} aria-label="Friends' progress">
+                  {standing.friends.slice(0, LEADERS).map((friend) => (
+                    <li key={friend.member.username} className={styles.leader}>
+                      <Avatar member={friend.member} size={AvatarSize.ExtraSmall} />
+                      {displayName(friend.member)}
+                      <b>{friend.played}</b>
+                    </li>
+                  ))}
+                  {others > 0 && <li className={styles.leader}>and {others} more {others === 1 ? "friend" : "friends"}</li>}
+                </ul>
+              )}
+            </div>
+          ) : null
+        }
+      />
 
       <div className={styles.tabs} role="tablist" aria-label="Top lists">
         {Object.values(ListTab).map((value) => (

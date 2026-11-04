@@ -29,7 +29,7 @@ export function RouteError({ error }: { error: unknown }) {
   return (
     <section className="page active">
       <div className="empty" role="alert">
-        <h3>{title}</h3>
+        <h2>{title}</h2>
         <p>{detail}</p>
         <button
           className="primary"
