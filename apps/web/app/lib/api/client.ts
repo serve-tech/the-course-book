@@ -1,4 +1,5 @@
 import createClient, { type Middleware } from "openapi-fetch";
+import { anySignal } from "../../shared/lib/abort";
 import type { components, paths } from "./schema";
 
 /**
@@ -119,7 +120,7 @@ export function createApiClient(options: ApiClientOptions) {
     fetch: async (request: Request) => {
       const settle = tracker.start();
       try {
-        const signal = AbortSignal.any([request.signal, AbortSignal.timeout(timeoutMs)]);
+        const signal = anySignal([request.signal, AbortSignal.timeout(timeoutMs)]);
         return await send(new Request(request, { signal }));
       } finally {
         settle();

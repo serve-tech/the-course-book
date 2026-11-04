@@ -52,6 +52,51 @@ describe("API client", () => {
   });
 });
 
+describe("API client without AbortSignal.any, as Safari before 17.4", () => {
+  const nativeAny: unknown = Reflect.get(AbortSignal, "any");
+
+  beforeEach(() => {
+    Reflect.deleteProperty(AbortSignal, "any");
+  });
+
+  afterEach(() => {
+    Reflect.set(AbortSignal, "any", nativeAny);
+  });
+
+  /** A client whose requests end only when their signal aborts, as `fetch` does, even if it already has. */
+  const hangingClient = (timeoutMs: number) =>
+    createApiClient({
+      baseUrl: "https://api.example",
+      getToken: () => Promise.resolve(null),
+      timeoutMs,
+      fetch: (request: Request) =>
+        new Promise((_, reject) => {
+          const fail = () => {
+            reject(request.signal.reason as Error);
+          };
+          if (request.signal.aborted) fail();
+          else request.signal.addEventListener("abort", fail);
+        }),
+    });
+
+  it("sends requests", async () => {
+    const { client, requests } = recordingClient(() => json(200, { entries: [] }));
+    await client.GET("/v1/rankings");
+    expect(requests).toHaveLength(1);
+  });
+
+  it("gives up on a request after the timeout", async () => {
+    await expect(hangingClient(1).GET("/v1/rankings")).rejects.toMatchObject({ name: "TimeoutError" });
+  });
+
+  it("still lets the caller abort a request", async () => {
+    const controller = new AbortController();
+    const pending = hangingClient(60_000).GET("/v1/rankings", { signal: controller.signal });
+    controller.abort(new Error("Left the page"));
+    await expect(pending).rejects.toThrow("Left the page");
+  });
+});
+
 describe("slow request tracker", () => {
   beforeEach(() => {
     vi.useFakeTimers();
