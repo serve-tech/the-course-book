@@ -7,12 +7,15 @@
   margin: 18px 0 12px;
 }
 .viewTitle { flex: 1 1 240px; min-width: 0; }
-.heading {
+/* Beside a page's title: the same panel as the Courses page's progress, buttons sharing its width. */
+.panel {
+  composes: progress from "../top-lists/top-lists.module.css";
+  display: flex;
   margin: 0;
-  /* Sans, because Playfair's old-style figures make "Top 10" read as "Top IO". */
-  font: 600 22px / 1.2 "DM Sans", Arial, sans-serif;
-  color: var(--cream);
 }
+.panel .actions { flex: 1 1 100%; }
+.panel .actions > button { flex: 1 1 0; }
+.heading { composes: sectionTitle from "../../shared/ui/page-header.module.css"; }
 .caption { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
 
 .actions { display: flex; gap: 8px; }
@@ -33,7 +36,8 @@
 .invite p { margin: 0; }
 
 @media (max-width: 760px) {
-  /* Two equal tap targets under the title. */
+  /* Two equal tap targets under the title, with no panel around them: a phone has no room to spare. */
   .actions { flex: 1 1 100%; }
   .actions > button { flex: 1 1 0; justify-content: center; }
+  .panel { padding: 0; border: 0; border-radius: 0; background: none; }
 }

@@ -12,11 +12,12 @@ export default [
     route("courses", "routes/top-100.tsx"),
     route("top-100", "routes/top-100-redirect.tsx"),
     route("u/:username", "routes/profile.tsx", [
-      index("routes/profile.timeline.tsx"),
+      index("routes/profile.index.tsx"),
       route("ranking", "routes/profile.ranking.tsx"),
       route("lists", "routes/profile.lists.tsx"),
       route("lists/:list", "routes/profile.top-list.tsx"),
       route("stats", "routes/profile.stats.tsx"),
+      route("timeline", "routes/profile.timeline.tsx"),
     ]),
     route("r/:username", "routes/public-ranking.tsx"),
     route("friends", "routes/friends.tsx"),

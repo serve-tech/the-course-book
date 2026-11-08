@@ -33,12 +33,12 @@ export function Modal({
         aria-labelledby={id + "Title"}
       >
         {plainHeader ? (
-          <h3 id={id + "Title"}>{title}</h3>
+          <h2 id={id + "Title"}>{title}</h2>
         ) : (
           <div className="modalhead">
             <div>
               <div className="eyebrow">{eyebrow}</div>
-              <h3 id={id + "Title"}>{title}</h3>
+              <h2 id={id + "Title"}>{title}</h2>
             </div>
             <button className="modalclose" aria-label="Close" onClick={onClose}>
               ×

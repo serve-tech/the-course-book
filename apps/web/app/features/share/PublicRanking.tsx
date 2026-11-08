@@ -14,10 +14,7 @@ import listStyles from "../top-lists/top-lists.module.css";
 import type { RankingImageContent } from "./ranking-image";
 import { viewRows, type ShareView } from "@coursebook/domain/sharing/view";
 import styles from "./share.module.css";
-import { TopChoices, ViewHeader } from "./ViewHeader";
-
-/** Lists longer than this offer a search. */
-const SEARCH_FROM = 10;
+import { SEARCH_FROM, TopChoices, ViewHeader } from "./ViewHeader";
 
 /**
  * A member's ranking as anyone sees it, signed in or not, and the place to
@@ -63,7 +60,6 @@ export function PublicRanking({
   const shownState = shownRegion === RegionFilter.State ? tabState : "";
   const shown = useMemo<ShareView>(() => ({ region: shownRegion, state: shownState, top: shownTop }), [shownRegion, shownState, shownTop]);
   const rows = useMemo(() => viewRows(ranking.rows, shown), [ranking.rows, shown]);
-  // A short list needs no search, and on a phone that row pushes the courses off the first screen.
   const searchable = rows.length > SEARCH_FROM;
   const visible = rankingRows(rows, { region: RegionFilter.All, state: "", query: searchable ? query : "" });
 
@@ -72,13 +68,13 @@ export function PublicRanking({
       <div className={profileStyles.hero}>
         <div className={profileStyles.heroInner}>
           <Avatar member={ranking.member} size={AvatarSize.Large} />
-          <div className={profileStyles.identity}>
-            <span className={profileStyles.eyebrow}>Course ranking</span>
+          <hgroup className={profileStyles.identity}>
+            <p className={profileStyles.eyebrow}>Course ranking</p>
             <h1 className={profileStyles.name}>{name}</h1>
-            <span className={profileStyles.handle}>
+            <p className={profileStyles.handle}>
               <b>@{username}</b>
-            </span>
-          </div>
+            </p>
+          </hgroup>
           <dl className={profileStyles.stats} aria-label="Stats">
             <Stat value={ranking.rows.length} label="Courses" />
             <Stat value={places.states} label="States" />

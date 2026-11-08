@@ -3,7 +3,7 @@ import { fromFeedItem } from "../../lib/api/mappers";
 
 const FIRST_PAGE = 30;
 
-/** Shared feed read for Classic Home and Activity; call only after checking the session. */
+/** The feed read for Activity; call only after checking the session. */
 export async function loadFeed() {
   const [feed, friends] = await Promise.all([
     api

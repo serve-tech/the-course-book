@@ -1,7 +1,7 @@
 # Opt-in layout preview in production
 
 **Date:** 2026-10-19
-**Status:** Accepted
+**Status:** Ended by [Ranking-first product](2026-11-03-ranking-first-product-one-master-ranking-with-derived-top-n-views.md): the new Home is the default, and the preview control and preference are gone
 
 ## Context
 
