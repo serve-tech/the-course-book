@@ -59,3 +59,15 @@ export interface MemberList {
   member: PublicMember;
   rows: MemberListRow[];
 }
+
+/** One course on a member's public ranking: the course and its rank, nothing about rounds. */
+export interface PublicRankingRow {
+  course: Course;
+  rank: number;
+}
+
+/** A member's ranking as anyone may read it (decision 2026-11-03, ranking-first product). */
+export interface PublicRanking {
+  member: PublicMember;
+  rows: PublicRankingRow[];
+}

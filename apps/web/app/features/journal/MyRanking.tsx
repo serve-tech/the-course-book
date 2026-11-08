@@ -1,10 +1,13 @@
-import { Fragment, useState, type ReactNode } from "react";
+import { Fragment, useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { RegionFilter, type Course } from "@coursebook/domain/catalog/course";
 import { reorder } from "@coursebook/domain/journal/reorder";
 import type { ListEntry } from "@coursebook/domain/journal/types";
 import { cx } from "../../shared/lib/cx";
 import { RoundHistory } from "../rounds/RoundHistory";
+import type { RankingImageContent } from "../share/ranking-image";
+import { viewRows, type ShareView } from "@coursebook/domain/sharing/view";
+import { TopChoices, ViewHeader } from "../share/ViewHeader";
 import { CourseSummary, PlayedMarks, type PlayedMark } from "../top-lists/CourseRow";
 import styles from "../top-lists/top-lists.module.css";
 import { CountEditor } from "./CountEditor";
@@ -20,32 +23,44 @@ import { replyMessage, useJournalFetcher } from "./use-journal-fetcher";
  * while a move is pending the list is reordered optimistically from the
  * full order, and the loader's revalidation replaces it.
  *
- * The region tabs (USA, International, Best in State) are read-only: ranks
- * there are overall ranks, and a drop would land among courses the tab
- * hides. Search keeps editing, because a move renumbers the full list.
+ * The region tabs (USA, International, Best in State) number courses within
+ * the tab, as the shared link and image do, and are read-only until a drop
+ * can place a course among the ones the tab hides (#55). Search keeps editing,
+ * because a move renumbers the full list. All cut to a Top N also keeps
+ * editing, because its numbers are the overall ones.
  *
  * @param rows - The member's ranking in rank order.
+ * @param username - The member, for the link to their public ranking.
+ * @param name - The member's name, which the saved image shows.
  * @param onLog - Opens the Log a round dialog over the page (the empty ranking's Log your first round).
  * @param selectedState - The state for Best in State, shared with the Courses page.
  * @param onState - Chooses that state.
+ * @param renderImage - Draws the saved image; for tests, because jsdom has no canvas.
  */
 export function MyRanking({
   rows,
+  username,
+  name,
   onLog,
   selectedState,
   onState,
   notify,
   onSearchFocus,
+  renderImage,
 }: {
   rows: readonly ListEntry[];
+  username: string;
+  name: string;
   onLog: () => void;
   selectedState: string;
   onState: (value: string) => void;
   notify: (message: string) => void;
   onSearchFocus: (focused: boolean) => void;
+  renderImage?: (content: RankingImageContent) => Promise<Blob>;
 }) {
   const [query, setQuery] = useState(""),
     [region, setRegion] = useState(RegionFilter.All),
+    [top, setTop] = useState<number | null>(null),
     [details, setDetails] = useState<Course | null>(null),
     [history, setHistory] = useState<Course | null>(null),
     [editing, setEditing] = useState<string | null>(null);
@@ -54,22 +69,29 @@ export function MyRanking({
   });
 
   const readOnly = region !== RegionFilter.All;
-  const byId = new Map(rows.map((row) => [row.course.id, row]));
+  const byId = useMemo(() => new Map(rows.map((row) => [row.course.id, row])), [rows]);
   const played = Object.fromEntries(rows.map((row) => [row.course.id, row.played]));
-  const loaderOrder = rows.map((row) => row.course.id);
-  const pendingMove = move.busy ? move.fetcher.formData : null;
+  const pendingMove = move.busy && move.fetcher.formData?.get("intent") === "move" ? move.fetcher.formData : null;
   const movingId = pendingMove?.get("courseId");
   const movingRank = pendingMove?.get("rank");
-  const order =
-    pendingMove?.get("intent") === "move" && typeof movingId === "string" && typeof movingRank === "string"
-      ? reorder(loaderOrder, movingId, Number(movingRank))
-      : loaderOrder;
-  const courses = order.flatMap((id, index) => {
-    const row = byId.get(id);
-    return row ? [{ ...row, rank: index + 1 }] : [];
-  });
-  const inRegion = rankingRows(courses, { region, state: selectedState, query: "" });
-  const visible = rankingRows(courses, { region, state: selectedState, query });
+  const order = useMemo(() => {
+    const ids = rows.map((row) => row.course.id);
+    return typeof movingId === "string" && typeof movingRank === "string" ? reorder(ids, movingId, Number(movingRank)) : ids;
+  }, [rows, movingId, movingRank]);
+  const courses = useMemo(
+    () =>
+      order.flatMap((id, index) => {
+        const row = byId.get(id);
+        return row ? [{ ...row, rank: index + 1 }] : [];
+      }),
+    [order, byId],
+  );
+  const shown = useMemo<ShareView>(
+    () => ({ region, state: region === RegionFilter.State ? selectedState : "", top }),
+    [region, selectedState, top],
+  );
+  const viewed = useMemo(() => viewRows(courses, shown), [courses, shown]);
+  const visible = rankingRows(viewed, { region: RegionFilter.All, state: "", query });
   const stateMissing = region === RegionFilter.State && !selectedState;
 
   const { drag, start, suppressClick } = useCourseDrag(!readOnly && !move.busy, (id, target, after) => {
@@ -107,13 +129,15 @@ export function MyRanking({
         onState={onState}
         onQuery={setQuery}
         onSearchFocus={onSearchFocus}
-      />
+      >
+        {courses.length > 0 && <TopChoices top={top} onTop={setTop} />}
+      </RankingFilters>
       {courses.length > 0 && !stateMissing && (
-        <p className={styles.caption} aria-live="polite">
-          <span id="rankingCount">{coursesLabel(inRegion.length)}</span>
+        <ViewHeader username={username} memberName={name} view={shown} rows={viewed} notify={notify} render={renderImage}>
+          <span id="rankingCount">{coursesLabel(viewed.length)}</span>
           {" · "}
-          {readOnly ? "Your overall ranks. Reorder from All." : "Drag a course to change your ranking."}
-        </p>
+          {readOnly ? "Switch to All to reorder." : "Drag a course to change your ranking."}
+        </ViewHeader>
       )}
 
       {!courses.length ? (

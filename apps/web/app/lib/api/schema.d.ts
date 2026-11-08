@@ -194,6 +194,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/members/{username}/ranking": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Any member's ranking, for anyone
+         * @description Public: needs no session and works for every active member. Carries the member and each course's rank, never rounds. Usernames match case-insensitively. Send no Authorization header.
+         */
+        get: operations["getPublicRanking"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/members": {
         parameters: {
             query?: never;
@@ -660,15 +680,24 @@ export interface components {
             logoUrl: string | null;
             websiteUrl: string | null;
         };
-        Members: {
-            members: components["schemas"]["Member"][];
-            /** @description Pass as `cursor` for the next page; null on the last page. */
-            nextCursor: string | null;
+        PublicRanking: {
+            member: components["schemas"]["Member"];
+            /** @description The member's ranking in rank order. */
+            courses: components["schemas"]["PublicRankingCourse"][];
         };
         /** @description Another member's public projection; never an email or an id. */
         Member: {
             username: string;
             displayName: string;
+        };
+        PublicRankingCourse: {
+            course: components["schemas"]["Course"];
+            rank: number;
+        };
+        Members: {
+            members: components["schemas"]["Member"][];
+            /** @description Pass as `cursor` for the next page; null on the last page. */
+            nextCursor: string | null;
         };
         MemberList: {
             member: components["schemas"]["Member"];
@@ -1631,6 +1660,37 @@ export interface operations {
             };
             /** @description Course discovery is unavailable: `search_unavailable`. Retry later. */
             503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    getPublicRanking: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                username: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The member and their ranking. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicRanking"];
+                };
+            };
+            /** @description No active member with that username: `member_not_found`. */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

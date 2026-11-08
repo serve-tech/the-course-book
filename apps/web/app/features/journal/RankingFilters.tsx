@@ -17,6 +17,7 @@ import { RANKING_TABS, rankingTabLabel } from "./ranking";
  * @param onQuery - Changes the search text.
  * @param onSearchFocus - Tells the shell when the search gains or loses focus.
  * @param children - Filter buttons shown before the state picker, e.g. a friend's "Both played".
+ * @param searchable - Whether to offer the search; a short list has no need of it. Defaults to true.
  */
 export function RankingFilters({
   region,
@@ -27,6 +28,7 @@ export function RankingFilters({
   onQuery,
   onSearchFocus,
   children,
+  searchable = true,
 }: {
   region: RegionFilter;
   state: string;
@@ -36,6 +38,7 @@ export function RankingFilters({
   onQuery: (query: string) => void;
   onSearchFocus: (focused: boolean) => void;
   children?: ReactNode;
+  searchable?: boolean;
 }) {
   return (
     <>
@@ -62,27 +65,29 @@ export function RankingFilters({
             <StateSelect id="rankingStateSelect" value={state} onChange={onState} label="State for Best in State" />
           </span>
         )}
-        <div className={styles.search}>
-          <input
-            id="rankingSearch"
-            type="search"
-            aria-label="Search this ranking"
-            placeholder="Search this ranking…"
-            value={query}
-            onFocus={() => {
-              onSearchFocus(true);
-            }}
-            onBlur={() => {
-              onSearchFocus(false);
-            }}
-            onKeyDown={(event) => {
-              if (event.key === "Escape") event.currentTarget.blur();
-            }}
-            onChange={(event) => {
-              onQuery(event.target.value);
-            }}
-          />
-        </div>
+        {searchable && (
+          <div className={styles.search}>
+            <input
+              id="rankingSearch"
+              type="search"
+              aria-label="Search this ranking"
+              placeholder="Search this ranking…"
+              value={query}
+              onFocus={() => {
+                onSearchFocus(true);
+              }}
+              onBlur={() => {
+                onSearchFocus(false);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") event.currentTarget.blur();
+              }}
+              onChange={(event) => {
+                onQuery(event.target.value);
+              }}
+            />
+          </div>
+        )}
       </div>
     </>
   );

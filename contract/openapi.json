@@ -679,6 +679,57 @@
         ],
         "description": "A course described by its details, e.g. a search result not yet in the catalog."
       },
+      "PublicRanking": {
+        "type": "object",
+        "properties": {
+          "member": {
+            "$ref": "#/components/schemas/Member"
+          },
+          "courses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicRankingCourse"
+            },
+            "description": "The member's ranking in rank order."
+          }
+        },
+        "required": [
+          "member",
+          "courses"
+        ]
+      },
+      "Member": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "username",
+          "displayName"
+        ],
+        "description": "Another member's public projection; never an email or an id."
+      },
+      "PublicRankingCourse": {
+        "type": "object",
+        "properties": {
+          "course": {
+            "$ref": "#/components/schemas/Course"
+          },
+          "rank": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "course",
+          "rank"
+        ]
+      },
       "Members": {
         "type": "object",
         "properties": {
@@ -698,22 +749,6 @@
           "members",
           "nextCursor"
         ]
-      },
-      "Member": {
-        "type": "object",
-        "properties": {
-          "username": {
-            "type": "string"
-          },
-          "displayName": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "username",
-          "displayName"
-        ],
-        "description": "Another member's public projection; never an email or an id."
       },
       "MemberList": {
         "type": "object",
@@ -2323,6 +2358,50 @@
           },
           "503": {
             "description": "Course discovery is unavailable: `search_unavailable`. Retry later.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/members/{username}/ranking": {
+      "get": {
+        "operationId": "getPublicRanking",
+        "tags": [
+          "Members"
+        ],
+        "summary": "Any member's ranking, for anyone",
+        "description": "Public: needs no session and works for every active member. Carries the member and each course's rank, never rounds. Usernames match case-insensitively. Send no Authorization header.",
+        "security": [],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "username",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The member and their ranking.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicRanking"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No active member with that username: `member_not_found`.",
             "content": {
               "application/json": {
                 "schema": {

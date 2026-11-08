@@ -70,6 +70,7 @@ export default defineConfig({
         NODE_ENV: "production",
         DATABASE_URL: TEST_DATABASE_URL,
         WEB_ORIGINS: APP,
+        PUBLIC_WEB_URL: APP,
         OPENGOLF_API_URL: STUB + "/v1/courses/search",
         OPENGOLF_CSV_URL: STUB + "/opengolfapi-us.csv",
         ...clerkKeys,
@@ -83,6 +84,7 @@ export default defineConfig({
       timeout: 120_000,
       env: {
         PORT: "3100",
+        API_URL: API,
         VITE_API_URL: API,
         VITE_CLERK_PUBLISHABLE_KEY: clerkKeys.CLERK_PUBLISHABLE_KEY,
       },

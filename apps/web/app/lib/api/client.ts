@@ -31,7 +31,7 @@ export class ApiError extends Error {
 }
 
 /** Public operations are called without a token so shared caches can keep them. */
-const PUBLIC_PATHS: ReadonlySet<string> = new Set(["/v1/rankings", "/v1/client-config"]);
+const PUBLIC_PATHS: ReadonlySet<string> = new Set(["/v1/rankings", "/v1/client-config", "/v1/members/{username}/ranking"]);
 
 const isEnvelope = (value: unknown): value is ApiSchemas["ApiError"] =>
   typeof value === "object" &&

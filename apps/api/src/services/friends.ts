@@ -11,6 +11,7 @@ import type {
   MemberListRow,
   MemberRelationship,
   PublicMember,
+  PublicRanking,
 } from "@coursebook/domain/friends/types";
 import { toPublicMember } from "./authz";
 import { rankedViews } from "./catalog";
@@ -183,6 +184,21 @@ export async function memberRanking(db: Executor, userId: string): Promise<Membe
     played: Number(row.played),
     lastPlayedOn: row.lastPlayedOn ?? null,
   }));
+}
+
+/**
+ * A member's ranking as anyone may read it, signed in or not (decision
+ * 2026-11-03, ranking-first product). Only courses and ranks leave here:
+ * rounds stay behind the friends rule, so they are dropped before returning.
+ *
+ * Returns:
+ *     The ranking, or null when no active member has that username.
+ */
+export async function publicRanking(db: Executor, username: string): Promise<PublicRanking | null> {
+  const member = await findMember(db, username);
+  if (!member) return null;
+  const rows = await memberRanking(db, member.id);
+  return { member: toPublicMember(member), rows: rows.map(({ course, rank }) => ({ course, rank })) };
 }
 
 /**

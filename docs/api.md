@@ -54,6 +54,7 @@ Every failure returns:
 | `GET /v1/course-search?q=&page=&source=` | `searchCourses` | member | Stored courses by default; `source=external` explicitly discovers more. Alphabetical pages of ten hits (`page` defaults to 1), with `page`, `pageSize` and `total`; catalog hits carry `courseId` |
 | `GET /v1/members?cursor=&limit=` | `listMembers` | member | The member's friends, paged by username (limit 1–200, default 50) |
 | `GET /v1/members/{username}` | `getMemberList` | member | The member's own list or a friend's, with `onMyList` flags; anyone else is 404 `member_not_found` |
+| `GET /v1/members/{username}/ranking` | `getPublicRanking` | public | Any active member's ranking: username, display name and each course's rank, never rounds; unknown or deleted is 404 `member_not_found`; `no-store` |
 | `GET /v1/members/{username}/rounds?cursor=&limit=` | `listMemberRounds` | member | The member's own or a friend's timeline, newest played first (limit 1–100, default 30), with `months`: the full round count of every month on the page, so a month split across pages shows its total from the first page; anyone else is 404 `member_not_found` |
 | `GET /v1/member-search?q=` | `searchMembers` | member | Up to 20 other members whose username contains `q` (3–64 characters), prefix matches first, each with the viewer's `relationship`; `no-store` |
 | `GET /v1/me/friend-requests` | `listFriendRequests` | member | Pending requests: `incoming` (they asked) and `outgoing` (the viewer asked) |
@@ -68,5 +69,7 @@ Every failure returns:
 `relationship` is one of `none`, `friends`, `requested` (the viewer asked) and `incoming` (they asked); treat an unknown value as `none`. Friendships are mutual: one member asks, the other accepts, and either can end it. When both ask each other, they are friends ([decision](../.planning/decisions/2026-09-29-friends-only-visibility-with-mutual-friend-requests.md)).
 
 `POST` operations are not idempotent: a retry after a lost response logs the rounds again. `PUT` and `DELETE` operations are safe to retry; a `DELETE` retried after success answers 404, except `removeWantToPlay`, which answers 200 with the list.
+
+`GET /r/*` (outside `/v1`, not in the contract) answers shared ranking links with the web app's HTML and a preview card; clients should not call it.
 
 `GET /healthz` (outside `/v1`, not in the contract) answers `{ "ok": true }` after a database round-trip, for Render's health checks.

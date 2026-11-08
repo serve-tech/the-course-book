@@ -26,6 +26,8 @@ export function contractDocument() {
       privacyUrl: "https://coursebook.golf/privacy",
       accountDeletionUrl: "https://coursebook.golf/account",
     },
+    webUrl: "https://coursebook.golf",
+    webShell: { read: () => Promise.resolve(null) },
   });
   return app.getOpenAPIDocument(documentConfig);
 }

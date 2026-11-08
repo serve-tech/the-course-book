@@ -1,9 +1,10 @@
 import { randomBytes } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import { createClerkClient } from "@clerk/backend";
-import { users } from "@coursebook/api/db/schema";
+import { userCourses, users } from "@coursebook/api/db/schema";
 import { FriendshipStatus } from "@coursebook/api/domain/friendship";
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { clerk } from "@clerk/testing/playwright";
 import { isLayoutPreviewEnabled, LAYOUT_PREFERENCE_KEY, LayoutMode } from "../../apps/web/app/features/shell/layout-preview";
 import { authAvailable, clerkAvailable, signInAs } from "./auth";
@@ -672,6 +673,125 @@ function signal() {
   const promise = new Promise<void>((complete) => { resolve = complete; });
   return { promise, resolve };
 }
+
+test.describe("public ranking", () => {
+  test.skip(!authAvailable, "Clerk development instance keys or test users are not configured");
+
+  test.beforeEach(async () => {
+    const { owner, friend } = members();
+    await resetScenario(db, owner, friend);
+  });
+
+  /** A saved PNG's size, read from its header, after checking that it is a PNG. */
+  const pngSize = async (path: string) => {
+    const bytes = await readFile(path);
+    expect(bytes.subarray(1, 4).toString("latin1")).toBe("PNG");
+    return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) };
+  };
+
+  test("a signed-out visitor opens a shared link, changes the view and saves the image", async ({ page }, testInfo) => {
+    const { owner } = members();
+    await page.goto(`/r/${owner.username}`);
+    await expect(page.getByRole("heading", { level: 1, name: owner.displayName })).toBeVisible();
+    await expect.poll(() => rankingOrder(page)).toEqual(["Test Beta Links", "Test Alpha Links"]);
+    await expect(page.getByLabel("Stats").getByText("Courses")).toBeVisible();
+    // Twice when the page came through the API: its card asks too, for readers that run no script.
+    await expect(page.locator('meta[name="robots"]').first()).toHaveAttribute("content", "noindex");
+    // A public ranking says nothing about rounds, though the owner has some.
+    await expect(page.locator("#ranking")).not.toContainText("round");
+    await expect(page.getByLabel("Stats")).not.toContainText("Rounds");
+    await expect(page.getByRole("button", { name: "Make your ranking" })).toBeVisible();
+
+    // The view lives in the link, so a reload or a copy of the URL keeps it.
+    await page.getByRole("button", { name: "Top 5" }).click();
+    await page.getByRole("tab", { name: "Best in Michigan" }).click();
+    await expect(page).toHaveURL(/\?view=state-mi&top=5$/);
+    await expect(page.getByRole("heading", { level: 2, name: "Top 5 in Michigan" })).toBeVisible();
+    await page.reload();
+    await expect(page.getByRole("heading", { level: 2, name: "Top 5 in Michigan" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Top 5" })).toHaveAttribute("aria-pressed", "true");
+
+    const save = page.getByRole("button", { name: "Save image" });
+    await expect(save).toBeEnabled();
+    const [download] = await Promise.all([page.waitForEvent("download"), save.click()]);
+    expect(download.suggestedFilename()).toBe(`${owner.username.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-top-5-in-michigan.png`);
+    const saved = testInfo.outputPath("ranking.png");
+    await download.saveAs(saved);
+    const size = await pngSize(saved);
+    expect(size.width).toBe(1080);
+    expect(size.height).toBeGreaterThan(400);
+
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  });
+
+  test("an unknown member's link says the ranking isn't available", async ({ page }) => {
+    await page.goto("/r/no_such_member_here");
+    await expect(page.getByRole("alert")).toContainText("This ranking isn't available");
+  });
+
+  test("a member copies the link and saves the image from their own ranking", async ({ page, context, browserName }, testInfo) => {
+    test.skip(browserName !== "chromium", "Clipboard permissions are Chromium-only in Playwright");
+    const { owner } = members();
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    await page.goto("/");
+    await signInAs(page, owner);
+    await expectSignedInAs(page, owner.username);
+    await openRanking(page, owner);
+    await page.getByRole("tab", { name: "USA" }).click();
+    await page.getByRole("button", { name: "Top 5" }).click();
+    await expect(page.getByRole("heading", { level: 2, name: "Top 5 in the USA" })).toBeVisible();
+
+    const save = page.getByRole("button", { name: "Save image" });
+    await expect(save).toBeEnabled();
+    const [download] = await Promise.all([page.waitForEvent("download"), save.click()]);
+    expect(download.suggestedFilename()).toMatch(/-top-5-in-the-usa\.png$/);
+    const saved = testInfo.outputPath("own-ranking.png");
+    await download.saveAs(saved);
+    expect((await pngSize(saved)).width).toBe(1080);
+
+    await page.getByRole("button", { name: "Copy link" }).click();
+    await expect(page.getByText("Link copied")).toBeVisible();
+    const link = await page.evaluate(() => navigator.clipboard.readText());
+    expect(link).toMatch(new RegExp(`/r/${owner.username}\\?view=usa&top=5$`));
+
+    // What was shared opens as the same view.
+    await page.goto(link);
+    await expect(page.getByRole("heading", { level: 2, name: "Top 5 in the USA" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Make your ranking" })).toHaveCount(0);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  });
+
+  test("a shared link carries a card for that member and view, and still opens the normal page", async ({ page, request }) => {
+    const { owner } = members();
+    const link = `/r/${owner.username}?view=state-mi&top=5`;
+    const response = await request.get(link);
+    expect(response.status()).toBe(200);
+    const html = await response.text();
+    expect(html).toContain(`<meta property="og:title" content="${owner.displayName}&#39;s Top 5 in Michigan">`);
+    expect(html).toContain(`<meta property="og:description" content="1. Test Beta Links · 2. Test Alpha Links">`);
+    expect(html).toContain(`<meta property="og:url" content="${new URL(link, response.url()).href.replaceAll("&", "&amp;")}">`);
+    expect(html).toContain('<meta name="robots" content="noindex">');
+    expect(response.headers()["x-robots-tag"]).toBe("noindex");
+
+    // The card must not disturb the app: no hydration errors, and the page opens as usual.
+    const problems: string[] = [];
+    page.on("console", (message) => {
+      if (message.type() === "error" && /hydrat|did not match/i.test(message.text())) problems.push(message.text());
+    });
+    page.on("pageerror", (error) => problems.push(error.message));
+    await page.goto(link);
+    await expect(page.getByRole("heading", { level: 2, name: "Top 5 in Michigan" })).toBeVisible();
+    await expect.poll(() => rankingOrder(page)).toEqual(["Test Beta Links", "Test Alpha Links"]);
+    expect(problems).toEqual([]);
+  });
+
+  test("a re-rank shows on the public page", async ({ page }) => {
+    const { owner } = members();
+    await db.update(userCourses).set({ personalRank: 9 }).where(and(eq(userCourses.userId, owner.id), eq(userCourses.courseId, fixtureCourses.beta.id)));
+    await page.goto(`/r/${owner.username}`);
+    await expect.poll(() => rankingOrder(page)).toEqual(["Test Alpha Links", "Test Beta Links"]);
+  });
+});
 
 test.describe("layout preview", () => {
   test.skip(!previewEnabled, "The layout preview is disabled in this build");

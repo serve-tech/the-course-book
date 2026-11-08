@@ -1,6 +1,7 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
 import type { MiddlewareHandler } from "hono";
 import { bodyLimit } from "hono/body-limit";
+import { except } from "hono/combine";
 import { compress } from "hono/compress";
 import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
@@ -21,11 +22,13 @@ import { registerClientRoutes } from "./routes/clients";
 import { registerFeedRoutes } from "./routes/feed";
 import { registerJournalRoutes } from "./routes/journal";
 import { registerMemberRoutes } from "./routes/members";
+import { registerSharePageRoutes } from "./routes/share-page";
 import { registerTopListRoutes } from "./routes/top-lists";
 import { registerWantToPlayRoutes } from "./routes/want-to-play";
 import { checkDatabase } from "./services/health";
 import type { Provisioner } from "./services/provisioning";
 import type { CourseSearch } from "./services/search";
+import type { WebShell } from "./services/web-shell";
 
 /** One line per request, for Render's log stream. */
 export interface RequestLog {
@@ -64,6 +67,10 @@ export interface AppDependencies {
   /** Exact origins of the web app, used for CORS and the token `azp` check. */
   webOrigins: readonly string[];
   clientConfig: ClientConfig;
+  /** The web app's public origin, which shared ranking links point to. */
+  webUrl: string;
+  /** The web app's page, which a shared ranking link answers with. */
+  webShell: WebShell;
   logger?: Logger;
 }
 
@@ -146,7 +153,8 @@ export function createApp(deps: AppDependencies): OpenAPIHono<AppEnv> {
       ms: Math.round(performance.now() - started),
     });
   });
-  app.use("*", securityHeaders);
+  // A shared link's page is the web app itself, which `default-src 'none'` would stop from loading.
+  app.use("*", except("/r/*", securityHeaders));
   app.use(
     "*",
     cors({
@@ -194,6 +202,7 @@ export function createApp(deps: AppDependencies): OpenAPIHono<AppEnv> {
   registerTopListRoutes(app, deps);
   registerFeedRoutes(app, deps);
   registerClientRoutes(app, deps);
+  registerSharePageRoutes(app, deps, logger);
 
   app.openAPIRegistry.registerComponent("securitySchemes", SECURITY_SCHEME, {
     type: "http",

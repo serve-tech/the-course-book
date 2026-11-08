@@ -1,6 +1,6 @@
 import { courseSchema, type Course, type RankedCourse } from "@coursebook/domain/catalog/course";
 import type { SearchResult } from "@coursebook/domain/catalog/search-results";
-import type { MemberList, MemberListRow } from "@coursebook/domain/friends/types";
+import type { MemberList, MemberListRow, PublicRanking } from "@coursebook/domain/friends/types";
 import {
   FeedItemType,
   ProfileRelationship,
@@ -95,6 +95,10 @@ export function fromMemberCourse(row: ApiSchemas["MemberCourse"]): MemberListRow
 
 export function fromMemberList(list: ApiSchemas["MemberList"]): MemberList {
   return { member: list.member, rows: list.courses.map(fromMemberCourse) };
+}
+
+export function fromPublicRanking(ranking: ApiSchemas["PublicRanking"]): PublicRanking {
+  return { member: ranking.member, rows: ranking.courses.map((row) => ({ course: fromApiCourse(row.course), rank: row.rank })) };
 }
 
 export function fromTimelineRound(round: ApiSchemas["TimelineRound"]): TimelineRound {
