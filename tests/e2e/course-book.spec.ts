@@ -184,6 +184,25 @@ test("anonymous navigation, dialogs and mobile layout remain usable", async ({ p
   expect(await page.evaluate(() => location.hash)).toBe("");
 });
 
+/**
+ * Remove `AbortSignal.any` from the page, as on Safari before 17.4. The API
+ * client once used it on every request, so on iOS 16 no page loaded its data.
+ * This stands in for the missing method only, not for the rest of iOS 16.
+ */
+async function withoutAbortSignalAny(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    Reflect.deleteProperty(AbortSignal, "any");
+  });
+}
+
+test("public pages load their data without AbortSignal.any", async ({ page }) => {
+  test.skip(!clerkAvailable, "Clerk development instance keys are not configured");
+  await withoutAbortSignalAny(page);
+  await page.goto("/courses");
+  expect(await page.evaluate(() => "any" in AbortSignal)).toBe(false);
+  await expect(page.locator("#toplist > li")).toHaveCount(100);
+});
+
 test.describe("signed in", () => {
   test.skip(!authAvailable, "Clerk development instance keys or test users are not configured");
 
@@ -335,6 +354,15 @@ test.describe("signed in", () => {
     await page.locator(".delete-round").click();
     await expect(page.locator("#roundmodal")).toHaveCount(0);
     await expect(page.locator("#rankingCount")).toHaveText("1 course");
+  });
+
+  test("a member's own data loads without AbortSignal.any", async ({ page }) => {
+    const { owner } = members();
+    await withoutAbortSignalAny(page);
+    await signInAs(page, owner);
+    expect(await page.evaluate(() => "any" in AbortSignal)).toBe(false);
+    await openRanking(page, owner);
+    await expect.poll(() => rankingOrder(page)).toEqual(["Test Beta Links", "Test Alpha Links"]);
   });
 
   test("manual US course stores its state and logs one round", async ({ page }) => {

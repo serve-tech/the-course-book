@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { anySignal } from "./abort";
 import { SELECTED_STATE_KEY, type SafeStorage } from "./storage";
 import { stateCode } from "@coursebook/domain/catalog/geography";
 const responseSchema = z.object({
@@ -30,7 +31,7 @@ export function detectState(
         String(position.coords.longitude) +
         "&localityLanguage=en";
       void fetch(url, {
-        signal: AbortSignal.any([controller.signal, AbortSignal.timeout(8000)]),
+        signal: anySignal([controller.signal, AbortSignal.timeout(8000)]),
       })
         .then(async (response) => {
           if (!response.ok) throw new Error("Location lookup failed");
