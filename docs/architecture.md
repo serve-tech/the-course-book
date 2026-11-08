@@ -164,6 +164,12 @@ The contract grows only; its rules (named schemas, always-present response field
 
 Validate untrusted input at boundaries: request parameters and bodies (contract schemas), environment variables at startup ([env.ts](../apps/api/src/services/env.ts)), external API responses, and token claims. Use `unknown` until validated. In the web app, [errors.ts](../apps/web/app/shared/lib/errors.ts) formats errors and `RouteError` shows a failed page load with Retry inside the layout. Noncritical failures (geolocation, search fallback) log and degrade; failed mutations show a visible failure and leave controls usable.
 
+## Supported browsers
+
+The web app's floor is what its build targets, Vite's default: Safari and iOS 16.4, Chrome and Edge 111, Firefox 114. Older browsers are not supported, because the bundle's syntax is not lowered for them.
+
+Check [MDN's compatibility data](https://github.com/mdn/browser-compat-data) before using a browser API, since the build lowers syntax but adds no polyfills. `AbortSignal.any` needs Safari 17.4, so use `anySignal` ([abort.ts](../apps/web/app/shared/lib/abort.ts)) instead. A browser test removes the method and checks that pages still load. CI runs Chromium only, so nothing here has run on a real iPhone or in Safari.
+
 ## Hosting and operations
 
 - **Security headers:** every API response carries `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, HSTS and `Referrer-Policy: no-referrer` (Hono's `secureHeaders`). `Cross-Origin-Resource-Policy` is `cross-origin`, because the web app reads the API from another origin and CORS decides who may read a response.
