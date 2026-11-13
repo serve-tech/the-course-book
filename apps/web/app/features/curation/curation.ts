@@ -1,4 +1,6 @@
 import type { Course } from "@coursebook/domain/catalog/course";
+import { topListTitle } from "@coursebook/domain/social/top-lists";
+import { coursePath } from "../courses/paths";
 import { findList, ListTab, tabList, topListSlug, type TopListRef } from "../top-lists/lists";
 
 /**
@@ -30,18 +32,43 @@ export function curationList(slug: string | null): TopListRef | null {
 
 /**
  * The curator screen's URL: the course list, or one course's photo picker,
- * keeping the published list being worked through (`from`).
+ * keeping the published list being worked through (`from`), or, opened
+ * from a course's page, returning there (`back=course`).
  *
  * Example:
  *     >>> curatePath({ list: { type: "global", scope: "GLOBAL" }, courseId: "c1" })
  *     "/curate?course=c1&from=world"
+ *     >>> curatePath({ courseId: "c1", backToCourse: true })
+ *     "/curate?course=c1&back=course"
  */
-export function curatePath({ list = null, courseId = null }: { list?: TopListRef | null; courseId?: string | null } = {}): string {
+export function curatePath({
+  list = null,
+  courseId = null,
+  backToCourse = false,
+}: { list?: TopListRef | null; courseId?: string | null; backToCourse?: boolean } = {}): string {
   const params = new URLSearchParams();
   if (courseId) params.set("course", courseId);
   if (list) params.set("from", topListSlug(list));
+  if (courseId && backToCourse) params.set("back", BACK_TO_COURSE);
   const query = params.toString();
   return "/curate" + (query ? "?" + query : "");
+}
+
+/** The `back` value that returns the photo picker to the course's page. */
+export const BACK_TO_COURSE = "course";
+
+/** Where the course list comes from, as its picker, progress and back link name it. */
+export function sourceTitle(source: TopListRef | null): string {
+  return source ? topListTitle(source.type, source.scope) : "Members' rankings";
+}
+
+/**
+ * Where the photo picker goes back to, by its link and once a photo is set:
+ * the course's page when it was opened from there, otherwise the course list
+ * it came from.
+ */
+export function pickerReturn(course: Course, source: TopListRef | null, backToCourse: boolean): { path: string; label: string } {
+  return backToCourse ? { path: coursePath(course.id), label: course.name } : { path: curatePath({ list: source }), label: sourceTitle(source) };
 }
 
 /** "1 member", "3 members": how many members rank a course. */

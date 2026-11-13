@@ -1,6 +1,5 @@
 import type { Course } from "@coursebook/domain/catalog/course";
 import { MemberRole, type CommonsCandidate, type RoledMember } from "@coursebook/domain/curation/types";
-import { topListTitle } from "@coursebook/domain/social/top-lists";
 import { useState } from "react";
 import { Form, Link, useNavigate } from "react-router";
 import { cx } from "../../shared/lib/cx";
@@ -13,7 +12,19 @@ import { Avatar } from "../social/Avatar";
 import { displayName } from "../social/paths";
 import { AvatarSize } from "../social/sizes";
 import { findList, topListSlug, type TopListRef } from "../top-lists/lists";
-import { CURATION_LISTS, curatePath, CurationFilter, CurationTab, filterCourses, openingFilter, photoProgress, type CurationEntry } from "./curation";
+import {
+  BACK_TO_COURSE,
+  CURATION_LISTS,
+  curatePath,
+  CurationFilter,
+  CurationTab,
+  filterCourses,
+  openingFilter,
+  photoProgress,
+  pickerReturn,
+  sourceTitle,
+  type CurationEntry,
+} from "./curation";
 import styles from "./curation.module.css";
 
 /** Reply shape of the curator screen's action. */
@@ -34,7 +45,7 @@ export type CurationView =
       /** The published list being worked through; null for members' rankings. */
       source: TopListRef | null;
       courses: CurationEntry[];
-      picking: { course: Course; query: string; candidates: CommonsCandidate[]; searchError: string | null } | null;
+      picking: { course: Course; query: string; candidates: CommonsCandidate[]; searchError: string | null; backToCourse: boolean } | null;
     };
 
 const ACTION = "/curate";
@@ -91,11 +102,6 @@ export function CurationPage({ view, notify }: { view: CurationView; notify: (me
       )}
     </section>
   );
-}
-
-/** Where the course list comes from, as its picker and progress name it. */
-function sourceTitle(source: TopListRef | null): string {
-  return source ? topListTitle(source.type, source.scope) : "Members' rankings";
 }
 
 /** The picker's value for members' rankings; published lists use their slug. */
@@ -164,6 +170,7 @@ function PhotoPicker({
   query,
   candidates,
   searchError,
+  backToCourse,
   source,
   notify,
 }: {
@@ -171,21 +178,22 @@ function PhotoPicker({
   query: string;
   candidates: CommonsCandidate[];
   searchError: string | null;
+  backToCourse: boolean;
   source: TopListRef | null;
   notify: (message: string) => void;
 }) {
   const navigate = useNavigate();
-  const back = curatePath({ list: source });
+  const back = pickerReturn(course, source, backToCourse);
   const action = useActionFetcher<CurationReply>(ACTION, (reply) => {
     notify(reply.error ?? reply.message ?? "Done");
-    if (reply.ok && reply.courseId) void navigate(back);
+    if (reply.ok && reply.courseId) void navigate(back.path);
   });
   const pendingFile = action.busy ? action.fetcher.formData?.get("file") : null;
 
   return (
     <div className={styles.picker}>
-      <Link to={back} className={styles.back}>
-        ← {sourceTitle(source)}
+      <Link to={back.path} className={styles.back}>
+        ← {back.label}
       </Link>
       <div className={styles.current}>
         <CourseImage course={course} credit={CreditStyle.Link} className={styles.currentImage} />
@@ -219,6 +227,7 @@ function PhotoPicker({
         <Form method="get" action={ACTION} className={styles.search} role="search">
           <input type="hidden" name="course" value={course.id} />
           {source && <input type="hidden" name="from" value={topListSlug(source)} />}
+          {backToCourse && <input type="hidden" name="back" value={BACK_TO_COURSE} />}
           <input type="search" name="q" defaultValue={query} aria-label="Search Wikimedia Commons" minLength={2} required />
           <button type="submit" className={styles.button}>
             Search

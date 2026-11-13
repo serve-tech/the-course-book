@@ -67,6 +67,7 @@ describe("CurationPage", () => {
         query: "Arcadia Bluffs",
         candidates: [candidate("File:ArcadiaBluffs1011.jpg", photo.sourceUrl), candidate("File:ArcadiaBluffs18th.jpg", "https://commons.wikimedia.org/wiki/File:ArcadiaBluffs18th.jpg")],
         searchError: null,
+        backToCourse: false,
       },
     });
     expect(screen.getByRole("heading", { level: 2, name: "Arcadia Bluffs" })).toBeInTheDocument();
@@ -96,7 +97,7 @@ describe("CurationPage", () => {
       tab: CurationTab.Photos,
       source: world,
       courses: listed,
-      picking: { course: pine, query: "Pine Valley Golf Club", candidates: [], searchError: null },
+      picking: { course: pine, query: "Pine Valley Golf Club", candidates: [], searchError: null, backToCourse: false },
     });
     expect(screen.getByRole("link", { name: "← World Top 100" })).toHaveAttribute("href", "/curate?from=world");
   });
@@ -107,7 +108,7 @@ describe("CurationPage", () => {
       tab: CurationTab.Photos,
       source: null,
       courses,
-      picking: { course: course("b", "Pacific Dunes"), query: "Pacific Dunes", candidates: [], searchError: "Wikimedia Commons isn't answering right now." },
+      picking: { course: course("b", "Pacific Dunes"), query: "Pacific Dunes", candidates: [], searchError: "Wikimedia Commons isn't answering right now.", backToCourse: false },
     });
     expect(screen.getByRole("alert")).toHaveTextContent("Wikimedia Commons isn't answering right now.");
     expect(screen.queryByRole("button", { name: "Remove photo" })).not.toBeInTheDocument();
