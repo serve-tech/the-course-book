@@ -10,6 +10,7 @@ const priya = { username: "priya", displayName: "Priya" };
 const ben = { username: "ben", displayName: "Ben" };
 const photo = {
   url: "https://upload.wikimedia.org/arcadia.jpg",
+  thumbUrl: "https://upload.wikimedia.org/arcadia-330.jpg",
   credit: "Benscripps",
   license: "CC BY-SA 3.0",
   licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",

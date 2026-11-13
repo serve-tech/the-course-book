@@ -663,9 +663,14 @@ export interface components {
         CoursePhoto: {
             /**
              * Format: uri
-             * @description Where the image is served from.
+             * @description Where the image is served from, at display width (1280 px, or the original when narrower).
              */
             url: string;
+            /**
+             * Format: uri
+             * @description The same image at thumbnail width (330 px, or the original when narrower), for rows and small tiles.
+             */
+            thumbUrl: string;
             /** @description The photographer, as the source names them. Show it with the photo. */
             credit: string;
             /** @description The license's short name, e.g. `CC BY-SA 4.0` or `Public domain`. */

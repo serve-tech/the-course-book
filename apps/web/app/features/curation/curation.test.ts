@@ -2,7 +2,7 @@ import { courseSchema, type CoursePhoto } from "@coursebook/domain/catalog/cours
 import { describe, expect, it } from "vitest";
 import { commonsQuery, curatePath, curationList, CurationFilter, filterCourses, membersNote, openingFilter, photoProgress } from "./curation";
 
-const photo: CoursePhoto = { url: "https://x/a.jpg", credit: "Ana", license: "CC BY 2.0", licenseUrl: null, sourceUrl: "https://x" };
+const photo: CoursePhoto = { url: "https://x/a.jpg", thumbUrl: "https://x/a-330.jpg", credit: "Ana", license: "CC BY 2.0", licenseUrl: null, sourceUrl: "https://x" };
 const entry = (id: string, withPhoto: boolean, members = 1) => ({ course: courseSchema.parse({ id, name: id, location: "", photo: withPhoto ? photo : null }), members });
 
 describe("filterCourses", () => {

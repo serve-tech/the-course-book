@@ -9,6 +9,7 @@ import { CurationPage, type CurationView } from "./CurationPage";
 
 const photo = {
   url: "https://upload.wikimedia.org/a.jpg",
+  thumbUrl: "https://upload.wikimedia.org/a-330.jpg",
   credit: "Benscripps",
   license: "CC BY-SA 3.0",
   licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",

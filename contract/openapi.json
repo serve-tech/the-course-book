@@ -237,7 +237,12 @@
           "url": {
             "type": "string",
             "format": "uri",
-            "description": "Where the image is served from."
+            "description": "Where the image is served from, at display width (1280 px, or the original when narrower)."
+          },
+          "thumbUrl": {
+            "type": "string",
+            "format": "uri",
+            "description": "The same image at thumbnail width (330 px, or the original when narrower), for rows and small tiles."
           },
           "credit": {
             "type": "string",
@@ -261,6 +266,7 @@
         },
         "required": [
           "url",
+          "thumbUrl",
           "credit",
           "license",
           "licenseUrl",
