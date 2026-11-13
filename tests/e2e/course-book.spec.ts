@@ -164,6 +164,8 @@ test("anonymous navigation, dialogs and mobile layout remain usable", async ({ p
     /^USA #\d+$/,
     /^Georgia #\d+$/,
   ]);
+  // Visitors can't open a course page yet, so their cards don't link to one.
+  await expect(page.locator('#toplist > li[data-course="Augusta National Golf Club"] a')).toHaveCount(0);
   await page.getByRole("tab", { name: "International" }).click();
   await expect(page.locator("#toplist > li")).toHaveCount(100);
   await page.getByRole("tab", { name: "Best in Michigan" }).click();
@@ -435,6 +437,11 @@ test.describe("signed in", () => {
     await expect(page.locator("#modal")).toHaveCount(0);
     await expect(page.locator('#toplist > li[data-course="Augusta National Golf Club"]')).toHaveAttribute("data-played", "true");
     expect(await roundDates(db, owner.id, augusta)).toEqual(["2026-05-01"]);
+
+    // A member's card opens the course's page.
+    await page.locator('#toplist > li[data-course="Augusta National Golf Club"]').getByRole("link", { name: "Augusta National Golf Club" }).click();
+    await expect(page).toHaveURL(new RegExp(`/courses/${augusta}$`));
+    await expect(page.getByRole("heading", { level: 1, name: "Augusta National Golf Club" })).toBeVisible();
 
     await page.goto(`/u/${owner.username}/lists`);
     await expect(page.locator("#wantToPlay")).toContainText("Pine Valley Golf Club");
