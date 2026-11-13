@@ -48,6 +48,12 @@ describe("thumbnailUrl", () => {
         "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b1/Whistling_Straits_golf_course%2C_far_shot.jpg/1280px-Whistling_Straits_golf_course%2C_far_shot.jpg",
     },
     {
+      name: "tracking parameters are dropped",
+      url: "https://upload.wikimedia.org/wikipedia/commons/8/8a/ArcadiaBluffs1011.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo",
+      width: 1936,
+      expected: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/ArcadiaBluffs1011.jpg/1280px-ArcadiaBluffs1011.jpg",
+    },
+    {
       name: "a narrow photo stays the original",
       url: "https://upload.wikimedia.org/wikipedia/commons/9/9d/Oakland.jpg",
       width: 1250,

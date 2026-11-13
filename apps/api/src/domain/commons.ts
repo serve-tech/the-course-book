@@ -30,6 +30,8 @@ const metaValue = z.object({ value: z.union([z.string(), z.number()]).transform(
 /** One Commons file as the MediaWiki API's `imageinfo` describes it. */
 export const commonsPageSchema = z.object({
   title: z.string(),
+  /** A search result's position, best first; absent on a lookup by title. */
+  index: z.number().int().optional(),
   missing: z.boolean().optional(),
   imageinfo: z
     .array(
@@ -87,12 +89,14 @@ export function isAcceptedLicense(shortName: string): boolean {
  *     "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/A.jpg/1280px-A.jpg"
  */
 export function thumbnailUrl(originalUrl: string, originalWidth: number, width: number): string {
-  if (originalWidth <= width) return originalUrl;
+  // Commons adds utm_* tracking parameters to the URLs it returns; the image doesn't need them.
   const url = new URL(originalUrl);
+  url.search = "";
+  if (originalWidth <= width) return url.toString();
   const parts = url.pathname.split("/");
   const file = parts.at(-1);
   const commons = parts.indexOf("commons");
-  if (!file || commons < 0) return originalUrl;
+  if (!file || commons < 0) return url.toString();
   parts.splice(commons + 1, 0, "thumb");
   url.pathname = parts.join("/") + "/" + String(width) + "px-" + file;
   return url.toString();
@@ -129,5 +133,20 @@ export function commonsPhoto(page: CommonsPage): CommonsPhoto | null {
     licenseUrl: meta.LicenseUrl?.value ?? null,
     sourceUrl: info.descriptionurl,
     description: plainText(meta.ImageDescription?.value ?? "").slice(0, 280),
+  };
+}
+
+/** A photo's details for the results grid, without the display URL. */
+export function toCandidate(photo: CommonsPhoto): CommonsCandidate {
+  return {
+    file: photo.file,
+    thumbUrl: photo.thumbUrl,
+    width: photo.width,
+    height: photo.height,
+    credit: photo.credit,
+    license: photo.license,
+    licenseUrl: photo.licenseUrl,
+    sourceUrl: photo.sourceUrl,
+    description: photo.description,
   };
 }
