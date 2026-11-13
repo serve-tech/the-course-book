@@ -53,6 +53,16 @@ export const CourseRanksSchema = z
   })
   .openapi("CourseRanks");
 
+export const CoursePhotoSchema = z
+  .object({
+    url: z.url().openapi({ description: "Where the image is served from." }),
+    credit: z.string().openapi({ description: "The photographer, as the source names them. Show it with the photo." }),
+    license: z.string().openapi({ description: "The license's short name, e.g. `CC BY-SA 4.0` or `Public domain`." }),
+    licenseUrl: z.url().nullable().openapi({ description: "The license's text; null for public domain." }),
+    sourceUrl: z.url().openapi({ description: "The photo's source page, e.g. its Wikimedia Commons file page." }),
+  })
+  .openapi("CoursePhoto");
+
 export const CourseSchema = z
   .object({
     id: z.uuid(),
@@ -64,6 +74,7 @@ export const CourseSchema = z
     logoUrl: z.string().nullable(),
     websiteUrl: z.string().nullable(),
     ranks: CourseRanksSchema,
+    photo: CoursePhotoSchema.nullable().openapi({ description: "The course's photo, with the credit and license to show beside it; null until a curator picks one." }),
   })
   .openapi("Course");
 

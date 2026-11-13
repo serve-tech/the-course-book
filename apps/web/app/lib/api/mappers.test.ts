@@ -28,6 +28,7 @@ const arcadia: ApiSchemas["Course"] = {
   logoUrl: null,
   websiteUrl: "https://arcadiabluffs.com",
   ranks: ranks(3),
+  photo: null,
 };
 
 describe("API course to domain course", () => {
@@ -136,6 +137,20 @@ describe("other API shapes", () => {
       logoUrl: null,
       websiteUrl: "https://arcadiabluffs.com",
     });
+  });
+});
+
+describe("course photo", () => {
+  it("carries the photo and its credit onto the domain course", () => {
+    const photo = {
+      url: "https://upload.wikimedia.org/wikipedia/commons/8/8a/ArcadiaBluffs1011.jpg",
+      credit: "Benscripps",
+      license: "CC BY-SA 3.0",
+      licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
+      sourceUrl: "https://commons.wikimedia.org/wiki/File:ArcadiaBluffs1011.jpg",
+    };
+    expect(fromApiCourse({ ...arcadia, photo }).photo).toEqual(photo);
+    expect(fromApiCourse(arcadia).photo).toBeNull();
   });
 });
 

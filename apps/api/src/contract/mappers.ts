@@ -45,7 +45,7 @@ export function toCourseDetails(course: Course): CourseDetails {
 
 /** A catalog course; its id is the catalog row uuid. */
 export function toContractCourse(course: Course): ContractCourse {
-  return { id: course.id, ...toCourseDetails(course), ranks: toCourseRanks(course) };
+  return { id: course.id, ...toCourseDetails(course), ranks: toCourseRanks(course), photo: course.photo };
 }
 
 export function toMyCourse(entry: ListEntry) {

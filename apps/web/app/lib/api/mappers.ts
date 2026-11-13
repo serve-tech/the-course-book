@@ -14,7 +14,6 @@ import {
   type WantToPlayEntry,
 } from "@coursebook/domain/social/types";
 import type { ListEntry, RoundEntry } from "@coursebook/domain/journal/types";
-import { previewPhoto } from "./preview-photos";
 import type { ApiSchemas } from "./client";
 
 /**
@@ -37,7 +36,7 @@ function region(country: string, state: string | null): string {
   return state?.toUpperCase() === "MI" ? "michigan" : "usa";
 }
 
-function toCourse(id: string, details: Details, ranks: Ranks): Course {
+function toCourse(id: string, details: Details, ranks: Ranks, photo: ApiSchemas["CoursePhoto"] | null = null): Course {
   return courseSchema.parse({
     id,
     name: details.name,
@@ -54,12 +53,12 @@ function toCourse(id: string, details: Details, ranks: Ranks): Course {
     stateRank: ranks.state,
     logo: details.logoUrl ?? "",
     website: details.websiteUrl ?? "",
-    photo: previewPhoto(details.name),
+    photo,
   });
 }
 
 export function fromApiCourse(course: ApiSchemas["Course"]): Course {
-  return toCourse(course.id, course, course.ranks);
+  return toCourse(course.id, course, course.ranks, course.photo);
 }
 
 export function fromMyCourse(entry: ApiSchemas["MyCourse"]): ListEntry {

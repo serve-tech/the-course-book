@@ -167,6 +167,9 @@
           },
           "ranks": {
             "$ref": "#/components/schemas/CourseRanks"
+          },
+          "photo": {
+            "$ref": "#/components/schemas/CoursePhoto"
           }
         },
         "required": [
@@ -178,7 +181,8 @@
           "country",
           "logoUrl",
           "websiteUrl",
-          "ranks"
+          "ranks",
+          "photo"
         ]
       },
       "CourseRanks": {
@@ -220,6 +224,44 @@
           "state",
           "global"
         ]
+      },
+      "CoursePhoto": {
+        "type": "object",
+        "nullable": true,
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "Where the image is served from."
+          },
+          "credit": {
+            "type": "string",
+            "description": "The photographer, as the source names them. Show it with the photo."
+          },
+          "license": {
+            "type": "string",
+            "description": "The license's short name, e.g. `CC BY-SA 4.0` or `Public domain`."
+          },
+          "licenseUrl": {
+            "type": "string",
+            "nullable": true,
+            "format": "uri",
+            "description": "The license's text; null for public domain."
+          },
+          "sourceUrl": {
+            "type": "string",
+            "format": "uri",
+            "description": "The photo's source page, e.g. its Wikimedia Commons file page."
+          }
+        },
+        "required": [
+          "url",
+          "credit",
+          "license",
+          "licenseUrl",
+          "sourceUrl"
+        ],
+        "description": "The course's photo, with the credit and license to show beside it; null until a curator picks one."
       },
       "Rounds": {
         "type": "object",

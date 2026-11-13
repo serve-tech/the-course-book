@@ -23,6 +23,7 @@ const pineValley: ApiSchemas["Course"] = {
   logoUrl: null,
   websiteUrl: null,
   ranks: { global: 1, world: null, usa: 1, usaPublic: null, state: 1 },
+  photo: null,
 };
 const hit: ApiSchemas["SearchHit"] = {
   courseId: pineValley.id,

@@ -544,6 +544,7 @@ export interface components {
             logoUrl: string | null;
             websiteUrl: string | null;
             ranks: components["schemas"]["CourseRanks"];
+            photo: components["schemas"]["CoursePhoto"];
         };
         CourseRanks: {
             /** @description Golf Digest's World 100, which leaves out US courses (shown as International). */
@@ -555,6 +556,28 @@ export interface components {
             /** @description GOLF Magazine's Top 100 Courses in the World, every country together (shown as World). */
             global: number | null;
         };
+        /** @description The course's photo, with the credit and license to show beside it; null until a curator picks one. */
+        CoursePhoto: {
+            /**
+             * Format: uri
+             * @description Where the image is served from.
+             */
+            url: string;
+            /** @description The photographer, as the source names them. Show it with the photo. */
+            credit: string;
+            /** @description The license's short name, e.g. `CC BY-SA 4.0` or `Public domain`. */
+            license: string;
+            /**
+             * Format: uri
+             * @description The license's text; null for public domain.
+             */
+            licenseUrl: string | null;
+            /**
+             * Format: uri
+             * @description The photo's source page, e.g. its Wikimedia Commons file page.
+             */
+            sourceUrl: string;
+        } | null;
         Rounds: {
             /** @description Newest first. */
             rounds: components["schemas"]["Round"][];
