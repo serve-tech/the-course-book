@@ -3,7 +3,10 @@ import { topListTitle } from "@coursebook/domain/social/top-lists";
 import { useState } from "react";
 import { Link } from "react-router";
 import { cx } from "../../shared/lib/cx";
+import { useActionFetcher } from "../../shared/lib/use-action-fetcher";
 import { PageHeader } from "../../shared/ui/PageHeader";
+import { curatePath } from "../curation/curation";
+import type { CurationReply } from "../curation/CurationPage";
 import { replyMessage, useJournalFetcher } from "../journal/use-journal-fetcher";
 import { LogRoundDialog } from "../rounds/LogRoundDialog";
 import { Avatar } from "../social/Avatar";
@@ -11,7 +14,7 @@ import { displayName, profilePath } from "../social/paths";
 import { AvatarSize } from "../social/sizes";
 import { BookmarkIcon, LogIcon } from "../top-lists/icons";
 import { rankBadges } from "../top-lists/lists";
-import { CourseImage } from "./CourseImage";
+import { CameraIcon, CourseImage } from "./CourseImage";
 import { CreditStyle } from "./credit-style";
 import styles from "./course-page.module.css";
 
@@ -23,7 +26,8 @@ import styles from "./course-page.module.css";
  * reviews; the ranking is the point.
  *
  * @param page - The course and everyone's standing with it.
- * @param canCurate - Offers Change photo, which opens the curator screen on this course.
+ * @param canCurate - Turns a missing photo into an Add a photo button, and puts
+ *   Change photo and Remove on the photo; both open the curator screen on this course.
  * @param notify - Shows the outcome of an action as a toast.
  * @param openAuth - Opens the sign-in dialog, for the Log dialog.
  */
@@ -42,10 +46,22 @@ export function CoursePageView({
   const [logging, setLogging] = useState(false);
   const published = rankBadges(course);
   const photo = course.photo;
+  const choosePhoto = curatePath({ courseId: course.id, backToCourse: true });
 
   return (
     <article className={styles.page}>
-      <CourseImage course={course} credit={CreditStyle.Link} alt={"Photo of " + course.name} priority className={styles.hero} />
+      <div className={styles.heroFrame}>
+        {canCurate && !photo ? (
+          <Link to={choosePhoto} className={cx(styles.hero, styles.addPhoto)}>
+            <CameraIcon />
+            <span className={styles.addPhotoLabel}>Add a photo</span>
+            <span className={styles.addPhotoHint}>Search Wikimedia Commons</span>
+          </Link>
+        ) : (
+          <CourseImage course={course} credit={CreditStyle.Link} alt={"Photo of " + course.name} priority className={styles.hero} />
+        )}
+        {canCurate && photo && <PhotoTools courseId={course.id} courseName={course.name} change={choosePhoto} notify={notify} />}
+      </div>
       <PageHeader
         eyebrow="Course"
         title={course.name}
@@ -109,7 +125,7 @@ export function CoursePageView({
         )}
       </section>
 
-      {(course.website || photo || canCurate) && (
+      {(course.website || photo) && (
         <footer className={styles.footer}>
           {course.website && (
             <a href={course.website} target="_blank" rel="noreferrer">
@@ -132,7 +148,6 @@ export function CoursePageView({
               )}
             </span>
           )}
-          {canCurate && <Link to={"/curate?course=" + encodeURIComponent(course.id)}>{photo ? "Change photo" : "Add a photo"}</Link>}
         </footer>
       )}
 
@@ -149,6 +164,35 @@ export function CoursePageView({
         />
       )}
     </article>
+  );
+}
+
+/**
+ * A curator's buttons on the course's photo: Change photo opens the curator
+ * screen on this course (and comes back here), Remove takes the photo off
+ * after a confirmation, through the curator screen's action.
+ */
+function PhotoTools({ courseId, courseName, change, notify }: { courseId: string; courseName: string; change: string; notify: (message: string) => void }) {
+  const remove = useActionFetcher<CurationReply>("/curate", (reply) => {
+    notify(reply.error ?? reply.message ?? "Done");
+  });
+  return (
+    <div className={styles.photoTools}>
+      <Link to={change} className={styles.photoTool}>
+        <CameraIcon />
+        Change photo
+      </Link>
+      <button
+        type="button"
+        className={styles.photoTool}
+        disabled={remove.busy}
+        onClick={() => {
+          if (window.confirm("Remove the photo from " + courseName + "?")) remove.submit({ intent: "remove-photo", courseId });
+        }}
+      >
+        {remove.busy ? "Removing…" : "Remove"}
+      </button>
+    </div>
   );
 }
 

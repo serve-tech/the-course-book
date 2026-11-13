@@ -65,7 +65,8 @@ export function CourseImage({
   );
 }
 
-function CameraIcon() {
+/** A camera outline, for photo credits and photo buttons. */
+export function CameraIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M4 8h3l2-2.5h6L17 8h3v11H4z" />

@@ -1,7 +1,7 @@
 import "@testing-library/jest-dom/vitest";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { courseSchema } from "@coursebook/domain/catalog/course";
 import type { CoursePage } from "@coursebook/domain/social/types";
 import { CoursePageView } from "./CoursePageView";
@@ -28,15 +28,33 @@ const course = (withPhoto: boolean) =>
     photo: withPhoto ? photo : null,
   });
 
-function show(page: CoursePage) {
+/** Form fields posted to the curator screen's action, by the photo's Remove. */
+let posted: Record<string, FormDataEntryValue>[] = [];
+
+function show(page: CoursePage, canCurate = false) {
   const router = createMemoryRouter(
-    [{ path: "/courses/:id", element: <CoursePageView page={page} notify={() => undefined} openAuth={() => undefined} /> }],
+    [
+      { path: "/courses/:id", element: <CoursePageView page={page} canCurate={canCurate} notify={() => undefined} openAuth={() => undefined} /> },
+      {
+        path: "/curate",
+        action: async ({ request }) => {
+          posted.push(Object.fromEntries(await request.formData()));
+          return { ok: true, message: "Photo removed from Arcadia Bluffs" };
+        },
+      },
+    ],
     { initialEntries: ["/courses/arcadia"] },
   );
   return render(<RouterProvider router={router} />);
 }
 
-afterEach(cleanup);
+const standing = { you: { rank: 5, outOf: 23, wantToPlay: false }, friendsRanked: [], friendsWantToPlay: [] };
+
+afterEach(() => {
+  cleanup();
+  posted = [];
+  vi.restoreAllMocks();
+});
 
 describe("CoursePageView", () => {
   it("shows a ranked course with its photo, published ranks, friends and the photo's credit", () => {
@@ -64,5 +82,35 @@ describe("CoursePageView", () => {
     expect(screen.getByRole("button", { name: "Saved" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.queryByRole("img")).not.toBeInTheDocument();
     expect(screen.getByText(/None of your friends has ranked it/)).toBeInTheDocument();
+  });
+
+  it("turns a missing photo into one large Add a photo button for curators", () => {
+    show({ course: course(false), ...standing }, true);
+    expect(screen.getByRole("link", { name: /^Add a photo/ })).toHaveAttribute("href", "/curate?course=arcadia&back=course");
+    expect(screen.queryByRole("link", { name: "Change photo" })).not.toBeInTheDocument();
+  });
+
+  it("puts Change photo and Remove on a curator's photo, and removes only once confirmed", async () => {
+    show({ course: course(true), ...standing }, true);
+    expect(screen.getByRole("link", { name: "Change photo" })).toHaveAttribute("href", "/curate?course=arcadia&back=course");
+
+    const confirm = vi.spyOn(window, "confirm").mockReturnValueOnce(false).mockReturnValueOnce(true);
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+    expect(confirm).toHaveBeenCalledWith("Remove the photo from Arcadia Bluffs?");
+    expect(posted).toEqual([]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+    await waitFor(() => {
+      expect(posted).toEqual([{ intent: "remove-photo", courseId: "arcadia" }]);
+    });
+  });
+
+  it.each([
+    { name: "without a photo", withPhoto: false },
+    { name: "with a photo", withPhoto: true },
+  ])("offers members who don't curate no photo buttons, $name", ({ withPhoto }) => {
+    show({ course: course(withPhoto), ...standing });
+    expect(screen.queryByRole("link", { name: /Add a photo|Change photo/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Remove" })).not.toBeInTheDocument();
   });
 });
