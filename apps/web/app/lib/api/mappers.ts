@@ -4,6 +4,7 @@ import type { MemberList, MemberListRow, PublicRanking } from "@coursebook/domai
 import {
   FeedItemType,
   ProfileRelationship,
+  type CoursePage,
   type FeedItem,
   type Profile,
   type TimelineMonthCount,
@@ -188,5 +189,15 @@ export function fromTopListDetail(detail: ApiSchemas["TopListDetail"]): TopListD
       wantToPlay: entry.wantToPlay,
       friendsPlayed: entry.friendsPlayed,
     })),
+  };
+}
+
+/** A course's page: the course in domain form; the member's and friends' standing as the API has them. */
+export function fromCoursePage(page: ApiSchemas["CoursePage"]): CoursePage {
+  return {
+    course: fromApiCourse(page.course),
+    you: page.you,
+    friendsRanked: page.friendsRanked,
+    friendsWantToPlay: page.friendsWantToPlay,
   };
 }

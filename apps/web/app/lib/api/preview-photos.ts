@@ -17,11 +17,11 @@ import type { CoursePhoto } from "@coursebook/domain/catalog/course";
  */
 const PREVIEW_PHOTOS: Readonly<Record<string, CoursePhoto>> = {
   "Bandon Dunes": {
-    url: "https://upload.wikimedia.org/wikipedia/commons/b/bd/Golfers_on_the_16th_green_at_Bandon_Dunes.jpg",
-    credit: "Mwlloyd1216",
-    license: "CC BY-SA 4.0",
-    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
-    sourceUrl: "https://commons.wikimedia.org/wiki/File:Golfers_on_the_16th_green_at_Bandon_Dunes.jpg",
+    url: "https://upload.wikimedia.org/wikipedia/commons/6/61/4th_green_at_Bandon.jpg",
+    credit: "Matthewwlloyd",
+    license: "CC BY-SA 3.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
+    sourceUrl: "https://commons.wikimedia.org/wiki/File:4th_green_at_Bandon.jpg",
   },
   "Oakland Hills Country Club: South": {
     url: "https://upload.wikimedia.org/wikipedia/commons/9/9d/Oakland_Hills_Country_Club_-_Bloomfield_Hills%2C_Michigan.jpg",

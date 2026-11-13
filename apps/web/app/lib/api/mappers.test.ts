@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { ApiSchemas } from "./client";
 import {
   fromApiCourse,
+  fromCoursePage,
   fromFeedItem,
   fromMemberList,
   fromProfile,
@@ -135,5 +136,21 @@ describe("other API shapes", () => {
       logoUrl: null,
       websiteUrl: "https://arcadiabluffs.com",
     });
+  });
+});
+
+describe("course page", () => {
+  it("maps the course and keeps the member's and friends' standing", () => {
+    const priya = { username: "priya", displayName: "Priya" };
+    const page = fromCoursePage({
+      course: arcadia,
+      you: { rank: null, outOf: 12, wantToPlay: true },
+      friendsRanked: [{ member: priya, rank: 2, outOf: 30 }],
+      friendsWantToPlay: [priya],
+    });
+    expect(page.course).toMatchObject({ id: arcadia.id, name: "Arcadia Bluffs", michigan: 3, website: "https://arcadiabluffs.com" });
+    expect(page.you).toEqual({ rank: null, outOf: 12, wantToPlay: true });
+    expect(page.friendsRanked).toEqual([{ member: priya, rank: 2, outOf: 30 }]);
+    expect(page.friendsWantToPlay).toEqual([priya]);
   });
 });
