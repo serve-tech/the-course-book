@@ -1,6 +1,6 @@
 import { courseSchema, type CoursePhoto } from "@coursebook/domain/catalog/course";
 import { describe, expect, it } from "vitest";
-import { commonsQuery, curatePath, curationList, CurationFilter, filterCourses, membersNote, openingFilter, photoProgress } from "./curation";
+import { commonsQuery, curatePath, curationList, CurationFilter, filterCourses, membersNote, openingFilter, photoProgress, pickerReturn } from "./curation";
 
 const photo: CoursePhoto = { url: "https://x/a.jpg", thumbUrl: "https://x/a-330.jpg", credit: "Ana", license: "CC BY 2.0", licenseUrl: null, sourceUrl: "https://x" };
 const entry = (id: string, withPhoto: boolean, members = 1) => ({ course: courseSchema.parse({ id, name: id, location: "", photo: withPhoto ? photo : null }), members });
@@ -62,6 +62,8 @@ describe("curatePath", () => {
     { args: { list: usa }, path: "/curate?from=usa" },
     { args: { courseId: "c1" }, path: "/curate?course=c1" },
     { args: { list: usa, courseId: "c1" }, path: "/curate?course=c1&from=usa" },
+    { args: { courseId: "c1", backToCourse: true }, path: "/curate?course=c1&back=course" },
+    { args: { backToCourse: true }, path: "/curate" },
   ])("builds $path", ({ args, path }) => {
     expect(curatePath(args)).toBe(path);
   });
@@ -73,5 +75,16 @@ describe("membersNote", () => {
     [3, "3 members"],
   ])("%i reads %s", (members, note) => {
     expect(membersNote(members)).toBe(note);
+  });
+});
+
+describe("pickerReturn", () => {
+  const pine = courseSchema.parse({ id: "pine", name: "Pine Valley Golf Club", location: "" });
+  it.each([
+    { name: "a course page", source: null, back: true, expected: { path: "/courses/pine", label: "Pine Valley Golf Club" } },
+    { name: "members' rankings", source: null, back: false, expected: { path: "/curate", label: "Members' rankings" } },
+    { name: "the World list", source: { type: "global", scope: "GLOBAL" }, back: false, expected: { path: "/curate?from=world", label: "World Top 100" } },
+  ])("goes back to $name", ({ source, back, expected }) => {
+    expect(pickerReturn(pine, source, back)).toEqual(expected);
   });
 });

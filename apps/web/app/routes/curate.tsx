@@ -3,7 +3,7 @@ import { canCurate, MemberRole, roleFrom, type CommonsCandidate } from "@courseb
 import { data } from "react-router";
 import { z } from "zod";
 import type { Route } from "./+types/curate";
-import { commonsQuery, curationList, CurationTab, membersNote, type CurationEntry } from "../features/curation/curation";
+import { BACK_TO_COURSE, commonsQuery, curationList, CurationTab, membersNote, type CurationEntry } from "../features/curation/curation";
 import { listEntries } from "../features/top-lists/lists";
 import { CurationPage, type CurationReply } from "../features/curation/CurationPage";
 import { api, ApiError, unwrap } from "../lib/api";
@@ -16,7 +16,8 @@ import { useShell } from "../shared/ui/shell";
  * The curator screen (`/curate`): courses on members' rankings, or on a
  * national published list (`?from=world`), and their photos; a Wikimedia
  * Commons search for one course (`?course=<id>`, with `q` to search for
- * something other than its name); and, for admins, who curates
+ * something other than its name, and `back=course` to return to the course's
+ * page); and, for admins, who curates
  * (`?tab=curators`). Decision 2026-11-13.
  */
 export async function clientLoader({ request }: Route.ClientLoaderArgs) {
@@ -59,7 +60,8 @@ export async function clientLoader({ request }: Route.ClientLoaderArgs) {
       searchError = error.message;
     }
   }
-  return { role, tab: CurationTab.Photos, source, courses: listed, picking: { course, query, candidates, searchError } } as const;
+  const backToCourse = url.searchParams.get("back") === BACK_TO_COURSE;
+  return { role, tab: CurationTab.Photos, source, courses: listed, picking: { course, query, candidates, searchError, backToCourse } } as const;
 }
 
 const intentSchema = z.discriminatedUnion("intent", [
