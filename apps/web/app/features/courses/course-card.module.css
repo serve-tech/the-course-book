@@ -84,11 +84,11 @@ a.name:focus-visible::after { outline: 2px solid var(--gold); outline-offset: 6p
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
   gap: 8px 12px;
-  justify-self: stretch;
   margin-top: 8px;
 }
+/* No ticks yet: don't leave a gap before the buttons. */
+.footer > :empty { display: none; }
 
 /* Wider screens: rank column, photo, then text, like a printed ranking. */
 @media (min-width: 761px) {

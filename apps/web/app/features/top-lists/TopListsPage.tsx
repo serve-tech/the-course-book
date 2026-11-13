@@ -6,13 +6,15 @@ import type { TopListCourse, TopListStanding } from "@coursebook/domain/social/t
 import { countLabel } from "../../shared/lib/count-label";
 import type { Notify } from "../../shared/ui/shell";
 import { StateSelect } from "../../shared/ui/StateSelect";
+import { CourseCard, CourseCards } from "../courses/CourseCard";
+import { coursePath } from "../courses/paths";
 import { LogRoundDialog } from "../rounds/LogRoundDialog";
 import { RoundHistory } from "../rounds/RoundHistory";
 import { Avatar } from "../social/Avatar";
 import { displayName } from "../social/paths";
 import { AvatarSize } from "../social/sizes";
 import { CourseActions } from "./CourseActions";
-import { CourseRow } from "./CourseRow";
+import { PlayedMarks } from "./CourseRow";
 import { isCompleteList, ListTab, type TopListRef } from "./lists";
 import { PageHeader } from "../../shared/ui/PageHeader";
 import styles from "./top-lists.module.css";
@@ -44,11 +46,12 @@ enum Show {
 }
 
 /**
- * The Courses page: one published Top list as a checklist. The route
- * chooses the list and loads it; this renders the tabs, the viewer's and
- * friends' progress, and the courses. Each row carries every rank the course
- * holds, the viewer's tick (which opens their rounds there), the friends who
- * played it, and Log a round and Want to play buttons.
+ * The Courses page: one published Top list as a checklist of photo cards
+ * (decision 2026-11-13). The route chooses the list and loads it; this
+ * renders the tabs, the viewer's and friends' progress, and the courses.
+ * Each card opens the course's page (for members) and carries every rank the
+ * course holds, the viewer's tick (which opens their rounds there), the
+ * friends who played it, and Log a round and Want to play buttons.
  *
  * @param tab - The selected tab.
  * @param list - The list shown; null on Best in State before a state is chosen.
@@ -215,42 +218,48 @@ export function TopListsPage({
       ) : !shown.length ? (
         <div className={styles.empty}>No courses here match.</div>
       ) : (
-        <ol id="toplist" className={styles.list} aria-label={title}>
+        <CourseCards id="toplist" label={title}>
           {shown.map((entry) => (
-            <CourseRow
+            <CourseCard
               key={entry.course.id}
               course={entry.course}
               rank={entry.rank}
+              href={signedIn ? coursePath(entry.course.id) : undefined}
               current={list}
               played={entry.played > 0}
-              marks={
-                entry.played > 0
-                  ? [
-                      {
-                        label: "Played",
-                        you: false,
-                        onClick: () => {
-                          setHistory(entry.course);
-                        },
-                      },
-                    ]
-                  : []
-              }
-              note={entry.played > 1 ? String(entry.played) + " rounds" : undefined}
               friends={entry.friendsPlayed}
-              actions={
-                <CourseActions
-                  course={entry.course}
-                  wanted={entry.wantToPlay}
-                  signedIn={signedIn}
-                  onLog={setLogging}
-                  notify={notify}
-                  openAuth={openAuth}
-                />
+              footer={
+                <>
+                  <PlayedMarks
+                    course={entry.course}
+                    marks={
+                      entry.played > 0
+                        ? [
+                            {
+                              label: "Played",
+                              you: false,
+                              onClick: () => {
+                                setHistory(entry.course);
+                              },
+                            },
+                          ]
+                        : []
+                    }
+                    note={entry.played > 1 ? String(entry.played) + " rounds" : undefined}
+                  />
+                  <CourseActions
+                    course={entry.course}
+                    wanted={entry.wantToPlay}
+                    signedIn={signedIn}
+                    onLog={setLogging}
+                    notify={notify}
+                    openAuth={openAuth}
+                  />
+                </>
               }
             />
           ))}
-        </ol>
+        </CourseCards>
       )}
 
       {history && (
