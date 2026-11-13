@@ -1,7 +1,9 @@
 # Course photos in Cloudflare R2, a curator role, course pages and an image-led ranking
 
 **Date:** 2026-11-13
-**Status:** Accepted
+**Status:** Accepted, with R2 waiting on approval
+
+**Amendment (2026-11-13, later the same day):** using Cloudflare R2 needs the maintainer to get approval first. Until then, course photos are Wikimedia Commons files loaded directly from `upload.wikimedia.org`, and the curator screen offers Commons search only. The `course_photos` table, the curator role and the API's `photo` field are built now. R2 storage, uploads and copying the Commons photos into R2 are issue #67. Server requests to Commons identify the app with `https://coursebook.golf` as the contact, per Wikimedia's User-Agent policy.
 
 ## Context
 
