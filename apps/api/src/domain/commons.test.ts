@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { commonsPhoto, isAcceptedLicense, plainText, thumbnailUrl, type CommonsPage } from "./commons";
+import { absoluteUrl, commonsPhoto, isAcceptedLicense, plainText, thumbnailUrl, type CommonsPage } from "./commons";
 
 const page = (overrides: { mime?: string; width?: number; license?: string; artist?: string; missing?: boolean } = {}): CommonsPage => ({
   title: "File:ArcadiaBluffs1011.jpg",
@@ -61,6 +61,18 @@ describe("thumbnailUrl", () => {
     },
   ])("$name", ({ url, width, expected }) => {
     expect(thumbnailUrl(url, width, 1280)).toBe(expected);
+  });
+});
+
+describe("absoluteUrl", () => {
+  it.each([
+    { value: "https://creativecommons.org/licenses/by/2.0", expected: "https://creativecommons.org/licenses/by/2.0" },
+    { value: "//creativecommons.org/licenses/by-sa/3.0", expected: "https://creativecommons.org/licenses/by-sa/3.0" },
+    { value: "not a url", expected: null },
+    { value: "javascript:alert(1)", expected: null },
+    { value: undefined, expected: null },
+  ])("reads $value as $expected", ({ value, expected }) => {
+    expect(absoluteUrl(value)).toBe(expected);
   });
 });
 

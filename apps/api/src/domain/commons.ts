@@ -75,6 +75,13 @@ export function plainText(html: string): string {
     .trim();
 }
 
+/** An absolute https URL from Commons metadata, which sometimes omits the scheme; null when unusable. */
+export function absoluteUrl(value: string | undefined): string | null {
+  const text = plainText(value ?? "");
+  const candidate = text.startsWith("//") ? "https:" + text : text;
+  return URL.canParse(candidate) && /^https?:$/.test(new URL(candidate).protocol) ? candidate : null;
+}
+
 /** Whether the app accepts a Commons license, by its short name. */
 export function isAcceptedLicense(shortName: string): boolean {
   return FREE_LICENSE.test(shortName.trim());
@@ -130,7 +137,7 @@ export function commonsPhoto(page: CommonsPage): CommonsPhoto | null {
     height: info.height,
     credit: plainText(meta.Artist?.value ?? "") || "Wikimedia Commons",
     license,
-    licenseUrl: meta.LicenseUrl?.value ?? null,
+    licenseUrl: absoluteUrl(meta.LicenseUrl?.value),
     sourceUrl: info.descriptionurl,
     description: plainText(meta.ImageDescription?.value ?? "").slice(0, 280),
   };

@@ -6,6 +6,7 @@ import { deleteMe, getMe, listMyCourseRounds, listMyCourses } from "../contract/
 import type { AppEnv } from "../http/env";
 import { guarded } from "./guard";
 import { deleteAccountData } from "../services/accounts";
+import { memberRole } from "../services/curation";
 import { AppError, ErrorCode } from "../services/errors";
 import { personalList, roundHistory } from "../services/journal";
 
@@ -13,7 +14,7 @@ import { personalList, roundHistory } from "../services/journal";
 export function registerAccountRoutes(app: OpenAPIHono<AppEnv>, deps: AppDependencies): void {
   app.openapi(guarded(getMe), async (c) => {
     const user = await requireUser(c, deps.provisioner);
-    return c.json({ username: user.username, displayName: user.displayName }, 200);
+    return c.json({ username: user.username, displayName: user.displayName, role: await memberRole(deps.db, user.id) }, 200);
   });
 
   /*

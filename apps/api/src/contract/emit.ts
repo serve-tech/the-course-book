@@ -20,6 +20,7 @@ export function contractDocument() {
     },
     accounts: { deleteUser: () => Promise.reject(new Error("unused while emitting the contract")) },
     search: { search: () => Promise.resolve([]) },
+    commons: { search: () => Promise.resolve([]), file: () => Promise.resolve(null) },
     webOrigins: [],
     clientConfig: {
       minimumVersions: { ios: "0.0.0", android: "0.0.0" },

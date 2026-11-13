@@ -91,7 +91,13 @@ export const CourseDetailsSchema = z
   .openapi("CourseDetails", { description: "A course described by its details, e.g. a search result not yet in the catalog." });
 
 export const MeSchema = z
-  .object({ username: z.string(), displayName: z.string() })
+  .object({
+    username: z.string(),
+    displayName: z.string(),
+    role: z.string().openapi({
+      description: "member, curator or admin. Curators and admins set course photos; admins make members curators. New roles may appear.",
+    }),
+  })
   .openapi("Me");
 
 export const MyCourseSchema = z
@@ -529,3 +535,59 @@ export type CourseDetails = z.infer<typeof CourseDetailsSchema>;
 export type CourseRanks = z.infer<typeof CourseRanksSchema>;
 export type ClientConfig = z.infer<typeof ClientConfigSchema>;
 export type AddCourseRequest = z.infer<typeof AddCourseRequestSchema>;
+
+export const CurationCourseSchema = z
+  .object({
+    course: CourseSchema,
+    members: z.number().int().min(1).openapi({ description: "Members with the course on their ranking." }),
+  })
+  .openapi("CurationCourse");
+
+export const CurationCoursesSchema = z
+  .object({ courses: z.array(CurationCourseSchema).openapi({ description: "Every course on a member's ranking, most-ranked first." }) })
+  .openapi("CurationCourses");
+
+export const CommonsCandidateSchema = z
+  .object({
+    file: z.string().openapi({ description: "The file's Commons page title, e.g. `File:ArcadiaBluffs1011.jpg`; send it to pick the photo." }),
+    thumbUrl: z.url(),
+    width: z.number().int(),
+    height: z.number().int(),
+    credit: z.string(),
+    license: z.string(),
+    licenseUrl: z.url().nullable(),
+    sourceUrl: z.url(),
+    description: z.string().openapi({ description: "The file's description as plain text, at most 280 characters." }),
+  })
+  .openapi("CommonsCandidate");
+
+export const CommonsCandidatesSchema = z
+  .object({ candidates: z.array(CommonsCandidateSchema).openapi({ description: "Usable photos, best match first: free-licensed bitmaps at least 500 px wide." }) })
+  .openapi("CommonsCandidates");
+
+export const CommonsSearchQuerySchema = z.object({
+  q: z.string().trim().min(2, "Enter at least two characters.").max(200).openapi({ param: { name: "q", in: "query" }, description: "Words to search Commons file pages for." }),
+});
+
+export const SetCoursePhotoRequestSchema = z
+  .object({
+    commonsFile: z
+      .string()
+      .trim()
+      .max(255)
+      .regex(/^File:.+/, "Send a Commons file page title, starting with File:.")
+      .openapi({ description: "A Commons file page title from `searchCommonsPhotos`. Its credit and license are read from Commons." }),
+  })
+  .openapi("SetCoursePhotoRequest");
+
+export const RoledMemberSchema = z
+  .object({ member: MemberSchema, role: z.string().openapi({ description: "member, curator or admin. New roles may appear." }) })
+  .openapi("RoledMember");
+
+export const RoledMembersSchema = z
+  .object({ members: z.array(RoledMemberSchema).openapi({ description: "Every active member, admins and curators first." }) })
+  .openapi("RoledMembers");
+
+export const SetMemberRoleRequestSchema = z
+  .object({ role: z.enum(["member", "curator"]).openapi({ description: "Admins are made by command, never through the API." }) })
+  .openapi("SetMemberRoleRequest");
