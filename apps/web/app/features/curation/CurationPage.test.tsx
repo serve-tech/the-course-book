@@ -38,13 +38,16 @@ afterEach(cleanup);
 
 describe("CurationPage", () => {
   const courses = [
-    { course: course("a", "Arcadia Bluffs", true), members: 3 },
-    { course: course("b", "Pacific Dunes"), members: 2 },
+    { course: course("a", "Arcadia Bluffs", true), note: "3 members" },
+    { course: course("b", "Pacific Dunes"), note: "2 members" },
   ];
+  const world = { type: "global", scope: "GLOBAL" };
 
   it("opens on the courses still missing a photo, with progress", () => {
-    show({ role: MemberRole.Curator, tab: CurationTab.Photos, courses, picking: null });
+    show({ role: MemberRole.Curator, tab: CurationTab.Photos, source: null, courses, picking: null });
     expect(screen.getByText("of 2 courses")).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Courses from" })).toHaveValue("members");
+    expect(screen.getByText("2 members")).toBeInTheDocument();
     const list = () => within(screen.getByRole("list", { name: "Courses" })).getAllByRole("link");
     expect(list().map((link) => link.getAttribute("href"))).toEqual(["/curate?course=b"]);
     fireEvent.click(screen.getByRole("button", { name: "All (2)" }));
@@ -56,6 +59,7 @@ describe("CurationPage", () => {
     show({
       role: MemberRole.Admin,
       tab: CurationTab.Photos,
+      source: null,
       courses,
       picking: {
         course: course("a", "Arcadia Bluffs", true),
@@ -72,10 +76,35 @@ describe("CurationPage", () => {
     expect(screen.getByRole("navigation", { name: "Curation" })).toBeInTheDocument();
   });
 
+  it("works through a published list and keeps it on the way to a course and back", () => {
+    const pine = course("p", "Pine Valley Golf Club");
+    const listed = [
+      { course: pine, note: "#1" },
+      { course: course("c", "Cypress Point Club", true), note: "#2" },
+    ];
+    show({ role: MemberRole.Curator, tab: CurationTab.Photos, source: world, courses: listed, picking: null });
+    expect(screen.getByRole("combobox", { name: "Courses from" })).toHaveValue("world");
+    expect(screen.getByText("World Top 100", { selector: "p" })).toBeInTheDocument();
+    const link = within(screen.getByRole("list", { name: "Courses" })).getByRole("link");
+    expect(link).toHaveAttribute("href", "/curate?course=p&from=world");
+    expect(link).toHaveTextContent("#1");
+
+    cleanup();
+    show({
+      role: MemberRole.Curator,
+      tab: CurationTab.Photos,
+      source: world,
+      courses: listed,
+      picking: { course: pine, query: "Pine Valley Golf Club", candidates: [], searchError: null },
+    });
+    expect(screen.getByRole("link", { name: "← World Top 100" })).toHaveAttribute("href", "/curate?from=world");
+  });
+
   it("keeps the course on screen when Commons is down", () => {
     show({
       role: MemberRole.Curator,
       tab: CurationTab.Photos,
+      source: null,
       courses,
       picking: { course: course("b", "Pacific Dunes"), query: "Pacific Dunes", candidates: [], searchError: "Wikimedia Commons isn't answering right now." },
     });

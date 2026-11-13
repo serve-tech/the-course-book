@@ -1,5 +1,6 @@
 import type { Course } from "@coursebook/domain/catalog/course";
-import { MemberRole, type CommonsCandidate, type CurationCourse, type RoledMember } from "@coursebook/domain/curation/types";
+import { MemberRole, type CommonsCandidate, type RoledMember } from "@coursebook/domain/curation/types";
+import { topListTitle } from "@coursebook/domain/social/top-lists";
 import { useState } from "react";
 import { Form, Link, useNavigate } from "react-router";
 import { cx } from "../../shared/lib/cx";
@@ -11,7 +12,8 @@ import { coursePath } from "../courses/paths";
 import { Avatar } from "../social/Avatar";
 import { displayName } from "../social/paths";
 import { AvatarSize } from "../social/sizes";
-import { CurationFilter, CurationTab, filterCourses, openingFilter, photoProgress } from "./curation";
+import { findList, topListSlug, type TopListRef } from "../top-lists/lists";
+import { CURATION_LISTS, curatePath, CurationFilter, CurationTab, filterCourses, openingFilter, photoProgress, type CurationEntry } from "./curation";
 import styles from "./curation.module.css";
 
 /** Reply shape of the curator screen's action. */
@@ -29,35 +31,37 @@ export type CurationView =
   | {
       role: MemberRole;
       tab: CurationTab.Photos;
-      courses: CurationCourse[];
+      /** The published list being worked through; null for members' rankings. */
+      source: TopListRef | null;
+      courses: CurationEntry[];
       picking: { course: Course; query: string; candidates: CommonsCandidate[]; searchError: string | null } | null;
     };
 
 const ACTION = "/curate";
 
 /**
- * The curator screen (decision 2026-11-13): the courses members rank with
- * how far their photos have come, a Wikimedia Commons search for one
- * course, and, for admins, who curates. Photos come only from Commons until
- * uploads arrive with R2 (#67).
+ * The curator screen (decision 2026-11-13): the courses members rank, or a
+ * national published list's, with how far their photos have come; a
+ * Wikimedia Commons search for one course; and, for admins, who curates.
+ * Photos come only from Commons until uploads arrive with R2 (#67).
  *
  * @param view - What the route's loader found.
  * @param notify - Shows the outcome of a change as a toast.
  */
 export function CurationPage({ view, notify }: { view: CurationView; notify: (message: string) => void }) {
   const admin = view.role === MemberRole.Admin;
-  const progress = view.tab === CurationTab.Photos ? photoProgress(view.courses) : null;
+  const progress = view.tab === CurationTab.Photos ? { ...photoProgress(view.courses), label: sourceTitle(view.source) } : null;
   return (
     <section className={styles.page} aria-labelledby="curation-title">
       <PageHeader
         eyebrow="Curate"
         title="Course photos"
         titleId="curation-title"
-        lede="Give every course members rank a free-licensed photo from Wikimedia Commons. Its credit and license come with it."
+        lede="Give courses a free-licensed photo from Wikimedia Commons, starting with the ones members rank. Its credit and license come with it."
         aside={
           progress && (
             <div className={styles.progress}>
-              <p className={styles.progressLabel}>Photos</p>
+              <p className={styles.progressLabel}>{progress.label}</p>
               <p className={styles.progressLine}>
                 <b>{progress.withPhoto}</b> of {progress.total} courses
               </p>
@@ -81,21 +85,49 @@ export function CurationPage({ view, notify }: { view: CurationView; notify: (me
       {view.tab === CurationTab.Curators ? (
         <Curators members={view.members} notify={notify} />
       ) : view.picking ? (
-        <PhotoPicker {...view.picking} notify={notify} />
+        <PhotoPicker {...view.picking} source={view.source} notify={notify} />
       ) : (
-        <CourseList courses={view.courses} />
+        <CourseList key={view.source ? topListSlug(view.source) : MEMBERS} courses={view.courses} source={view.source} />
       )}
     </section>
   );
 }
 
-/** The courses members rank, those still missing a photo first. */
-function CourseList({ courses }: { courses: readonly CurationCourse[] }) {
+/** Where the course list comes from, as its picker and progress name it. */
+function sourceTitle(source: TopListRef | null): string {
+  return source ? topListTitle(source.type, source.scope) : "Members' rankings";
+}
+
+/** The picker's value for members' rankings; published lists use their slug. */
+const MEMBERS = "members";
+
+/**
+ * The courses from members' rankings (most-ranked first) or a published list
+ * (in rank order), opening on those still missing a photo.
+ */
+function CourseList({ courses, source }: { courses: readonly CurationEntry[]; source: TopListRef | null }) {
+  const navigate = useNavigate();
   const [filter, setFilter] = useState(() => openingFilter(courses));
   const shown = filterCourses(courses, filter);
   const missing = courses.length - photoProgress(courses).withPhoto;
   return (
     <>
+      <label className={styles.source}>
+        <span>Courses from</span>
+        <select
+          value={source ? topListSlug(source) : MEMBERS}
+          onChange={(event) => {
+            void navigate(curatePath({ list: findList(event.target.value, CURATION_LISTS) }));
+          }}
+        >
+          <option value={MEMBERS}>{sourceTitle(null)}</option>
+          {CURATION_LISTS.map((list) => (
+            <option key={topListSlug(list)} value={topListSlug(list)}>
+              {sourceTitle(list)}
+            </option>
+          ))}
+        </select>
+      </label>
       <div className={styles.filters} role="group" aria-label="Show">
         <button type="button" className={styles.filter} aria-pressed={filter === CurationFilter.Missing} onClick={() => { setFilter(CurationFilter.Missing); }}>
           Needs a photo ({missing})
@@ -105,20 +137,18 @@ function CourseList({ courses }: { courses: readonly CurationCourse[] }) {
         </button>
       </div>
       {shown.length === 0 ? (
-        <p className={styles.quiet}>Every course members rank has a photo.</p>
+        <p className={styles.quiet}>Every course here has a photo.</p>
       ) : (
         <ul className={styles.courses} aria-label="Courses">
-          {shown.map(({ course, members }) => (
+          {shown.map(({ course, note }) => (
             <li key={course.id}>
-              <Link to={ACTION + "?course=" + encodeURIComponent(course.id)} className={styles.course}>
+              <Link to={curatePath({ list: source, courseId: course.id })} className={styles.course}>
                 <CourseImage course={course} credit={CreditStyle.None} className={styles.courseThumb} />
                 <span className={styles.courseText}>
                   <span className={styles.courseName}>{course.name}</span>
                   <span className={styles.coursePlace}>{course.location}</span>
                 </span>
-                <span className={styles.courseMembers}>
-                  {members} {members === 1 ? "member" : "members"}
-                </span>
+                <span className={styles.courseMembers}>{note}</span>
               </Link>
             </li>
           ))}
@@ -134,25 +164,28 @@ function PhotoPicker({
   query,
   candidates,
   searchError,
+  source,
   notify,
 }: {
   course: Course;
   query: string;
   candidates: CommonsCandidate[];
   searchError: string | null;
+  source: TopListRef | null;
   notify: (message: string) => void;
 }) {
   const navigate = useNavigate();
+  const back = curatePath({ list: source });
   const action = useActionFetcher<CurationReply>(ACTION, (reply) => {
     notify(reply.error ?? reply.message ?? "Done");
-    if (reply.ok && reply.courseId) void navigate(ACTION);
+    if (reply.ok && reply.courseId) void navigate(back);
   });
   const pendingFile = action.busy ? action.fetcher.formData?.get("file") : null;
 
   return (
     <div className={styles.picker}>
-      <Link to={ACTION} className={styles.back}>
-        ← All courses
+      <Link to={back} className={styles.back}>
+        ← {sourceTitle(source)}
       </Link>
       <div className={styles.current}>
         <CourseImage course={course} credit={CreditStyle.Link} className={styles.currentImage} />
@@ -185,6 +218,7 @@ function PhotoPicker({
         </h3>
         <Form method="get" action={ACTION} className={styles.search} role="search">
           <input type="hidden" name="course" value={course.id} />
+          {source && <input type="hidden" name="from" value={topListSlug(source)} />}
           <input type="search" name="q" defaultValue={query} aria-label="Search Wikimedia Commons" minLength={2} required />
           <button type="submit" className={styles.button}>
             Search
