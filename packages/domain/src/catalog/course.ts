@@ -1,4 +1,25 @@
 import { z } from "zod";
+
+/**
+ * A course's hero photo and the credit its license requires.
+ *
+ * Every photo is free-licensed or used with permission, and its credit is
+ * shown wherever it appears (decision 2026-11-13, course photos in R2).
+ */
+export const coursePhotoSchema = z.object({
+  /** Where the image is served from. */
+  url: z.string().min(1),
+  /** The photographer, as the source names them. */
+  credit: z.string().min(1),
+  /** The license's short name, e.g. "CC BY-SA 4.0" or "Public domain". */
+  license: z.string().min(1),
+  /** The license's text, when it has one (public domain has none). */
+  licenseUrl: z.string().nullable().default(null),
+  /** The page the photo came from, e.g. its Wikimedia Commons file page. */
+  sourceUrl: z.string().min(1),
+});
+export type CoursePhoto = z.infer<typeof coursePhotoSchema>;
+
 export const courseSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
@@ -18,6 +39,8 @@ export const courseSchema = z.object({
   public: z.number().nullable().default(null),
   logo: z.string().default(""),
   website: z.string().default(""),
+  /** The course's hero photo; null until a curator sets one. */
+  photo: coursePhotoSchema.nullable().default(null),
 });
 export type Course = z.infer<typeof courseSchema>;
 export interface RankedCourse {

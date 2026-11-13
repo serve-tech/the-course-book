@@ -58,3 +58,11 @@ export function roundsLabel(count: number): string {
 export function coursesLabel(count: number): string {
   return String(count) + (count === 1 ? " course" : " courses");
 }
+
+/** How the member's own ranking is laid out (decision 2026-11-13). */
+export enum RankingLayout {
+  /** Photo cards for reading; each opens the course's page. */
+  Cards = "cards",
+  /** Compact rows with drag handles, for changing the order. */
+  Reorder = "reorder",
+}

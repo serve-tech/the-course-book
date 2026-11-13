@@ -13,7 +13,9 @@ import { CourseSummary, PlayedMarks, type PlayedMark } from "../top-lists/Course
 import styles from "../top-lists/top-lists.module.css";
 import { CountEditor } from "./CountEditor";
 import { CourseDetails } from "./CourseDetails";
-import { coursesLabel, rankingRows, roundsLabel } from "./ranking";
+import { coursesLabel, RankingLayout, rankingRows, roundsLabel } from "./ranking";
+import { RankingCards } from "./RankingCards";
+import cardStyles from "./ranking-cards.module.css";
 import { RankingFilters } from "./RankingFilters";
 import { useCourseDrag } from "./use-course-drag";
 import { replyMessage, useJournalFetcher } from "./use-journal-fetcher";
@@ -49,6 +51,7 @@ export interface RankingHeading {
  * @param searchFrom - Views with this many courses or fewer offer no search. Defaults to always offering it.
  * @param heading - The page's header, when this is the page rather than a tab: the view's title and share buttons become its panel.
  * @param showRounds - Whether each row shows its round count. Defaults to true.
+ * @param initialLayout - Photo cards or the compact Reorder rows. Defaults to cards; only Reorder drags.
  * @param renderImage - Draws the saved image; for tests, because jsdom has no canvas.
  */
 export function MyRanking({
@@ -64,6 +67,7 @@ export function MyRanking({
   searchFrom = 0,
   heading,
   showRounds = true,
+  initialLayout = RankingLayout.Cards,
   renderImage,
 }: {
   rows: readonly ListEntry[];
@@ -78,8 +82,11 @@ export function MyRanking({
   searchFrom?: number;
   heading?: RankingHeading | undefined;
   showRounds?: boolean;
+  initialLayout?: RankingLayout;
   renderImage?: (content: RankingImageContent) => Promise<Blob>;
 }) {
+  const [layout, setLayout] = useState(initialLayout);
+  const reordering = layout === RankingLayout.Reorder;
   const [query, setQuery] = useState(""),
     [region, setRegion] = useState(RegionFilter.All),
     [top, setTop] = useState(initialTop),
@@ -117,7 +124,7 @@ export function MyRanking({
   const visible = rankingRows(viewed, { region: RegionFilter.All, state: "", query: searchable ? query : "" });
   const stateMissing = region === RegionFilter.State && !selectedState;
 
-  const { drag, start, suppressClick } = useCourseDrag(!readOnly && !move.busy, (id, target, after) => {
+  const { drag, start, suppressClick } = useCourseDrag(reordering && !readOnly && !move.busy, (id, target, after) => {
     const without = order.filter((value) => value !== id),
       targetIndex = without.indexOf(target);
     if (targetIndex < 0) return;
@@ -171,7 +178,23 @@ export function MyRanking({
       </RankingFilters>
       {!heading && viewHeader(false)}
       {courses.length > 0 && !stateMissing && (
-        <p className={styles.hint}>{readOnly ? "Switch to All to reorder." : "Drag a course to change your ranking."}</p>
+        <div className={cardStyles.toolbar}>
+          {reordering && (
+            <p className={styles.hint}>{readOnly ? "Switch to All to reorder." : "Drag a course to change your ranking."}</p>
+          )}
+          {(reordering || !readOnly) && (
+            <button
+              type="button"
+              className={styles.filter}
+              aria-pressed={reordering}
+              onClick={() => {
+                setLayout(reordering ? RankingLayout.Cards : RankingLayout.Reorder);
+              }}
+            >
+              {reordering ? "Done" : "Reorder"}
+            </button>
+          )}
+        </div>
       )}
 
       {!courses.length ? (
@@ -183,6 +206,8 @@ export function MyRanking({
         <div className={styles.empty}>Pick a state to see the courses you've played there.</div>
       ) : !visible.length ? (
         <div className={styles.empty}>No courses here match.</div>
+      ) : !reordering ? (
+        <RankingCards rows={visible} />
       ) : (
         <ol id="ranking" className={styles.list} aria-label="Ranking">
           {visible.map(({ course, rank, played: count }) => {

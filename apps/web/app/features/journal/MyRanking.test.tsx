@@ -123,10 +123,33 @@ describe("MyRanking sharing", () => {
 
   it("stays editable on All cut to a Top N, and read-only on a region tab", () => {
     show();
+    fireEvent.click(screen.getByRole("button", { name: "Reorder" }));
     fireEvent.click(screen.getByRole("button", { name: "Top 5" }));
     expect(screen.getByText(/Drag a course to change your ranking/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("tab", { name: "USA" }));
     expect(screen.getByText(/Switch to All to reorder/)).toBeInTheDocument();
+  });
+
+  it("opens on photo cards that link to each course's page", () => {
+    show();
+    const cards = within(screen.getByRole("list", { name: "Ranking" })).getAllByRole("link");
+    expect(cards.map((card) => card.getAttribute("href"))).toEqual(["/courses/pine", "/courses/old", "/courses/crystal", "/courses/arcadia"]);
+    expect(screen.queryByText(/Drag a course/)).not.toBeInTheDocument();
+  });
+
+  it("switches to draggable rows with Reorder and back to cards with Done", () => {
+    show();
+    fireEvent.click(screen.getByRole("button", { name: "Reorder" }));
+    expect(within(screen.getByRole("list", { name: "Ranking" })).queryAllByRole("link")).toEqual([]);
+    expect(listed()).toEqual(["1 Pine Valley", "2 The Old Course", "3 Crystal Downs", "4 Arcadia Bluffs"]);
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+    expect(within(screen.getByRole("list", { name: "Ranking" })).getAllByRole("link")).toHaveLength(4);
+  });
+
+  it("offers Reorder only where the order can change", () => {
+    show();
+    fireEvent.click(screen.getByRole("tab", { name: "USA" }));
+    expect(screen.queryByRole("button", { name: "Reorder" })).not.toBeInTheDocument();
   });
 
   it("offers nothing to share until a state is picked", () => {

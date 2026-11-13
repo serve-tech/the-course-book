@@ -13,6 +13,7 @@ import {
   type WantToPlayEntry,
 } from "@coursebook/domain/social/types";
 import type { ListEntry, RoundEntry } from "@coursebook/domain/journal/types";
+import { previewPhoto } from "./preview-photos";
 import type { ApiSchemas } from "./client";
 
 /**
@@ -52,6 +53,7 @@ function toCourse(id: string, details: Details, ranks: Ranks): Course {
     stateRank: ranks.state,
     logo: details.logoUrl ?? "",
     website: details.websiteUrl ?? "",
+    photo: previewPhoto(details.name),
   });
 }
 
