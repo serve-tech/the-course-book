@@ -1,0 +1,11 @@
+/* The line between the filters and the ranking: a hint, then Reorder or Done. */
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 36px;
+  margin: 2px 2px 8px;
+}
+.toolbar p { margin: 0; }
+.toolbar button { margin-left: auto; }

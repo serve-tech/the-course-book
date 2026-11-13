@@ -90,18 +90,29 @@ export function CourseSummary({
         <div className={styles.name}>{course.name}</div>
         <div className={styles.place}>{course.location}</div>
         <RankPills course={course} current={current} />
-        {friends.length > 0 && (
-          <div className={styles.friends}>
-            <span className={styles.friendAvatars} aria-hidden="true">
-              {friends.slice(0, 3).map((friend) => (
-                <Avatar key={friend.username} member={friend} size={AvatarSize.ExtraSmall} />
-              ))}
-            </span>
-            {friendsLine(friends)}
-          </div>
-        )}
+        <FriendsPlayed friends={friends} />
       </div>
     </>
+  );
+}
+
+/**
+ * The viewer's friends who played a course: up to three avatars, then
+ * "Priya and 2 other friends played it". Renders nothing without friends.
+ *
+ * @param friends - Friends who played it.
+ */
+export function FriendsPlayed({ friends }: { friends: readonly PublicMember[] }) {
+  if (!friends.length) return null;
+  return (
+    <div className={styles.friends}>
+      <span className={styles.friendAvatars} aria-hidden="true">
+        {friends.slice(0, 3).map((friend) => (
+          <Avatar key={friend.username} member={friend} size={AvatarSize.ExtraSmall} />
+        ))}
+      </span>
+      {friendsLine(friends)}
+    </div>
   );
 }
 

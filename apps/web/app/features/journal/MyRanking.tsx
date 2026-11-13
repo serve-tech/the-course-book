@@ -15,7 +15,7 @@ import { CountEditor } from "./CountEditor";
 import { CourseDetails } from "./CourseDetails";
 import { coursesLabel, RankingLayout, rankingRows, roundsLabel } from "./ranking";
 import { RankingCards } from "./RankingCards";
-import cardStyles from "./ranking-cards.module.css";
+import toolbarStyles from "./ranking-toolbar.module.css";
 import { RankingFilters } from "./RankingFilters";
 import { useCourseDrag } from "./use-course-drag";
 import { replyMessage, useJournalFetcher } from "./use-journal-fetcher";
@@ -178,7 +178,7 @@ export function MyRanking({
       </RankingFilters>
       {!heading && viewHeader(false)}
       {courses.length > 0 && !stateMissing && (
-        <div className={cardStyles.toolbar}>
+        <div className={toolbarStyles.toolbar}>
           {reordering && (
             <p className={styles.hint}>{readOnly ? "Switch to All to reorder." : "Drag a course to change your ranking."}</p>
           )}
