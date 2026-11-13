@@ -46,6 +46,9 @@ function show(selectedState = "MI") {
 }
 
 /** The list as "number name", top to bottom. */
+/** Courses drawn as the featured photo cards. */
+const featured = () => [...document.querySelectorAll("#ranking > li[data-featured]")].map((item) => item.getAttribute("data-course"));
+
 const listed = () =>
   within(screen.getByRole("list", { name: "Ranking" }))
     .getAllByRole("listitem")
@@ -130,14 +133,22 @@ describe("MyRanking sharing", () => {
     expect(screen.getByText(/Switch to All to reorder/)).toBeInTheDocument();
   });
 
-  it("opens on photo cards that link to each course's page", () => {
+  it("opens on the top three as photo cards, then rows, each linking to the course's page", () => {
     show();
-    const cards = within(screen.getByRole("list", { name: "Ranking" })).getAllByRole("link");
-    expect(cards.map((card) => card.getAttribute("href"))).toEqual(["/courses/pine", "/courses/old", "/courses/crystal", "/courses/arcadia"]);
+    const links = within(screen.getByRole("list", { name: "Ranking" })).getAllByRole("link");
+    expect(links.map((link) => link.getAttribute("href"))).toEqual(["/courses/pine", "/courses/old", "/courses/crystal", "/courses/arcadia"]);
+    expect(featured()).toEqual(["Pine Valley", "The Old Course", "Crystal Downs"]);
     expect(screen.queryByText(/Drag a course/)).not.toBeInTheDocument();
   });
 
-  it("switches to draggable rows with Reorder and back to cards with Done", () => {
+  it("features nothing while searching, because the first results aren't the top three", () => {
+    show();
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "crystal" } });
+    expect(listed()).toEqual(["3 Crystal Downs"]);
+    expect(featured()).toEqual([]);
+  });
+
+  it("switches to draggable rows with Reorder and back with Done", () => {
     show();
     fireEvent.click(screen.getByRole("button", { name: "Reorder" }));
     expect(within(screen.getByRole("list", { name: "Ranking" })).queryAllByRole("link")).toEqual([]);

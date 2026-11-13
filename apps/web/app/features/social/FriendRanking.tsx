@@ -3,7 +3,9 @@ import { RegionFilter } from "@coursebook/domain/catalog/course";
 import type { MemberListRow } from "@coursebook/domain/friends/types";
 import { rankingRows, roundsLabel } from "../journal/ranking";
 import { RankingFilters } from "../journal/RankingFilters";
+import { coursePath } from "../courses/paths";
 import { CourseRow, type PlayedMark } from "../top-lists/CourseRow";
+import { isFeatured } from "../top-lists/lists";
 import styles from "../top-lists/top-lists.module.css";
 import { RankingFilter, emptyRankingMessage, filterRanking, rankingFilterOptions } from "./ranking-filter";
 
@@ -77,11 +79,13 @@ export function FriendRanking({
         <div className={styles.empty}>{emptyRankingMessage(filter, query.trim() !== "")}</div>
       ) : (
         <ol id="ranking" className={styles.list} aria-label={name + "'s ranking"}>
-          {visible.map((row) => (
+          {visible.map((row, index) => (
             <CourseRow
               key={row.course.id}
               course={row.course}
               rank={row.rank}
+              href={coursePath(row.course.id)}
+              featured={isFeatured(index, filter === RankingFilter.All && !query.trim())}
               current={null}
               marks={yourMark(row)}
               note={row.played > 1 ? roundsLabel(row.played) : undefined}

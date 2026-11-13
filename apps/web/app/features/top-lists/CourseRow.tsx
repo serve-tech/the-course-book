@@ -1,9 +1,11 @@
 import type { Course } from "@coursebook/domain/catalog/course";
 import type { PublicMember } from "@coursebook/domain/friends/types";
 import type { ReactNode } from "react";
+import { Link } from "react-router";
+import { CourseImage } from "../courses/CourseImage";
+import { CreditStyle } from "../courses/credit-style";
 import { Avatar } from "../social/Avatar";
-import { CourseTile } from "../social/CourseTile";
-import { AvatarSize, TileSize } from "../social/sizes";
+import { AvatarSize } from "../social/sizes";
 import { cx } from "../../shared/lib/cx";
 import { CheckIcon } from "./icons";
 import { friendsLine, type TopListRef } from "./lists";
@@ -20,9 +22,15 @@ export interface PlayedMark {
 }
 
 /**
- * One course in a list: its rank here, name and place, its rank on every
- * list it is on (the current list highlighted), who played it, and the
- * actions. A row the list's member played gets a gold edge.
+ * One course in a list: its rank here, its photo, name and place, its rank
+ * on every list it is on (the current list highlighted), who played it, and
+ * the actions. A row the list's member played gets a gold edge.
+ *
+ * Rows show a small photo; a featured row (a list's top three, decision
+ * 2026-11-13) is the same markup laid out as a photo card, so the list stays
+ * one `<ol>` whichever way its courses are drawn. With `href`, the name
+ * links to the course's page and the link covers the row; the ticks and
+ * buttons sit above it and keep working.
  *
  * @param course - The course.
  * @param rank - Its rank on the list shown; null hides the number (Want to play).
@@ -33,6 +41,8 @@ export interface PlayedMark {
  * @param note - Extra text before the marks, e.g. "3 rounds".
  * @param friends - Friends who played it, shown under the name.
  * @param actions - Buttons at the end of the row; omitted when there are none.
+ * @param href - The course's page; omitted where it can't be opened (visitors).
+ * @param featured - Draw the row as a photo card, for a list's top three.
  */
 export function CourseRow({
   course,
@@ -43,6 +53,8 @@ export function CourseRow({
   note,
   friends = [],
   actions,
+  href,
+  featured = false,
 }: {
   course: Course;
   rank: number | null;
@@ -52,11 +64,13 @@ export function CourseRow({
   note?: ReactNode;
   friends?: readonly PublicMember[];
   actions?: ReactNode;
+  href?: string | undefined;
+  featured?: boolean;
 }) {
   return (
-    <li className={styles.row} data-played={played} data-course={course.name}>
+    <li className={cx(styles.row, featured && styles.featured)} data-played={played} data-course={course.name} data-featured={featured || undefined}>
       <span className={styles.rank}>{rank ?? ""}</span>
-      <CourseSummary course={course} current={current} friends={friends} />
+      <CourseSummary course={course} current={current} friends={friends} href={href} featured={featured} />
       <PlayedMarks course={course} marks={marks} note={note} />
       {actions}
     </li>
@@ -64,30 +78,42 @@ export function CourseRow({
 }
 
 /**
- * The middle of a course row as two grid cells: the course's tile, then its
+ * The middle of a course row as two grid cells: the course's photo, then its
  * name, place, published ranks and the friends who played it. The Ranking
  * tab's draggable rows use it too, so every list reads the same.
  *
  * @param course - The course.
  * @param current - The published list on screen, whose badge is highlighted.
  * @param friends - Friends who played it, shown under the name.
+ * @param href - The course's page, linked from the name.
+ * @param featured - A photo card's full-size photo and credit, rather than a thumbnail.
  */
 export function CourseSummary({
   course,
   current,
   friends = [],
+  href,
+  featured = false,
 }: {
   course: Course;
   current: TopListRef | null;
   friends?: readonly PublicMember[];
+  href?: string | undefined;
+  featured?: boolean;
 }) {
   return (
     <>
       <div className={styles.tileCell}>
-        <CourseTile course={course} size={TileSize.Mini} />
+        <CourseImage course={course} thumbnail={!featured} credit={featured ? CreditStyle.Chip : CreditStyle.None} className={styles.photo} />
       </div>
       <div className={styles.main}>
-        <div className={styles.name}>{course.name}</div>
+        {href ? (
+          <Link to={href} className={cx(styles.name, styles.nameLink)}>
+            {course.name}
+          </Link>
+        ) : (
+          <div className={styles.name}>{course.name}</div>
+        )}
         <div className={styles.place}>{course.location}</div>
         <RankPills course={course} current={current} />
         <FriendsPlayed friends={friends} />

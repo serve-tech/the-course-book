@@ -6,13 +6,12 @@ import type { ViewerCourses } from "../../lib/api/viewer";
 import { countLabel } from "../../shared/lib/count-label";
 import { cx } from "../../shared/lib/cx";
 import type { Notify } from "../../shared/ui/shell";
-import { CourseCard, CourseCards } from "../courses/CourseCard";
 import { coursePath } from "../courses/paths";
 import { LogRoundDialog } from "../rounds/LogRoundDialog";
 import { RoundHistory } from "../rounds/RoundHistory";
 import { CourseActions } from "./CourseActions";
-import { PlayedMarks, type PlayedMark } from "./CourseRow";
-import { filterEntries, PlayedFilter, playedCount, type TopListRef } from "./lists";
+import { CourseRow, type PlayedMark } from "./CourseRow";
+import { filterEntries, isFeatured, PlayedFilter, playedCount, type TopListRef } from "./lists";
 import styles from "./top-lists.module.css";
 
 /** Filters on a member's list; "Only them" is a friend's courses the viewer hasn't played. */
@@ -25,9 +24,10 @@ enum MemberFilter {
 
 /**
  * One published list through a member's eyes: every course, ticked where
- * they played it and, on a friend's page, where you did too. The courses are
- * the Courses page's photo cards, buttons included, so spotting that a
- * friend played Shinnecock is one tap from wanting to play it.
+ * they played it and, on a friend's page, where you did too. The courses
+ * are drawn as on the Courses page (the top three as photo cards, then
+ * rows), buttons included, so spotting that a friend played Shinnecock is
+ * one tap from wanting to play it.
  *
  * @param list - The list shown.
  * @param entries - Its entries in rank order.
@@ -154,31 +154,30 @@ export function MemberTopList({
       {!shown.length ? (
         <div className={styles.empty}>No courses here.</div>
       ) : (
-        <CourseCards id="memberTopList" label={title}>
-          {shown.map((row) => (
-            <CourseCard
+        <ol id="memberTopList" className={styles.list} aria-label={title}>
+          {shown.map((row, index) => (
+            <CourseRow
               key={row.course.id}
               course={row.course}
               rank={row.rank}
               href={coursePath(row.course.id)}
+              featured={isFeatured(index, filter === MemberFilter.All)}
               current={list}
               played={memberPlayed.has(row.course.id)}
-              footer={
-                <>
-                  <PlayedMarks course={row.course} marks={marks(row.course)} />
-                  <CourseActions
-                    course={row.course}
-                    wanted={wanted.has(row.course.id)}
-                    signedIn
-                    onLog={setLogging}
-                    notify={notify}
-                    openAuth={openAuth}
-                  />
-                </>
+              marks={marks(row.course)}
+              actions={
+                <CourseActions
+                  course={row.course}
+                  wanted={wanted.has(row.course.id)}
+                  signedIn
+                  onLog={setLogging}
+                  notify={notify}
+                  openAuth={openAuth}
+                />
               }
             />
           ))}
-        </CourseCards>
+        </ol>
       )}
 
       {history && (

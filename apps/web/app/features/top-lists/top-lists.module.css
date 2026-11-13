@@ -99,18 +99,32 @@
 }
 .search input:focus { border-color: rgba(199, 170, 107, 0.5); }
 
-/* Course rows. */
-.list { margin: 0; padding: 0; list-style: none; }
+/*
+ * Course lists: rows with a small photo, after the list's top three as photo
+ * cards (.featured) when it is shown whole. One grid holds both: rows span
+ * every column; on phones #1 spans both and #2 and #3 share a line, wider
+ * screens put the three side by side.
+ */
+.list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.list > * { grid-column: 1 / -1; }
 .row {
   position: relative;
   display: grid;
-  grid-template-columns: 40px 26px minmax(0, 1fr) auto auto;
-  gap: 12px;
+  grid-template-columns: 40px 120px minmax(0, 1fr) auto auto;
+  gap: 14px;
   align-items: center;
-  padding: 11px 10px 11px 8px;
+  padding: 12px 10px 12px 8px;
   border-top: 1px solid var(--line);
 }
-.row:first-child { border-top: 0; }
+.row:first-child,
+.featured + .row:not(.featured) { border-top: 0; }
 /* Played by the member whose list it is: a gold edge and a warmer ground. */
 .row[data-played="true"] { background: linear-gradient(90deg, rgba(199, 170, 107, 0.1), rgba(199, 170, 107, 0.02) 60%, transparent); }
 .row[data-played="true"]::before {
@@ -124,14 +138,24 @@
   background: var(--gold);
 }
 .rank {
-  font: 600 20px / 1 "Playfair Display", Georgia, serif;
+  font: 600 22px / 1 "Playfair Display", Georgia, serif;
   color: var(--gold);
   text-align: center;
   font-variant-numeric: lining-nums tabular-nums;
 }
-.tileCell { display: flex; }
+.tileCell { display: flex; min-width: 0; }
+.photo { width: 100%; aspect-ratio: 3 / 2; border-radius: 9px; border: 1px solid rgba(199, 170, 107, 0.16); }
+.photo img { transition: transform 0.5s ease; }
 .main { min-width: 0; }
-.name { font: 600 16px / 1.25 "Playfair Display", Georgia, serif; color: var(--cream); overflow-wrap: anywhere; }
+.name { display: block; font: 600 17px / 1.25 "Playfair Display", Georgia, serif; color: var(--cream); text-decoration: none; overflow-wrap: anywhere; }
+/* The name's link covers the row, so the photo and the space around the text open the course too. */
+.nameLink::after { content: ""; position: absolute; inset: 0; z-index: 1; border-radius: 12px; }
+.nameLink:focus-visible { outline: none; }
+.nameLink:focus-visible::after { outline: 2px solid var(--gold); outline-offset: -2px; }
+.row:hover .nameLink { color: var(--gold); }
+.row:not([data-played="true"]):hover:has(.nameLink) { background: rgba(255, 255, 255, 0.03); }
+/* Ticks and buttons sit above the row's link. */
+.marks, .actions { position: relative; z-index: 2; }
 .place { margin-top: 2px; color: var(--muted); font-size: 12.5px; }
 .badges { display: flex; flex-wrap: wrap; gap: 4px 6px; margin: 6px 0 0; padding: 0; list-style: none; }
 .badge {
@@ -198,7 +222,7 @@
  * The member's own Ranking: a drag handle before the rank. Touch drags start
  * only on the handle (use-course-drag.ts), so the row itself still scrolls.
  */
-.rankRow { grid-template-columns: 28px 40px 26px minmax(0, 1fr) auto; touch-action: pan-y; user-select: none; cursor: grab; }
+.rankRow { grid-template-columns: 28px 40px 96px minmax(0, 1fr) auto; touch-action: pan-y; user-select: none; cursor: grab; }
 .rankRow[aria-disabled="true"] { cursor: default; }
 .handle {
   display: grid;
@@ -235,19 +259,75 @@
   font-size: 14px;
 }
 
+/* A list's top three: the row's cells as a photo card, the rank on the photo. */
+.row.featured {
+  grid-column: auto;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "photo photo" "main main" "marks actions";
+  align-items: start;
+  align-content: start;
+  gap: 10px 8px;
+  margin-bottom: 22px;
+  padding: 0;
+  border-top: 0;
+}
+.featured .tileCell { grid-area: photo; display: block; }
+.featured .photo { border-radius: 14px; border-color: rgba(199, 170, 107, 0.2); box-shadow: 0 18px 34px -24px rgba(0, 0, 0, 0.9); }
+.featured .main { grid-area: main; padding: 0 2px; }
+.featured .marks { grid-area: marks; justify-content: flex-start; padding-left: 2px; }
+.featured .actions { grid-area: actions; }
+.featured .rank {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 2;
+  grid-row: auto;
+  min-width: 40px;
+  padding: 5px 10px 6px;
+  border-radius: 10px;
+  background: rgba(8, 22, 15, 0.55);
+  backdrop-filter: blur(6px);
+  font-size: 26px;
+  pointer-events: none;
+}
+.featured .name { font-size: 20px; line-height: 1.15; }
+.featured .nameLink::after { border-radius: 14px; }
+.featured[data-played="true"] { background: none; }
+.featured[data-played="true"]::before { display: none; }
+.featured[data-played="true"] .photo { border-color: rgba(199, 170, 107, 0.8); }
+.featured:hover .photo { border-color: rgba(199, 170, 107, 0.55); }
+.featured:hover:has(.nameLink) .photo img { transform: scale(1.03); }
+
+@media (min-width: 761px) {
+  .list { grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: 20px; }
+  .featured { margin-bottom: 28px; }
+  .featured .name { font-size: 22px; }
+}
+
 @media (max-width: 760px) {
   .head { grid-template-columns: minmax(0, 1fr); }
   .search { max-width: none; margin-left: 0; flex-basis: 100%; }
-  /* Marks and buttons move under the name on phones. */
-  .row { grid-template-columns: 32px minmax(0, 1fr) auto; gap: 4px 10px; padding-right: 4px; }
-  .tileCell { display: none; }
-  .rank { font-size: 18px; grid-row: span 2; align-self: start; padding-top: 2px; }
-  .main { grid-column: 2 / 4; }
-  .marks { grid-column: 2; justify-content: flex-start; }
-  .actions { grid-column: 3; }
+  /* The photo stays; marks and buttons move under the name. */
+  .row { grid-template-columns: 26px 84px minmax(0, 1fr) auto; gap: 4px 10px; padding: 10px 4px 10px 0; }
+  .rank { font-size: 18px; grid-row: span 2; align-self: start; padding-top: 4px; }
+  .tileCell { grid-row: span 2; align-self: start; }
+  .main { grid-column: 3 / 5; }
+  .marks { grid-column: 3; justify-content: flex-start; }
+  .actions { grid-column: 4; }
   /* Ranking rows keep the handle in front of the rank. */
-  .rankRow { grid-template-columns: 24px 32px minmax(0, 1fr) auto; }
+  .rankRow { grid-template-columns: 20px 26px 72px minmax(0, 1fr); }
   .rankRow .handle { grid-row: span 2; align-self: start; }
-  .rankRow .main { grid-column: 3 / 5; }
-  .rankRow .marks { grid-column: 3 / 5; }
+  .rankRow .main { grid-column: 4 / 5; }
+  .rankRow .marks { grid-column: 4 / 5; }
+  /* #1 takes the full width; #2 and #3 share a line. */
+  .featured:first-child { grid-column: 1 / -1; }
+  .featured:first-child .rank { font-size: 32px; padding: 6px 12px 7px; }
+  .featured:first-child .name { font-size: 23px; }
+  .featured:not(:first-child) .name { font-size: 16px; }
+  .featured:not(:first-child) .rank { font-size: 22px; min-width: 34px; padding: 4px 8px 5px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .photo img { transition: none; }
+  .featured:hover:has(.nameLink) .photo img { transform: none; }
 }

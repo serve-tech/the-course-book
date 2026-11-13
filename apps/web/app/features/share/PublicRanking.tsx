@@ -9,7 +9,9 @@ import profileStyles from "../social/profile.module.css";
 import { AvatarSize } from "../social/sizes";
 import socialStyles from "../social/social.module.css";
 import { placeCounts } from "../social/stats";
+import { coursePath } from "../courses/paths";
 import { CourseRow } from "../top-lists/CourseRow";
+import { isFeatured } from "../top-lists/lists";
 import listStyles from "../top-lists/top-lists.module.css";
 import type { RankingImageContent } from "./ranking-image";
 import { viewRows, type ShareView } from "@coursebook/domain/sharing/view";
@@ -61,7 +63,8 @@ export function PublicRanking({
   const shown = useMemo<ShareView>(() => ({ region: shownRegion, state: shownState, top: shownTop }), [shownRegion, shownState, shownTop]);
   const rows = useMemo(() => viewRows(ranking.rows, shown), [ranking.rows, shown]);
   const searchable = rows.length > SEARCH_FROM;
-  const visible = rankingRows(rows, { region: RegionFilter.All, state: "", query: searchable ? query : "" });
+  const searching = searchable && query.trim() !== "";
+  const visible = rankingRows(rows, { region: RegionFilter.All, state: "", query: searching ? query : "" });
 
   return (
     <section className={listStyles.page} aria-label={name + "'s ranking"}>
@@ -117,8 +120,17 @@ export function PublicRanking({
         <div className={listStyles.empty}>No courses here match.</div>
       ) : (
         <ol id="ranking" className={listStyles.list} aria-label={name + "'s ranking"}>
-          {visible.map((row) => (
-            <CourseRow key={row.course.id} course={row.course} rank={row.rank} current={null} marks={[]} />
+          {visible.map((row, index) => (
+            <CourseRow
+              key={row.course.id}
+              course={row.course}
+              rank={row.rank}
+              current={null}
+              marks={[]}
+              // Visitors can't open a course page yet; members can.
+              href={signedOut ? undefined : coursePath(row.course.id)}
+              featured={isFeatured(index, !searching)}
+            />
           ))}
         </ol>
       )}

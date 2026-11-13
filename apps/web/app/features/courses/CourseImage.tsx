@@ -16,6 +16,7 @@ import styles from "./courses.module.css";
  *   already name the course next to the photo.
  * @param priority - Load the photo straight away (a page's hero) instead of
  *   when it nears the viewport.
+ * @param thumbnail - Load the small (330 px) image, for rows and tiles.
  * @param className - Sets the box's size, shape and radius.
  */
 export function CourseImage({
@@ -23,19 +24,28 @@ export function CourseImage({
   credit = CreditStyle.Chip,
   alt = "",
   priority = false,
+  thumbnail = false,
   className,
 }: {
   course: Course;
   credit?: CreditStyle;
   alt?: string;
   priority?: boolean;
+  thumbnail?: boolean;
   className?: string | undefined;
 }) {
   const photo = course.photo;
   return (
     <div className={cx(styles.image, className)} data-tone={courseTone(course)} data-photo={photo ? "true" : "false"}>
       {photo ? (
-        <img src={photo.url} alt={alt} loading={priority ? "eager" : "lazy"} decoding="async" />
+        <img
+          src={thumbnail ? photo.thumbUrl : photo.url}
+          alt={alt}
+          loading={priority ? "eager" : "lazy"}
+          decoding="async"
+          // Too small for a credit chip: name the photographer on hover; the course page shows the credit in full.
+          title={credit === CreditStyle.None ? "Photo: " + photo.credit + " · " + photo.license : undefined}
+        />
       ) : (
         <FlagIcon />
       )}
