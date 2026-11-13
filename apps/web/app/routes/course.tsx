@@ -24,7 +24,7 @@ export function meta({ loaderData }: Route.MetaArgs) {
 export default function Course({ loaderData }: Route.ComponentProps) {
   const shell = useShell();
   if (!loaderData) return null;
-  return <CoursePageView page={loaderData} notify={shell.notify} openAuth={shell.openAuth} />;
+  return <CoursePageView page={loaderData} canCurate={shell.canCurate} notify={shell.notify} openAuth={shell.openAuth} />;
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {

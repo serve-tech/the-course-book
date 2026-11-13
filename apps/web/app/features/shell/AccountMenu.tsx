@@ -9,17 +9,20 @@ import styles from "./nav.module.css";
 
 interface AccountMenuProps {
   member: PublicMember;
+  /** Adds Course photos, the curator screen. */
+  canCurate?: boolean;
   onSignOut: () => void;
   onNavigate: () => void;
 }
 
 /**
  * The signed-in member's avatar in the top bar. It opens a menu, headed by
- * who is signed in, with Profile, Account and Sign out, so the bar itself
+ * who is signed in, with Profile, Account and Sign out (and Course photos
+ * for curators), so the bar itself
  * carries no account buttons. The menu closes on Escape, a press outside it
  * or choosing an item.
  */
-export function AccountMenu({ member, onSignOut, onNavigate }: AccountMenuProps) {
+export function AccountMenu({ member, canCurate = false, onSignOut, onNavigate }: AccountMenuProps) {
   const [open, setOpen] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
   const close = useCallback(() => {
@@ -59,6 +62,11 @@ export function AccountMenu({ member, onSignOut, onNavigate }: AccountMenuProps)
             <Link role="menuitem" to="/activity" className={styles.menuItem} onClick={go}>
               Activity
             </Link>
+            {canCurate && (
+              <Link role="menuitem" to="/curate" className={styles.menuItem} onClick={go}>
+                Course photos
+              </Link>
+            )}
             <Link role="menuitem" to="/account" className={styles.menuItem} onClick={go}>
               Account
             </Link>

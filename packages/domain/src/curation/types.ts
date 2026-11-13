@@ -47,3 +47,8 @@ export interface RoledMember {
   member: PublicMember;
   role: MemberRole;
 }
+
+/** A role as the API names it; one this release does not know reads as a member. */
+export function roleFrom(value: string): MemberRole {
+  return Object.values(MemberRole).find((role) => role.valueOf() === value) ?? MemberRole.Member;
+}

@@ -26,6 +26,8 @@ export interface Shell {
   openAuth: () => void;
   /** Open the Log a round dialog over the current page; signed out, open the account dialog. */
   openLog: () => void;
+  /** Whether the signed-in member curates course photos (decision 2026-11-13). */
+  canCurate: boolean;
 }
 
 export function useShell(): Shell {

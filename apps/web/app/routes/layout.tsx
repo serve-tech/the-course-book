@@ -1,4 +1,5 @@
 import { getToken, useAuth, useClerk } from "@clerk/react-router";
+import { canCurate, roleFrom } from "@coursebook/domain/curation/types";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, Outlet, useLocation, useNavigation, useRevalidator, useSearchParams, type ShouldRevalidateFunctionArgs } from "react-router";
 import type { Route } from "./+types/layout";
@@ -180,6 +181,7 @@ export default function Layout({ loaderData }: Route.ComponentProps) {
     if (mobile) window.scrollTo(0, 0);
   }, []);
 
+  const curator = user !== null && canCurate(roleFrom(user.role));
   const shell: Shell = {
     notify,
     selectedState,
@@ -187,6 +189,7 @@ export default function Layout({ loaderData }: Route.ComponentProps) {
     searchFocus,
     openAuth: openAuthDialog,
     openLog,
+    canCurate: curator,
   };
 
   const signOut = () => {
@@ -201,7 +204,7 @@ export default function Layout({ loaderData }: Route.ComponentProps) {
 
   return (
     <div className={cx("app", navStyles.shell)}>
-      <TopBar member={user} incomingRequests={requests} onSignIn={openAuthDialog} onLog={openLog} onSignOut={signOut} onNavigate={navigate} />
+      <TopBar member={user && { ...user, canCurate: curator }} incomingRequests={requests} onSignIn={openAuthDialog} onLog={openLog} onSignOut={signOut} onNavigate={navigate} />
       {problem && (
         <p className="error-text" id="authProblem" role="alert">
           {problem}

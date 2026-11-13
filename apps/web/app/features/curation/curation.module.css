@@ -1,0 +1,100 @@
+/* The curator screen. Phone first: one column throughout. */
+.page { display: grid; gap: 0; }
+
+.progress { composes: progress from "../top-lists/top-lists.module.css"; }
+.progressLabel { composes: progressLabel from "../top-lists/top-lists.module.css"; }
+.progressLine { composes: progressLine from "../top-lists/top-lists.module.css"; justify-content: flex-start; }
+.bar { composes: bar from "../top-lists/top-lists.module.css"; }
+
+.tabs { composes: tabs from "../top-lists/top-lists.module.css"; margin-bottom: 16px; }
+.tab { composes: tab from "../top-lists/top-lists.module.css"; text-decoration: none; text-align: center; }
+.tab[aria-current="page"] { background: var(--cream); color: #0f2419; }
+
+.filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.filter { composes: filter from "../top-lists/top-lists.module.css"; }
+
+.button { composes: button buttonSolid from "../social/social.module.css"; }
+.buttonGhost { composes: buttonGhost from "../social/social.module.css"; }
+.quiet { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.6; }
+.error { margin: 0; color: #f0b4a8; font-size: 14px; }
+.heading { composes: sectionTitle from "../../shared/ui/page-header.module.css"; }
+.subheading { margin: 0; font: 700 13px / 1.2 "DM Sans", Arial, sans-serif; letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted); }
+
+/* Course list */
+.courses, .members { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.course, .memberRow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 8px;
+  border-radius: 12px;
+  color: inherit;
+  text-decoration: none;
+}
+.course:hover { background: rgba(255, 255, 255, 0.04); }
+.course:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.courseThumb { width: 72px; aspect-ratio: 3 / 2; border-radius: 8px; }
+.courseText { display: grid; gap: 3px; min-width: 0; }
+.courseName { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.coursePlace { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.courseMembers { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.roleBadge { color: var(--gold); font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+
+/* One course's picker */
+.picker { display: grid; gap: 22px; }
+.back { justify-self: start; color: var(--muted); font-size: 13px; font-weight: 700; text-decoration: none; }
+.back:hover { color: var(--gold); }
+.current { display: grid; gap: 16px; }
+.currentImage { aspect-ratio: 3 / 2; border-radius: 14px; border: 1px solid var(--line); }
+.currentText { display: grid; gap: 8px; align-content: start; }
+.currentActions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+
+.results { display: grid; gap: 14px; }
+.search { display: flex; gap: 8px; }
+.search input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--cream);
+}
+.search input:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
+
+.candidates {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.candidate {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.015));
+}
+.candidate img { width: 100%; aspect-ratio: 3 / 2; object-fit: cover; border-radius: 9px; display: block; background: rgba(255, 255, 255, 0.04); }
+.candidateText { display: grid; gap: 4px; min-width: 0; }
+.candidateCredit { margin: 0; font-size: 13px; font-weight: 700; }
+.candidateCredit a { color: var(--cream); }
+.candidateMeta {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+@media (min-width: 761px) {
+  .current { grid-template-columns: minmax(0, 420px) minmax(0, 1fr); align-items: start; }
+}

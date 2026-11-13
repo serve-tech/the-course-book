@@ -10,6 +10,8 @@ export interface NavMember {
   username: string;
   /** Gives the avatar's initials and accessible name. */
   displayName: string;
+  /** Shows Course photos in the account menu. */
+  canCurate?: boolean;
 }
 
 interface NavProps {
@@ -59,6 +61,7 @@ export function TopBar({
         {member ? (
           <AccountMenu
             member={member}
+            canCurate={member.canCurate ?? false}
             onSignOut={onSignOut}
             onNavigate={onNavigate}
           />

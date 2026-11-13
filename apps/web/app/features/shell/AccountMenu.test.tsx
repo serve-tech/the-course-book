@@ -6,11 +6,11 @@ import { AccountMenu } from "./AccountMenu";
 
 const member = { username: "jlinneburg", displayName: "Joshua Linneburg" };
 
-function renderMenu() {
+function renderMenu(canCurate = false) {
   const onSignOut = vi.fn();
   const onNavigate = vi.fn();
   const router = createMemoryRouter(
-    [{ path: "*", element: <AccountMenu member={member} onSignOut={onSignOut} onNavigate={onNavigate} /> }],
+    [{ path: "*", element: <AccountMenu member={member} canCurate={canCurate} onSignOut={onSignOut} onNavigate={onNavigate} /> }],
   );
   render(<RouterProvider router={router} />);
   const button = screen.getByRole("button", { name: "Account menu for Joshua Linneburg" });
@@ -30,6 +30,13 @@ describe("AccountMenu", () => {
     expect(screen.getAllByRole("menuitem").map((item) => item.textContent)).toEqual(["Profile", "Activity", "Account", "Sign out"]);
     expect(screen.getByRole("menuitem", { name: "Profile" })).toHaveAttribute("href", "/u/jlinneburg");
     expect(screen.getByRole("menuitem", { name: "Account" })).toHaveAttribute("href", "/account");
+  });
+
+  it("adds Course photos for a curator", () => {
+    const { button } = renderMenu(true);
+    fireEvent.click(button);
+    expect(screen.getAllByRole("menuitem").map((item) => item.textContent)).toEqual(["Profile", "Activity", "Course photos", "Account", "Sign out"]);
+    expect(screen.getByRole("menuitem", { name: "Course photos" })).toHaveAttribute("href", "/curate");
   });
 
   it("signs out and closes", () => {

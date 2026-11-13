@@ -23,10 +23,21 @@ import styles from "./course-page.module.css";
  * reviews; the ranking is the point.
  *
  * @param page - The course and everyone's standing with it.
+ * @param canCurate - Offers Change photo, which opens the curator screen on this course.
  * @param notify - Shows the outcome of an action as a toast.
  * @param openAuth - Opens the sign-in dialog, for the Log dialog.
  */
-export function CoursePageView({ page, notify, openAuth }: { page: CoursePage; notify: (message: string) => void; openAuth: () => void }) {
+export function CoursePageView({
+  page,
+  canCurate = false,
+  notify,
+  openAuth,
+}: {
+  page: CoursePage;
+  canCurate?: boolean;
+  notify: (message: string) => void;
+  openAuth: () => void;
+}) {
   const { course, friendsRanked, friendsWantToPlay } = page;
   const [logging, setLogging] = useState(false);
   const published = rankBadges(course);
@@ -98,7 +109,7 @@ export function CoursePageView({ page, notify, openAuth }: { page: CoursePage; n
         )}
       </section>
 
-      {(course.website || photo) && (
+      {(course.website || photo || canCurate) && (
         <footer className={styles.footer}>
           {course.website && (
             <a href={course.website} target="_blank" rel="noreferrer">
@@ -121,6 +132,7 @@ export function CoursePageView({ page, notify, openAuth }: { page: CoursePage; n
               )}
             </span>
           )}
+          {canCurate && <Link to={"/curate?course=" + encodeURIComponent(course.id)}>{photo ? "Change photo" : "Add a photo"}</Link>}
         </footer>
       )}
 
