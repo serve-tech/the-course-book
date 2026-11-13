@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { absoluteUrl, commonsPhoto, isAcceptedLicense, plainText, thumbnailUrl, type CommonsPage } from "./commons";
+import { absoluteUrl, commonsPhoto, creditText, isAcceptedLicense, plainText, thumbnailUrl, type CommonsPage } from "./commons";
 
 const page = (overrides: { mime?: string; width?: number; license?: string; artist?: string; missing?: boolean } = {}): CommonsPage => ({
   title: "File:ArcadiaBluffs1011.jpg",
@@ -79,6 +79,17 @@ describe("absoluteUrl", () => {
 describe("plainText", () => {
   it("drops tags and decodes the common entities", () => {
     expect(plainText('<a href="x">Dan&nbsp;Perry</a> &amp; <i>friends</i>')).toBe("Dan Perry & friends");
+  });
+});
+
+describe("creditText", () => {
+  it.each([
+    ['<a href="//commons.wikimedia.org/wiki/User:Frjlove">Frjlove</a> (<a href="//commons.wikimedia.org/wiki/User_talk:Frjlove">talk</a>)', "Frjlove"],
+    ['<a href="x">Ana</a> (<a href="y">talk</a> | <a href="z">contribs</a>)', "Ana"],
+    ["Benscripps", "Benscripps"],
+    ["Talk Radio (talking heads)", "Talk Radio (talking heads)"],
+  ])("reads %s as %s", (html, credit) => {
+    expect(creditText(html)).toBe(credit);
   });
 });
 

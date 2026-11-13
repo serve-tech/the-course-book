@@ -75,6 +75,16 @@ export function plainText(html: string): string {
     .trim();
 }
 
+/**
+ * A file's credit as text: its Artist field without the link to the
+ * uploader's talk page that Commons often adds ("Frjlove (talk)").
+ */
+export function creditText(html: string): string {
+  return plainText(html)
+    .replace(/\s*\(\s*talk(\s*\|\s*contribs)?\s*\)$/i, "")
+    .trim();
+}
+
 /** An absolute https URL from Commons metadata, which sometimes omits the scheme; null when unusable. */
 export function absoluteUrl(value: string | undefined): string | null {
   const text = plainText(value ?? "");
@@ -135,7 +145,7 @@ export function commonsPhoto(page: CommonsPage): CommonsPhoto | null {
     thumbUrl: info.thumburl ?? thumbnailUrl(info.url, info.width, PREVIEW_WIDTH),
     width: info.width,
     height: info.height,
-    credit: plainText(meta.Artist?.value ?? "") || "Wikimedia Commons",
+    credit: creditText(meta.Artist?.value ?? "") || "Wikimedia Commons",
     license,
     licenseUrl: absoluteUrl(meta.LicenseUrl?.value),
     sourceUrl: info.descriptionurl,
