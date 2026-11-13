@@ -5,6 +5,8 @@
 
 **Amendment (2026-11-13, later the same day):** using Cloudflare R2 needs the maintainer to get approval first. Until then, course photos are Wikimedia Commons files loaded directly from `upload.wikimedia.org`, and the curator screen offers Commons search only. The `course_photos` table, the curator role and the API's `photo` field are built now. R2 storage, uploads and copying the Commons photos into R2 are issue #67. Server requests to Commons identify the app with `https://coursebook.golf` as the contact, per Wikimedia's User-Agent policy.
 
+**Amendment (2026-11-13, layout):** full photo cards are replaced by photo rows with a featured top three; see 2026-11-13-photo-rows-with-a-featured-top-three.md.
+
 **Amendment (2026-11-13, lists):** the Courses page's Top lists and a member's list (`/u/<username>/lists/<list>`) use the ranking's photo cards too, at the maintainer's request, keeping their ticks, friends and Log a round / Want to play buttons. Those lists hold 290 courses no member may rank, so curators can also work through a national list on `/curate` (`?from=`). Best in State (1,130 courses) is not offered there. `/v1/rankings` keeps its hour-long browser cache, so a new photo can take an hour to reach pages built from it; the curator screen revalidates.
 
 ## Context
