@@ -6,7 +6,12 @@ import {
   AddToListRequestSchema,
   ApiErrorSchema,
   ClientConfigSchema,
+  CommonsCandidatesSchema,
+  CommonsSearchQuerySchema,
+  CourseSchema,
   CourseIdParamsSchema,
+  CoursePageSchema,
+  CurationCoursesSchema,
   DeletedRoundSchema,
   FeedSchema,
   FriendRequestsSchema,
@@ -27,10 +32,14 @@ import {
   ProfileSchema,
   PublicRankingSchema,
   RankingsSchema,
+  RoledMemberSchema,
+  RoledMembersSchema,
   RoundIdParamsSchema,
   RoundsSchema,
   SearchQuerySchema,
   SearchResultsSchema,
+  SetCoursePhotoRequestSchema,
+  SetMemberRoleRequestSchema,
   SetPlayCountRequestSchema,
   TimelineSchema,
   TopListDetailSchema,
@@ -250,6 +259,27 @@ export const getTopList = createRoute({
     401: unauthenticated,
     403: forbidden,
     404: failure("No published list with that type and scope: `top_list_not_found`."),
+    409: usernameTaken,
+  },
+});
+
+export const getCourse = createRoute({
+  method: "get",
+  path: "/v1/courses/{courseId}",
+  operationId: "getCourse",
+  tags: ["Catalog"],
+  summary: "One catalog course with the member's standing and their friends'",
+  description:
+    "The course with its published ranks; the member's rank and Want to play; friends who rank it, best rank first; " +
+    "and friends who want to play it. Only the member's accepted friends appear.",
+  security: MEMBER,
+  request: { params: CourseIdParamsSchema },
+  responses: {
+    200: json(CoursePageSchema, "The course."),
+    400: invalid,
+    401: unauthenticated,
+    403: forbidden,
+    404: failure("No such catalog course: `course_not_found`."),
     409: usernameTaken,
   },
 });
@@ -528,5 +558,107 @@ export const deleteMe = createRoute({
     401: unauthenticated,
     403: failure("Not returned since account deletion stopped provisioning the member; kept so existing clients still compile."),
     502: failure("The data is deleted but the sign-in account could not be: `account_deletion_incomplete`. Retry."),
+  },
+});
+
+const notCurator = failure("The Clerk account cannot use the app (`username_invalid`), or the member is not a curator or admin (`curator_required`).");
+const notAdmin = failure("The Clerk account cannot use the app (`username_invalid`), or the member is not an admin (`admin_required`).");
+const commonsUnavailable = failure("Wikimedia Commons did not answer: `commons_unavailable`. Try again shortly.");
+
+export const listCurationCourses = createRoute({
+  method: "get",
+  path: "/v1/curation/courses",
+  operationId: "listCurationCourses",
+  tags: ["Curation"],
+  summary: "Courses on members' rankings, for curators choosing photos",
+  description: "Every course on an active member's ranking with how many members rank it, most-ranked first. Curators and admins only.",
+  security: MEMBER,
+  responses: { 200: json(CurationCoursesSchema, "The courses."), 401: unauthenticated, 403: notCurator, 409: usernameTaken },
+});
+
+export const searchCommonsPhotos = createRoute({
+  method: "get",
+  path: "/v1/curation/commons-photos",
+  operationId: "searchCommonsPhotos",
+  tags: ["Curation"],
+  summary: "Search Wikimedia Commons for usable course photos",
+  description: "Free-licensed bitmaps only (public domain, CC0, CC BY, CC BY-SA), at least 500 px wide. Curators and admins only.",
+  security: MEMBER,
+  request: { query: CommonsSearchQuerySchema },
+  responses: {
+    200: json(CommonsCandidatesSchema, "Usable photos, best match first."),
+    400: invalid,
+    401: unauthenticated,
+    403: notCurator,
+    409: usernameTaken,
+    503: commonsUnavailable,
+  },
+});
+
+export const setCoursePhoto = createRoute({
+  method: "put",
+  path: "/v1/courses/{courseId}/photo",
+  operationId: "setCoursePhoto",
+  tags: ["Curation"],
+  summary: "Make a Wikimedia Commons file a course's photo",
+  description: "Replaces any photo the course had. The credit and license come from Commons. Curators and admins only.",
+  security: MEMBER,
+  request: { params: CourseIdParamsSchema, ...jsonBody(SetCoursePhotoRequestSchema) },
+  responses: {
+    200: json(CourseSchema, "The course with its new photo."),
+    400: failure("Invalid body (`validation_failed`, `bad_request`), or Commons has no usable photo by that name: `photo_not_usable`."),
+    401: unauthenticated,
+    403: notCurator,
+    404: failure("No such catalog course: `course_not_found`."),
+    409: usernameTaken,
+    503: commonsUnavailable,
+  },
+});
+
+export const removeCoursePhoto = createRoute({
+  method: "delete",
+  path: "/v1/courses/{courseId}/photo",
+  operationId: "removeCoursePhoto",
+  tags: ["Curation"],
+  summary: "Remove a course's photo",
+  description: "Succeeds when the course has no photo. Curators and admins only.",
+  security: MEMBER,
+  request: { params: CourseIdParamsSchema },
+  responses: {
+    200: json(CourseSchema, "The course without a photo."),
+    400: invalid,
+    401: unauthenticated,
+    403: notCurator,
+    404: failure("No such catalog course: `course_not_found`."),
+    409: usernameTaken,
+  },
+});
+
+export const listMemberRoles = createRoute({
+  method: "get",
+  path: "/v1/admin/members",
+  operationId: "listMemberRoles",
+  tags: ["Curation"],
+  summary: "Every member with their role, for admins",
+  security: MEMBER,
+  responses: { 200: json(RoledMembersSchema, "The members."), 401: unauthenticated, 403: notAdmin, 409: usernameTaken },
+});
+
+export const setMemberRole = createRoute({
+  method: "put",
+  path: "/v1/admin/members/{username}/role",
+  operationId: "setMemberRole",
+  tags: ["Curation"],
+  summary: "Make a member a curator, or a member again",
+  description: "Admins only. An admin's role is changed by command, never here.",
+  security: MEMBER,
+  request: { params: UsernameParamsSchema, ...jsonBody(SetMemberRoleRequestSchema) },
+  responses: {
+    200: json(RoledMemberSchema, "The member and their new role."),
+    400: invalidBody,
+    401: unauthenticated,
+    403: notAdmin,
+    404: failure("No active member with that username: `member_not_found`."),
+    409: failure("The member is an admin (`role_protected`), or another member holds the Clerk account's username (`username_taken`)."),
   },
 });

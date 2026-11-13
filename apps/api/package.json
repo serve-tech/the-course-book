@@ -21,6 +21,7 @@
     "seed:build": "tsx scripts/build-seed.ts",
     "import:supabase": "tsx scripts/import-supabase.ts",
     "seed:dev": "tsx scripts/seed-dev.ts",
+    "role:set": "tsx scripts/set-role.ts",
     "contract:emit": "tsx scripts/emit-openapi.ts"
   },
   "dependencies": {

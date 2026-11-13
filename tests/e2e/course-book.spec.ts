@@ -56,8 +56,22 @@ const row = (page: Page, name: string) => page.locator(`#ranking > li[data-cours
 const rankingOrder = (page: Page) =>
   page.locator("#ranking > li[data-course]").evaluateAll((rows) => rows.map((item) => item.getAttribute("data-course")));
 
-/** Click a course's name on the member's own Ranking, which opens its details (the mini tile's copy of the name is hidden). */
-const openDetails = (page: Page, name: string) => row(page, name).getByText(name, { exact: true }).filter({ visible: true }).click();
+/**
+ * Switch the member's own ranking from photo cards to Reorder, its compact
+ * draggable rows, where a row opens the course's details (decision
+ * 2026-11-13). Does nothing when it is already in Reorder.
+ */
+async function startReordering(page: Page): Promise<void> {
+  const reorder = page.getByRole("button", { name: "Reorder", exact: true });
+  if (await reorder.isVisible()) await reorder.click();
+  await expect(page.getByRole("button", { name: "Done", exact: true })).toBeVisible();
+}
+
+/** Click a course's name on the member's own Ranking in Reorder, which opens its details (the mini tile's copy of the name is hidden). */
+async function openDetails(page: Page, name: string): Promise<void> {
+  await startReordering(page);
+  await row(page, name).getByText(name, { exact: true }).filter({ visible: true }).click();
+}
 
 /**
  * The vertical center of an element's own text, measured on the text rather
@@ -150,6 +164,8 @@ test("anonymous navigation, dialogs and mobile layout remain usable", async ({ p
     /^USA #\d+$/,
     /^Georgia #\d+$/,
   ]);
+  // Visitors can't open a course page yet, so their cards don't link to one.
+  await expect(page.locator('#toplist > li[data-course="Augusta National Golf Club"] a')).toHaveCount(0);
   await page.getByRole("tab", { name: "International" }).click();
   await expect(page.locator("#toplist > li")).toHaveCount(100);
   await page.getByRole("tab", { name: "Best in Michigan" }).click();
@@ -227,6 +243,7 @@ test.describe("signed in", () => {
     await page.locator("#timesPlayed").fill("2");
     await page.locator("#confirmLog").click();
     await expect(page.locator("#modal")).toHaveCount(0);
+    await startReordering(page);
     await expect(row(page, "Test Alpha Links")).toContainText("3 rounds");
     await expect.poll(() => rankingOrder(page)).toEqual(["Test Beta Links", "Test Alpha Links"]);
     expect(await listOrder(db, owner.id)).toEqual([fixtureCourses.beta.id, fixtureCourses.alpha.id]);
@@ -421,6 +438,11 @@ test.describe("signed in", () => {
     await expect(page.locator('#toplist > li[data-course="Augusta National Golf Club"]')).toHaveAttribute("data-played", "true");
     expect(await roundDates(db, owner.id, augusta)).toEqual(["2026-05-01"]);
 
+    // A member's card opens the course's page.
+    await page.locator('#toplist > li[data-course="Augusta National Golf Club"]').getByRole("link", { name: "Augusta National Golf Club" }).click();
+    await expect(page).toHaveURL(new RegExp(`/courses/${augusta}$`));
+    await expect(page.getByRole("heading", { level: 1, name: "Augusta National Golf Club" })).toBeVisible();
+
     await page.goto(`/u/${owner.username}/lists`);
     await expect(page.locator("#wantToPlay")).toContainText("Pine Valley Golf Club");
     await page.getByRole("button", { name: "Want to play Pine Valley Golf Club" }).click();
@@ -539,6 +561,7 @@ test.describe("signed in", () => {
     await openRanking(page, owner);
     await expect(page.locator("#rankingCount")).toHaveText("3 courses");
     await expect.poll(() => rankingOrder(page)).toEqual(["Test Beta Links", "Test Alpha Links", "Hidden Course"]);
+    await startReordering(page);
     const search = page.getByRole("searchbox", { name: "Search this ranking" });
     await search.fill("Test");
     await search.blur();
@@ -566,6 +589,7 @@ test.describe("signed in", () => {
     await expect.poll(() => rankingOrder(page)).toEqual(reordered);
 
     // Region tabs are read-only, and only the state tab shows the state picker.
+    await startReordering(page);
     const statePicker = page.getByRole("combobox", { name: "State for Best in State" });
     await expect(statePicker).toHaveCount(0);
     await page.getByRole("tab", { name: "USA", exact: true }).click();
@@ -617,6 +641,7 @@ test.describe("signed in", () => {
     await page.locator(".result").filter({ hasText: "External Pagination 13" }).click();
     await page.locator("#confirmLog").click();
     await expect(page.locator("#modal")).toHaveCount(0);
+    await startReordering(page);
     await expect(row(page, "External Pagination 13")).toContainText("1 round");
     expect(await courseByName(db, "External Pagination 13")).toMatchObject({ state: "MI", country: "USA", isCustom: false, createdBy: owner.id });
   });
@@ -632,6 +657,7 @@ test.describe("signed in", () => {
     await page.locator("#timesPlayed").fill("2");
     await page.locator("#confirmLog").click();
     await expect(page.locator("#modal")).toHaveCount(0);
+    await startReordering(page);
     await expect(row(page, "Fallback Test Links")).toContainText("2 rounds");
   });
 });

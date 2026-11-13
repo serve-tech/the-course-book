@@ -1,24 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { courseSchema, type Course, type RankedCourse } from "@coursebook/domain/catalog/course";
-import {
-  availableLists,
-  busiestState,
-  chooseList,
-  friendsLine,
-  isCompleteList,
-  listTab,
-  filterEntries,
-  findList,
-  listEntries,
-  ListTab,
-  parseListTab,
-  rankingOwner,
-  PlayedFilter,
-  playedCount,
-  rankBadges,
-  tabList,
-  topListSlug,
-} from "./lists";
+import { tabList, parseListTab, availableLists, busiestState, chooseList, filterEntries, findList, friendsLine, isCompleteList, isFeatured, playedCount, listEntries, ListTab, listTab, topListSlug, PlayedFilter, rankBadges, rankingOwner } from "./lists";
 
 const course = (id: string, fields: Partial<Course> = {}): Course =>
   courseSchema.parse({ id, name: "Course " + id, location: "Somewhere, MI, USA", country: "USA", state: "MI", ...fields });
@@ -192,5 +174,16 @@ describe("friendsLine", () => {
     { names: ["Priya", "Dan", "Kevin"], line: "Priya and 2 other friends played it" },
   ])("$line", ({ names, line }) => {
     expect(friendsLine(names.map(member))).toBe(line);
+  });
+});
+
+describe("isFeatured", () => {
+  it.each([
+    { index: 0, whole: true, featured: true },
+    { index: 2, whole: true, featured: true },
+    { index: 3, whole: true, featured: false },
+    { index: 0, whole: false, featured: false },
+  ])("course $index of a list shown whole=$whole is featured: $featured", ({ index, whole, featured }) => {
+    expect(isFeatured(index, whole)).toBe(featured);
   });
 });

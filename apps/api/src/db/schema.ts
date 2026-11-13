@@ -1,4 +1,6 @@
 import { sql } from "drizzle-orm";
+import { MemberRole } from "@coursebook/domain/curation/types";
+import { PhotoSource } from "../domain/course-photo";
 import { FriendshipStatus } from "../domain/friendship";
 import {
   boolean,
@@ -56,6 +58,9 @@ const timestamps = {
 export const USERNAME_UNIQUE_INDEX = "users_username_lower_idx";
 
 /** One row per Clerk user. Rows are soft-deleted only. */
+/** Member role column type; values from `MemberRole` (@coursebook/domain/curation/types). */
+export const memberRole = pgEnum("member_role", MemberRole);
+
 export const users = pgTable(
   "users",
   {
@@ -65,6 +70,8 @@ export const users = pgTable(
     email: text("email"),
     avatarUrl: text("avatar_url"),
     legacySupabaseId: uuid("legacy_supabase_id"),
+    /** Who may curate course photos; admins are set by `pnpm role:set`, never by the API. */
+    role: memberRole("role").notNull().default(MemberRole.Member),
     ...timestamps,
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
   },
@@ -245,3 +252,33 @@ export type UserCourseRow = typeof userCourses.$inferSelect;
 export type RoundRow = typeof rounds.$inferSelect;
 export type FriendshipRow = typeof friendships.$inferSelect;
 export type WantToPlayRow = typeof wantToPlay.$inferSelect;
+
+/** Course photo source column type; values from `PhotoSource` (domain/course-photo.ts). */
+export const photoSource = pgEnum("photo_source", PhotoSource);
+
+/**
+ * At most one photo per course, chosen by a curator (decision 2026-11-13).
+ * Every row carries the credit and license its source requires; the API
+ * shows them wherever the photo appears. `url` is where the image is served
+ * from: upload.wikimedia.org for Commons photos until R2 (#67).
+ */
+export const coursePhotos = pgTable("course_photos", {
+  courseId: uuid("course_id")
+    .primaryKey()
+    .references(() => courses.id, { onDelete: "cascade" }),
+  source: photoSource("source").notNull(),
+  url: text("url").notNull(),
+  width: integer("width").notNull(),
+  height: integer("height").notNull(),
+  credit: text("credit").notNull(),
+  license: text("license").notNull(),
+  licenseUrl: text("license_url"),
+  sourceUrl: text("source_url").notNull(),
+  /** The Commons file's page title, e.g. "File:ArcadiaBluffs1011.jpg"; null for other sources. */
+  commonsFile: text("commons_file"),
+  /** The curator who set it; null once their account is deleted. */
+  setBy: text("set_by").references(() => users.id, { onDelete: "set null" }),
+  ...timestamps,
+});
+
+export type CoursePhotoRow = typeof coursePhotos.$inferSelect;

@@ -4,6 +4,7 @@ import type { MemberList, MemberListRow, PublicRanking } from "@coursebook/domai
 import {
   FeedItemType,
   ProfileRelationship,
+  type CoursePage,
   type FeedItem,
   type Profile,
   type TimelineMonthCount,
@@ -35,7 +36,7 @@ function region(country: string, state: string | null): string {
   return state?.toUpperCase() === "MI" ? "michigan" : "usa";
 }
 
-function toCourse(id: string, details: Details, ranks: Ranks): Course {
+function toCourse(id: string, details: Details, ranks: Ranks, photo: ApiSchemas["CoursePhoto"] | null = null): Course {
   return courseSchema.parse({
     id,
     name: details.name,
@@ -52,11 +53,12 @@ function toCourse(id: string, details: Details, ranks: Ranks): Course {
     stateRank: ranks.state,
     logo: details.logoUrl ?? "",
     website: details.websiteUrl ?? "",
+    photo,
   });
 }
 
 export function fromApiCourse(course: ApiSchemas["Course"]): Course {
-  return toCourse(course.id, course, course.ranks);
+  return toCourse(course.id, course, course.ranks, course.photo);
 }
 
 export function fromMyCourse(entry: ApiSchemas["MyCourse"]): ListEntry {
@@ -186,5 +188,15 @@ export function fromTopListDetail(detail: ApiSchemas["TopListDetail"]): TopListD
       wantToPlay: entry.wantToPlay,
       friendsPlayed: entry.friendsPlayed,
     })),
+  };
+}
+
+/** A course's page: the course in domain form; the member's and friends' standing as the API has them. */
+export function fromCoursePage(page: ApiSchemas["CoursePage"]): CoursePage {
+  return {
+    course: fromApiCourse(page.course),
+    you: page.you,
+    friendsRanked: page.friendsRanked,
+    friendsWantToPlay: page.friendsWantToPlay,
   };
 }

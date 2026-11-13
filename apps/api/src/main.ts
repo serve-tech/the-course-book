@@ -9,6 +9,7 @@ import { loggableError } from "./http/loggable-error";
 import { allCourses, catalog } from "./services/catalog";
 import { apiEnv, clerkEnv, databaseEnv, searchEnv } from "./services/env";
 import { createProvisioner, identityFromClerkUser, provisionUser } from "./services/provisioning";
+import { createCommonsClient } from "./services/commons";
 import { createCourseSearch } from "./services/search";
 import { createWebShell } from "./services/web-shell";
 
@@ -56,6 +57,7 @@ const app = createApp({
     apiUrl: search.OPENGOLF_API_URL,
     csvUrl: search.OPENGOLF_CSV_URL,
   }),
+  commons: createCommonsClient(),
   webOrigins: api.WEB_ORIGINS,
   clientConfig: {
     minimumVersions: { ios: api.MIN_IOS_VERSION, android: api.MIN_ANDROID_VERSION },

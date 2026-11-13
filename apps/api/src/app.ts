@@ -19,6 +19,8 @@ import { loggableError, type LoggedError } from "./http/loggable-error";
 import { registerAccountRoutes } from "./routes/account";
 import { registerCatalogRoutes } from "./routes/catalog";
 import { registerClientRoutes } from "./routes/clients";
+import { registerCourseRoutes } from "./routes/courses";
+import { registerCurationRoutes } from "./routes/curation";
 import { registerFeedRoutes } from "./routes/feed";
 import { registerJournalRoutes } from "./routes/journal";
 import { registerMemberRoutes } from "./routes/members";
@@ -27,6 +29,7 @@ import { registerTopListRoutes } from "./routes/top-lists";
 import { registerWantToPlayRoutes } from "./routes/want-to-play";
 import { checkDatabase } from "./services/health";
 import type { Provisioner } from "./services/provisioning";
+import type { CommonsClient } from "./services/commons";
 import type { CourseSearch } from "./services/search";
 import type { WebShell } from "./services/web-shell";
 
@@ -64,6 +67,8 @@ export interface AppDependencies {
   /** Clerk's side of account deletion. */
   accounts: AccountDirectory;
   search: CourseSearch;
+  /** Wikimedia Commons, for curators picking course photos. */
+  commons: CommonsClient;
   /** Exact origins of the web app, used for CORS and the token `azp` check. */
   webOrigins: readonly string[];
   clientConfig: ClientConfig;
@@ -200,6 +205,8 @@ export function createApp(deps: AppDependencies): OpenAPIHono<AppEnv> {
   registerMemberRoutes(app, deps);
   registerWantToPlayRoutes(app, deps);
   registerTopListRoutes(app, deps);
+  registerCourseRoutes(app, deps);
+  registerCurationRoutes(app, deps);
   registerFeedRoutes(app, deps);
   registerClientRoutes(app, deps);
   registerSharePageRoutes(app, deps, logger);

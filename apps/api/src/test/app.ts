@@ -1,4 +1,5 @@
 import type { SearchResult } from "@coursebook/domain/catalog/search-results";
+import { toCandidate, type CommonsPhoto } from "../domain/commons";
 import { createApp, type AppDependencies, type Logger, type RequestLog } from "../app";
 import { createClerkSessionVerifier } from "../auth/session";
 import type { Database } from "../db/client";
@@ -18,8 +19,9 @@ export const TEST_CLIENT_CONFIG = {
 /**
  * The real API over the test database. Tokens are signed locally and checked
  * by the real Clerk verifier; only the external services are replaced:
- * course discovery (`setSearchResults`) and Clerk account deletion
- * (`deletedAccounts`, `failAccountDeletion`).
+ * course discovery (`setSearchResults`), Wikimedia Commons
+ * (`setCommonsPhotos`) and Clerk account deletion (`deletedAccounts`,
+ * `failAccountDeletion`).
  */
 export function createTestApp(db: Database, overrides: Partial<AppDependencies> = {}) {
   const tokens = createTestTokens();
@@ -27,6 +29,8 @@ export function createTestApp(db: Database, overrides: Partial<AppDependencies> 
   const errors: { message: string; error: LoggedError; detail: Record<string, unknown> | undefined }[] = [];
   const warnings: { message: string; detail: Record<string, unknown> }[] = [];
   let searchResults: SearchResult[] | Error = [];
+  let commonsPhotos: CommonsPhoto[] | Error = [];
+  const commonsFailure = () => (commonsPhotos instanceof Error ? commonsPhotos : null);
   const deletedAccounts: string[] = [];
   let accountDeletionFailure: Error | null = null;
   const logger: Logger = {
@@ -59,6 +63,23 @@ export function createTestApp(db: Database, overrides: Partial<AppDependencies> 
           ? Promise.reject(searchResults)
           : Promise.resolve(searchResults.filter((result) => result.course.name.toLowerCase().includes(query.toLowerCase()))),
     },
+    commons: {
+      search: (query) => {
+        const failure = commonsFailure();
+        if (failure) return Promise.reject(failure);
+        const words = query.toLowerCase();
+        return Promise.resolve(
+          (commonsPhotos as CommonsPhoto[])
+            .filter((photo) => photo.file.toLowerCase().includes(words) || photo.description.toLowerCase().includes(words))
+            .map(toCandidate),
+        );
+      },
+      file: (title) => {
+        const failure = commonsFailure();
+        if (failure) return Promise.reject(failure);
+        return Promise.resolve((commonsPhotos as CommonsPhoto[]).find((photo) => photo.file === title) ?? null);
+      },
+    },
     webOrigins: [WEB_ORIGIN],
     clientConfig: TEST_CLIENT_CONFIG,
     webUrl: "https://coursebook.golf",
@@ -82,6 +103,10 @@ export function createTestApp(db: Database, overrides: Partial<AppDependencies> 
     bearer,
     setSearchResults: (value: SearchResult[] | Error) => {
       searchResults = value;
+    },
+    /** The usable photos the fake Commons knows, or the error it fails with. */
+    setCommonsPhotos: (value: CommonsPhoto[] | Error) => {
+      commonsPhotos = value;
     },
     deletedAccounts,
     failAccountDeletion: (error: Error | null) => {

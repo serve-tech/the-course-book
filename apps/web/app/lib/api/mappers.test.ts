@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { ApiSchemas } from "./client";
 import {
   fromApiCourse,
+  fromCoursePage,
   fromFeedItem,
   fromMemberList,
   fromProfile,
@@ -27,6 +28,7 @@ const arcadia: ApiSchemas["Course"] = {
   logoUrl: null,
   websiteUrl: "https://arcadiabluffs.com",
   ranks: ranks(3),
+  photo: null,
 };
 
 describe("API course to domain course", () => {
@@ -135,5 +137,36 @@ describe("other API shapes", () => {
       logoUrl: null,
       websiteUrl: "https://arcadiabluffs.com",
     });
+  });
+});
+
+describe("course photo", () => {
+  it("carries the photo and its credit onto the domain course", () => {
+    const photo = {
+      url: "https://upload.wikimedia.org/wikipedia/commons/8/8a/ArcadiaBluffs1011.jpg",
+      thumbUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/ArcadiaBluffs1011.jpg/330px-ArcadiaBluffs1011.jpg",
+      credit: "Benscripps",
+      license: "CC BY-SA 3.0",
+      licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
+      sourceUrl: "https://commons.wikimedia.org/wiki/File:ArcadiaBluffs1011.jpg",
+    };
+    expect(fromApiCourse({ ...arcadia, photo }).photo).toEqual(photo);
+    expect(fromApiCourse(arcadia).photo).toBeNull();
+  });
+});
+
+describe("course page", () => {
+  it("maps the course and keeps the member's and friends' standing", () => {
+    const priya = { username: "priya", displayName: "Priya" };
+    const page = fromCoursePage({
+      course: arcadia,
+      you: { rank: null, outOf: 12, wantToPlay: true },
+      friendsRanked: [{ member: priya, rank: 2, outOf: 30 }],
+      friendsWantToPlay: [priya],
+    });
+    expect(page.course).toMatchObject({ id: arcadia.id, name: "Arcadia Bluffs", michigan: 3, website: "https://arcadiabluffs.com" });
+    expect(page.you).toEqual({ rank: null, outOf: 12, wantToPlay: true });
+    expect(page.friendsRanked).toEqual([{ member: priya, rank: 2, outOf: 30 }]);
+    expect(page.friendsWantToPlay).toEqual([priya]);
   });
 });

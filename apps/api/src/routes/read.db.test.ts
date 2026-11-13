@@ -56,7 +56,7 @@ describe("GET /v1/me", () => {
     const t = createTestApp(db);
     const result = await t.get("/v1/me", t.bearer("user_1", "golfer_1"));
     expect(result.status).toBe(200);
-    expect(MeSchema.parse(result.body)).toEqual({ username: "golfer_1", displayName: "golfer_1 Name" });
+    expect(MeSchema.parse(result.body)).toEqual({ username: "golfer_1", displayName: "golfer_1 Name", role: "member" });
     const [row] = await db.select().from(users).where(eq(users.id, "user_1"));
     expect(row?.email).toBe("golfer_1@example.com");
   });

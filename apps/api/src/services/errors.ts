@@ -36,6 +36,15 @@ export enum ErrorCode {
   UnsupportedMediaType = "unsupported_media_type",
   AccountDeletionIncomplete = "account_deletion_incomplete",
   SearchUnavailable = "search_unavailable",
+  /** Only curators and admins set course photos. */
+  CuratorRequired = "curator_required",
+  /** Only admins change members' roles. */
+  AdminRequired = "admin_required",
+  /** The Commons file is missing, not a photo, too small, or under a license the app does not accept. */
+  PhotoNotUsable = "photo_not_usable",
+  CommonsUnavailable = "commons_unavailable",
+  /** An admin's role is changed by command, never through the API. */
+  RoleProtected = "role_protected",
   Internal = "internal",
 }
 

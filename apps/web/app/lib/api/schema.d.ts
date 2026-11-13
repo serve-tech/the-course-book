@@ -433,6 +433,127 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/courses/{courseId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * One catalog course with the member's standing and their friends'
+         * @description The course with its published ranks; the member's rank and Want to play; friends who rank it, best rank first; and friends who want to play it. Only the member's accepted friends appear.
+         */
+        get: operations["getCourse"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/curation/courses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Courses on members' rankings, for curators choosing photos
+         * @description Every course on an active member's ranking with how many members rank it, most-ranked first. Curators and admins only.
+         */
+        get: operations["listCurationCourses"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/curation/commons-photos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search Wikimedia Commons for usable course photos
+         * @description Free-licensed bitmaps only (public domain, CC0, CC BY, CC BY-SA), at least 500 px wide. Curators and admins only.
+         */
+        get: operations["searchCommonsPhotos"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/courses/{courseId}/photo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Make a Wikimedia Commons file a course's photo
+         * @description Replaces any photo the course had. The credit and license come from Commons. Curators and admins only.
+         */
+        put: operations["setCoursePhoto"];
+        post?: never;
+        /**
+         * Remove a course's photo
+         * @description Succeeds when the course has no photo. Curators and admins only.
+         */
+        delete: operations["removeCoursePhoto"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Every member with their role, for admins */
+        get: operations["listMemberRoles"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/members/{username}/role": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Make a member a curator, or a member again
+         * @description Admins only. An admin's role is changed by command, never here.
+         */
+        put: operations["setMemberRole"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/feed": {
         parameters: {
             query?: never;
@@ -480,13 +601,15 @@ export interface components {
         Me: {
             username: string;
             displayName: string;
+            /** @description member, curator or admin. Curators and admins set course photos; admins make members curators. New roles may appear. */
+            role: string;
         };
         ApiError: {
             error: components["schemas"]["ApiErrorBody"];
         };
         ApiErrorBody: {
             /**
-             * @description Stable machine-readable code. Current values: bad_request, validation_failed, us_state_required, unauthenticated, account_deleted, username_invalid, username_taken, not_found, course_not_found, not_on_list, round_not_found, member_not_found, friendship_not_found, top_list_not_found, payload_too_large, unsupported_media_type, account_deletion_incomplete, search_unavailable, internal. New codes may appear; treat unknown codes by HTTP status.
+             * @description Stable machine-readable code. Current values: bad_request, validation_failed, us_state_required, unauthenticated, account_deleted, username_invalid, username_taken, not_found, course_not_found, not_on_list, round_not_found, member_not_found, friendship_not_found, top_list_not_found, payload_too_large, unsupported_media_type, account_deletion_incomplete, search_unavailable, curator_required, admin_required, photo_not_usable, commons_unavailable, role_protected, internal. New codes may appear; treat unknown codes by HTTP status.
              * @example not_on_list
              */
             code: string;
@@ -524,6 +647,7 @@ export interface components {
             logoUrl: string | null;
             websiteUrl: string | null;
             ranks: components["schemas"]["CourseRanks"];
+            photo: components["schemas"]["CoursePhoto"];
         };
         CourseRanks: {
             /** @description Golf Digest's World 100, which leaves out US courses (shown as International). */
@@ -535,6 +659,33 @@ export interface components {
             /** @description GOLF Magazine's Top 100 Courses in the World, every country together (shown as World). */
             global: number | null;
         };
+        /** @description The course's photo, with the credit and license to show beside it; null until a curator picks one. */
+        CoursePhoto: {
+            /**
+             * Format: uri
+             * @description Where the image is served from, at display width (1280 px, or the original when narrower).
+             */
+            url: string;
+            /**
+             * Format: uri
+             * @description The same image at thumbnail width (330 px, or the original when narrower), for rows and small tiles.
+             */
+            thumbUrl: string;
+            /** @description The photographer, as the source names them. Show it with the photo. */
+            credit: string;
+            /** @description The license's short name, e.g. `CC BY-SA 4.0` or `Public domain`. */
+            license: string;
+            /**
+             * Format: uri
+             * @description The license's text; null for public domain.
+             */
+            licenseUrl: string | null;
+            /**
+             * Format: uri
+             * @description The photo's source page, e.g. its Wikimedia Commons file page.
+             */
+            sourceUrl: string;
+        } | null;
         Rounds: {
             /** @description Newest first. */
             rounds: components["schemas"]["Round"][];
@@ -851,6 +1002,76 @@ export interface components {
             wantToPlay: boolean;
             /** @description Friends who have played it, by display name. */
             friendsPlayed: components["schemas"]["Member"][];
+        };
+        CoursePage: {
+            course: components["schemas"]["Course"];
+            you: components["schemas"]["CourseStanding"];
+            /** @description Friends with the course on their ranking, best rank first. */
+            friendsRanked: components["schemas"]["CourseFriendRank"][];
+            /** @description Friends who want to play it, by display name. */
+            friendsWantToPlay: components["schemas"]["Member"][];
+        };
+        CourseStanding: {
+            /** @description The member's rank for the course; null when it is not on their ranking. */
+            rank: number | null;
+            /** @description How many courses the member's ranking holds. */
+            outOf: number;
+            wantToPlay: boolean;
+        };
+        CourseFriendRank: {
+            member: components["schemas"]["Member"];
+            rank: number;
+            /** @description How many courses the friend's ranking holds, for `#3 of 42`. */
+            outOf: number;
+        };
+        CurationCourses: {
+            /** @description Every course on a member's ranking, most-ranked first. */
+            courses: components["schemas"]["CurationCourse"][];
+        };
+        CurationCourse: {
+            course: components["schemas"]["Course"];
+            /** @description Members with the course on their ranking. */
+            members: number;
+        };
+        CommonsCandidates: {
+            /** @description Usable photos, best match first: free-licensed bitmaps at least 500 px wide. */
+            candidates: components["schemas"]["CommonsCandidate"][];
+        };
+        CommonsCandidate: {
+            /** @description The file's Commons page title, e.g. `File:ArcadiaBluffs1011.jpg`; send it to pick the photo. */
+            file: string;
+            /** Format: uri */
+            thumbUrl: string;
+            width: number;
+            height: number;
+            credit: string;
+            license: string;
+            /** Format: uri */
+            licenseUrl: string | null;
+            /** Format: uri */
+            sourceUrl: string;
+            /** @description The file's description as plain text, at most 280 characters. */
+            description: string;
+        };
+        SetCoursePhotoRequest: {
+            /** @description A Commons file page title from `searchCommonsPhotos`. Its credit and license are read from Commons. */
+            commonsFile: string;
+        };
+        RoledMembers: {
+            /** @description Every active member, admins and curators first. */
+            members: components["schemas"]["RoledMember"][];
+        };
+        RoledMember: {
+            member: components["schemas"]["Member"];
+            /** @description member, curator or admin. New roles may appear. */
+            role: string;
+        };
+        SetMemberRoleRequest: {
+            /**
+             * @description Admins are made by command, never through the API.
+             * @enum {string}
+             */
+            role: "member" | "curator";
         };
         Feed: {
             /** @description Newest first. */
@@ -2456,6 +2677,453 @@ export interface operations {
                 };
             };
             /** @description Another member holds the Clerk account's username: `username_taken`. Choose a different username. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    getCourse: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                courseId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The course. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoursePage"];
+                };
+            };
+            /** @description Invalid parameters: `validation_failed`. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description No valid session: `unauthenticated`, or `account_deleted` after the account was deleted. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description The Clerk account cannot use the app: `username_invalid`. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description No such catalog course: `course_not_found`. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Another member holds the Clerk account's username: `username_taken`. Choose a different username. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    listCurationCourses: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The courses. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CurationCourses"];
+                };
+            };
+            /** @description No valid session: `unauthenticated`, or `account_deleted` after the account was deleted. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description The Clerk account cannot use the app (`username_invalid`), or the member is not a curator or admin (`curator_required`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Another member holds the Clerk account's username: `username_taken`. Choose a different username. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    searchCommonsPhotos: {
+        parameters: {
+            query: {
+                /** @description Words to search Commons file pages for. */
+                q: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Usable photos, best match first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommonsCandidates"];
+                };
+            };
+            /** @description Invalid parameters: `validation_failed`. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description No valid session: `unauthenticated`, or `account_deleted` after the account was deleted. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description The Clerk account cannot use the app (`username_invalid`), or the member is not a curator or admin (`curator_required`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Another member holds the Clerk account's username: `username_taken`. Choose a different username. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Wikimedia Commons did not answer: `commons_unavailable`. Try again shortly. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    setCoursePhoto: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                courseId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetCoursePhotoRequest"];
+            };
+        };
+        responses: {
+            /** @description The course with its new photo. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Course"];
+                };
+            };
+            /** @description Invalid body (`validation_failed`, `bad_request`), or Commons has no usable photo by that name: `photo_not_usable`. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description No valid session: `unauthenticated`, or `account_deleted` after the account was deleted. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description The Clerk account cannot use the app (`username_invalid`), or the member is not a curator or admin (`curator_required`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description No such catalog course: `course_not_found`. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Another member holds the Clerk account's username: `username_taken`. Choose a different username. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Wikimedia Commons did not answer: `commons_unavailable`. Try again shortly. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    removeCoursePhoto: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                courseId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The course without a photo. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Course"];
+                };
+            };
+            /** @description Invalid parameters: `validation_failed`. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description No valid session: `unauthenticated`, or `account_deleted` after the account was deleted. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description The Clerk account cannot use the app (`username_invalid`), or the member is not a curator or admin (`curator_required`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description No such catalog course: `course_not_found`. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Another member holds the Clerk account's username: `username_taken`. Choose a different username. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    listMemberRoles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The members. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoledMembers"];
+                };
+            };
+            /** @description No valid session: `unauthenticated`, or `account_deleted` after the account was deleted. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description The Clerk account cannot use the app (`username_invalid`), or the member is not an admin (`admin_required`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Another member holds the Clerk account's username: `username_taken`. Choose a different username. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    setMemberRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                username: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetMemberRoleRequest"];
+            };
+        };
+        responses: {
+            /** @description The member and their new role. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoledMember"];
+                };
+            };
+            /** @description Invalid body: `validation_failed`, `us_state_required`, or `bad_request` for unreadable JSON. Also 413 `payload_too_large` above 32 KB and 415 `unsupported_media_type` without Content-Type: application/json. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description No valid session: `unauthenticated`, or `account_deleted` after the account was deleted. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description The Clerk account cannot use the app (`username_invalid`), or the member is not an admin (`admin_required`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description No active member with that username: `member_not_found`. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description The member is an admin (`role_protected`), or another member holds the Clerk account's username (`username_taken`). */
             409: {
                 headers: {
                     [name: string]: unknown;

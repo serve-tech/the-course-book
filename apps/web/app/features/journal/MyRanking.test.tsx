@@ -46,6 +46,9 @@ function show(selectedState = "MI") {
 }
 
 /** The list as "number name", top to bottom. */
+/** Courses drawn as the featured photo cards. */
+const featured = () => [...document.querySelectorAll("#ranking > li[data-featured]")].map((item) => item.getAttribute("data-course"));
+
 const listed = () =>
   within(screen.getByRole("list", { name: "Ranking" }))
     .getAllByRole("listitem")
@@ -123,10 +126,41 @@ describe("MyRanking sharing", () => {
 
   it("stays editable on All cut to a Top N, and read-only on a region tab", () => {
     show();
+    fireEvent.click(screen.getByRole("button", { name: "Reorder" }));
     fireEvent.click(screen.getByRole("button", { name: "Top 5" }));
     expect(screen.getByText(/Drag a course to change your ranking/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("tab", { name: "USA" }));
     expect(screen.getByText(/Switch to All to reorder/)).toBeInTheDocument();
+  });
+
+  it("opens on the top three as photo cards, then rows, each linking to the course's page", () => {
+    show();
+    const links = within(screen.getByRole("list", { name: "Ranking" })).getAllByRole("link");
+    expect(links.map((link) => link.getAttribute("href"))).toEqual(["/courses/pine", "/courses/old", "/courses/crystal", "/courses/arcadia"]);
+    expect(featured()).toEqual(["Pine Valley", "The Old Course", "Crystal Downs"]);
+    expect(screen.queryByText(/Drag a course/)).not.toBeInTheDocument();
+  });
+
+  it("features nothing while searching, because the first results aren't the top three", () => {
+    show();
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "crystal" } });
+    expect(listed()).toEqual(["3 Crystal Downs"]);
+    expect(featured()).toEqual([]);
+  });
+
+  it("switches to draggable rows with Reorder and back with Done", () => {
+    show();
+    fireEvent.click(screen.getByRole("button", { name: "Reorder" }));
+    expect(within(screen.getByRole("list", { name: "Ranking" })).queryAllByRole("link")).toEqual([]);
+    expect(listed()).toEqual(["1 Pine Valley", "2 The Old Course", "3 Crystal Downs", "4 Arcadia Bluffs"]);
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+    expect(within(screen.getByRole("list", { name: "Ranking" })).getAllByRole("link")).toHaveLength(4);
+  });
+
+  it("offers Reorder only where the order can change", () => {
+    show();
+    fireEvent.click(screen.getByRole("tab", { name: "USA" }));
+    expect(screen.queryByRole("button", { name: "Reorder" })).not.toBeInTheDocument();
   });
 
   it("offers nothing to share until a state is picked", () => {

@@ -43,6 +43,13 @@
       "when": 1790783925801,
       "tag": "0005_golf_world_top_100",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794587917468,
+      "tag": "0006_course_photos_and_roles",
+      "breakpoints": true
     }
   ]
 }

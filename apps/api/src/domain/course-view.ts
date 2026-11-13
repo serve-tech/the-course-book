@@ -1,5 +1,5 @@
 import type { CourseRankingRow, CourseRow } from "../db/schema";
-import { cloudLocation, courseSchema, type Course, type RankedCourse } from "@coursebook/domain/catalog/course";
+import { cloudLocation, courseSchema, type Course, type CoursePhoto, type RankedCourse } from "@coursebook/domain/catalog/course";
 import { canonicalize } from "./identity";
 
 /**
@@ -26,8 +26,8 @@ function region(country: string, state: string | null): string {
   return state?.toUpperCase() === "MI" ? "michigan" : "usa";
 }
 
-/** Domain view of a course row, with canonical geography applied. */
-export function courseView(row: CourseRow, ranks: RankSummary = {}): Course {
+/** Domain view of a course row, with canonical geography applied and its photo, if it has one. */
+export function courseView(row: CourseRow, ranks: RankSummary = {}, photo: CoursePhoto | null = null): Course {
   return canonicalize(
     courseSchema.parse({
       id: row.id,
@@ -45,6 +45,7 @@ export function courseView(row: CourseRow, ranks: RankSummary = {}): Course {
       stateRank: ranks.state ?? null,
       logo: row.logoUrl ?? "",
       website: row.websiteUrl ?? "",
+      photo,
     }),
   );
 }

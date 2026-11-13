@@ -28,6 +28,7 @@ const shell: Shell = {
   searchFocus: () => undefined,
   openAuth: () => undefined,
   openLog: () => undefined,
+  canCurate: false,
 };
 
 const onLog = vi.fn<() => void>();

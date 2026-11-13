@@ -10,6 +10,8 @@ export default [
     index("routes/home.tsx"),
     route("activity", "routes/activity.tsx"),
     route("courses", "routes/top-100.tsx"),
+    route("courses/:courseId", "routes/course.tsx"),
+    route("curate", "routes/curate.tsx"),
     route("top-100", "routes/top-100-redirect.tsx"),
     route("u/:username", "routes/profile.tsx", [
       index("routes/profile.index.tsx"),

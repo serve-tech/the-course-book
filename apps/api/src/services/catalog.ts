@@ -1,7 +1,8 @@
 import { eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Database, Executor, Transaction } from "../db/client";
-import { courseRankings, courses, type CourseRow } from "../db/schema";
+import { coursePhotos, courseRankings, courses, type CourseRow } from "../db/schema";
+import { toCoursePhoto } from "../domain/course-photo";
 import { AppError, ErrorCode } from "./errors";
 import {
   cloudLocation,
@@ -36,13 +37,15 @@ const CATALOG_TTL_MS = 10 * 60_000;
 let pending: Promise<CatalogSnapshot> | undefined;
 
 async function loadSnapshot(db: Database): Promise<CatalogSnapshot> {
-  const [courseRows, rankingRows] = await Promise.all([
+  const [courseRows, rankingRows, photoRows] = await Promise.all([
     db.select().from(courses),
     db.select().from(courseRankings),
+    db.select().from(coursePhotos),
   ]);
   const summaries = rankSummaries(rankingRows);
+  const photos = new Map(photoRows.map((row) => [row.courseId, toCoursePhoto(row)]));
   const byId = new Map(
-    courseRows.map((row) => [row.id, courseView(row, summaries.get(row.id))]),
+    courseRows.map((row) => [row.id, courseView(row, summaries.get(row.id), photos.get(row.id) ?? null)]),
   );
   return {
     courses: [...byId.values()],
@@ -66,10 +69,10 @@ export async function catalog(db: Database): Promise<CatalogSnapshot> {
 }
 
 /**
- * Domain views of course rows with their published ranks.
+ * Domain views of course rows with their published ranks and photos.
  *
- * Reads the rankings of just these courses, so it works inside a
- * transaction and never serves ranks from a stale snapshot.
+ * Reads the rankings and photos of just these courses, so it works inside
+ * a transaction and never serves ranks or photos from a stale snapshot.
  *
  * Args:
  *     executor: Database or open transaction.
@@ -83,11 +86,15 @@ export async function rankedViews(
   rows: readonly CourseRow[],
 ): Promise<Map<string, Course>> {
   const ids = rows.map((row) => row.id);
-  const rankingRows = ids.length
-    ? await executor.select().from(courseRankings).where(inArray(courseRankings.courseId, ids))
-    : [];
+  const [rankingRows, photoRows] = ids.length
+    ? await Promise.all([
+        executor.select().from(courseRankings).where(inArray(courseRankings.courseId, ids)),
+        executor.select().from(coursePhotos).where(inArray(coursePhotos.courseId, ids)),
+      ])
+    : [[], []];
   const summaries = rankSummaries(rankingRows);
-  return new Map(rows.map((row) => [row.id, courseView(row, summaries.get(row.id))]));
+  const photos = new Map(photoRows.map((row) => [row.courseId, toCoursePhoto(row)]));
+  return new Map(rows.map((row) => [row.id, courseView(row, summaries.get(row.id), photos.get(row.id) ?? null)]));
 }
 
 /** Drop the snapshot so the next read sees a newly inserted course; call after commit. */

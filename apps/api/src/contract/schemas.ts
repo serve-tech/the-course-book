@@ -53,6 +53,17 @@ export const CourseRanksSchema = z
   })
   .openapi("CourseRanks");
 
+export const CoursePhotoSchema = z
+  .object({
+    url: z.url().openapi({ description: "Where the image is served from, at display width (1280 px, or the original when narrower)." }),
+    thumbUrl: z.url().openapi({ description: "The same image at thumbnail width (330 px, or the original when narrower), for rows and small tiles." }),
+    credit: z.string().openapi({ description: "The photographer, as the source names them. Show it with the photo." }),
+    license: z.string().openapi({ description: "The license's short name, e.g. `CC BY-SA 4.0` or `Public domain`." }),
+    licenseUrl: z.url().nullable().openapi({ description: "The license's text; null for public domain." }),
+    sourceUrl: z.url().openapi({ description: "The photo's source page, e.g. its Wikimedia Commons file page." }),
+  })
+  .openapi("CoursePhoto");
+
 export const CourseSchema = z
   .object({
     id: z.uuid(),
@@ -64,6 +75,7 @@ export const CourseSchema = z
     logoUrl: z.string().nullable(),
     websiteUrl: z.string().nullable(),
     ranks: CourseRanksSchema,
+    photo: CoursePhotoSchema.nullable().openapi({ description: "The course's photo, with the credit and license to show beside it; null until a curator picks one." }),
   })
   .openapi("Course");
 
@@ -80,7 +92,13 @@ export const CourseDetailsSchema = z
   .openapi("CourseDetails", { description: "A course described by its details, e.g. a search result not yet in the catalog." });
 
 export const MeSchema = z
-  .object({ username: z.string(), displayName: z.string() })
+  .object({
+    username: z.string(),
+    displayName: z.string(),
+    role: z.string().openapi({
+      description: "member, curator or admin. Curators and admins set course photos; admins make members curators. New roles may appear.",
+    }),
+  })
   .openapi("Me");
 
 export const MyCourseSchema = z
@@ -310,6 +328,31 @@ export const TopListEntrySchema = z
   })
   .openapi("TopListEntry");
 
+export const CourseFriendRankSchema = z
+  .object({
+    member: MemberSchema,
+    rank,
+    outOf: z.number().int().min(1).openapi({ description: "How many courses the friend's ranking holds, for `#3 of 42`." }),
+  })
+  .openapi("CourseFriendRank");
+
+export const CourseStandingSchema = z
+  .object({
+    rank: optionalRank.openapi({ description: "The member's rank for the course; null when it is not on their ranking." }),
+    outOf: z.number().int().min(0).openapi({ description: "How many courses the member's ranking holds." }),
+    wantToPlay: z.boolean(),
+  })
+  .openapi("CourseStanding");
+
+export const CoursePageSchema = z
+  .object({
+    course: CourseSchema,
+    you: CourseStandingSchema,
+    friendsRanked: z.array(CourseFriendRankSchema).openapi({ description: "Friends with the course on their ranking, best rank first." }),
+    friendsWantToPlay: z.array(MemberSchema).openapi({ description: "Friends who want to play it, by display name." }),
+  })
+  .openapi("CoursePage");
+
 export const TopListDetailSchema = z
   .object({ progress: TopListProgressSchema, entries: z.array(TopListEntrySchema).openapi({ description: "In rank order." }) })
   .openapi("TopListDetail");
@@ -493,3 +536,59 @@ export type CourseDetails = z.infer<typeof CourseDetailsSchema>;
 export type CourseRanks = z.infer<typeof CourseRanksSchema>;
 export type ClientConfig = z.infer<typeof ClientConfigSchema>;
 export type AddCourseRequest = z.infer<typeof AddCourseRequestSchema>;
+
+export const CurationCourseSchema = z
+  .object({
+    course: CourseSchema,
+    members: z.number().int().min(1).openapi({ description: "Members with the course on their ranking." }),
+  })
+  .openapi("CurationCourse");
+
+export const CurationCoursesSchema = z
+  .object({ courses: z.array(CurationCourseSchema).openapi({ description: "Every course on a member's ranking, most-ranked first." }) })
+  .openapi("CurationCourses");
+
+export const CommonsCandidateSchema = z
+  .object({
+    file: z.string().openapi({ description: "The file's Commons page title, e.g. `File:ArcadiaBluffs1011.jpg`; send it to pick the photo." }),
+    thumbUrl: z.url(),
+    width: z.number().int(),
+    height: z.number().int(),
+    credit: z.string(),
+    license: z.string(),
+    licenseUrl: z.url().nullable(),
+    sourceUrl: z.url(),
+    description: z.string().openapi({ description: "The file's description as plain text, at most 280 characters." }),
+  })
+  .openapi("CommonsCandidate");
+
+export const CommonsCandidatesSchema = z
+  .object({ candidates: z.array(CommonsCandidateSchema).openapi({ description: "Usable photos, best match first: free-licensed bitmaps at least 500 px wide." }) })
+  .openapi("CommonsCandidates");
+
+export const CommonsSearchQuerySchema = z.object({
+  q: z.string().trim().min(2, "Enter at least two characters.").max(200).openapi({ param: { name: "q", in: "query" }, description: "Words to search Commons file pages for." }),
+});
+
+export const SetCoursePhotoRequestSchema = z
+  .object({
+    commonsFile: z
+      .string()
+      .trim()
+      .max(255)
+      .regex(/^File:.+/, "Send a Commons file page title, starting with File:.")
+      .openapi({ description: "A Commons file page title from `searchCommonsPhotos`. Its credit and license are read from Commons." }),
+  })
+  .openapi("SetCoursePhotoRequest");
+
+export const RoledMemberSchema = z
+  .object({ member: MemberSchema, role: z.string().openapi({ description: "member, curator or admin. New roles may appear." }) })
+  .openapi("RoledMember");
+
+export const RoledMembersSchema = z
+  .object({ members: z.array(RoledMemberSchema).openapi({ description: "Every active member, admins and curators first." }) })
+  .openapi("RoledMembers");
+
+export const SetMemberRoleRequestSchema = z
+  .object({ role: z.enum(["member", "curator"]).openapi({ description: "Admins are made by command, never through the API." }) })
+  .openapi("SetMemberRoleRequest");

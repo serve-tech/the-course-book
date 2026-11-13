@@ -59,7 +59,22 @@ describe("contract course mapping", () => {
       logoUrl: null,
       websiteUrl: "https://arcadiabluffs.com",
       ranks: { world: 60, usa: 40, usaPublic: 12, state: 3, global: 70 },
+      photo: null,
     });
+    expect(CourseSchema.safeParse(mapped).success).toBe(true);
+  });
+
+  it("carries a course's photo with its credit and license", () => {
+    const photo = {
+      url: "https://upload.wikimedia.org/wikipedia/commons/8/8a/ArcadiaBluffs1011.jpg",
+      thumbUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/ArcadiaBluffs1011.jpg/330px-ArcadiaBluffs1011.jpg",
+      credit: "Benscripps",
+      license: "CC BY-SA 3.0",
+      licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
+      sourceUrl: "https://commons.wikimedia.org/wiki/File:ArcadiaBluffs1011.jpg",
+    };
+    const mapped = toContractCourse(course({ photo }));
+    expect(mapped.photo).toEqual(photo);
     expect(CourseSchema.safeParse(mapped).success).toBe(true);
   });
 

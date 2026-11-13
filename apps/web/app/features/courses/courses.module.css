@@ -1,0 +1,67 @@
+/* A course's photo, or its toned stand-in. The parent sets size and radius. */
+.image {
+  position: relative;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  isolation: isolate;
+  background: linear-gradient(165deg, #245a3d 0%, #143626 55%, #0b1f15 100%);
+  color: rgba(244, 240, 230, 0.34);
+}
+.image[data-tone="sea"] { background: linear-gradient(165deg, #245a6b 0%, #133644 55%, #0a1c24 100%); }
+.image[data-tone="sand"] { background: linear-gradient(165deg, #6e5731 0%, #3b2f1a 55%, #1d170d 100%); }
+.image[data-tone="heath"] { background: linear-gradient(165deg, #52405e 0%, #2b2135 55%, #150f1b 100%); }
+/* Contour lines, like an old course map, on the stand-in only. */
+.image[data-photo="false"]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    repeating-radial-gradient(ellipse at 110% -10%, transparent 0 18px, rgba(244, 240, 230, 0.05) 18px 19px),
+    repeating-radial-gradient(ellipse at -15% 115%, transparent 0 24px, rgba(244, 240, 230, 0.035) 24px 25px);
+}
+/* A soft shade at the foot keeps the credit and any overlaid text legible. */
+.image::after {
+  content: "";
+  position: absolute;
+  inset: 55% 0 0;
+  background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.38));
+  pointer-events: none;
+}
+.image img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.flag { width: clamp(28px, 18%, 64px); height: auto; }
+
+.credit {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: calc(100% - 20px);
+  padding: 4px 9px 4px 7px;
+  border-radius: 999px;
+  background: rgba(8, 22, 15, 0.55);
+  backdrop-filter: blur(6px);
+  color: rgba(244, 240, 230, 0.9);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.credit svg { width: 13px; height: 13px; flex: none; }
+a.credit:hover,
+a.credit:focus-visible { background: rgba(8, 22, 15, 0.8); color: var(--cream); }
+a.credit:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
