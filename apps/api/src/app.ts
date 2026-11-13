@@ -19,6 +19,7 @@ import { loggableError, type LoggedError } from "./http/loggable-error";
 import { registerAccountRoutes } from "./routes/account";
 import { registerCatalogRoutes } from "./routes/catalog";
 import { registerClientRoutes } from "./routes/clients";
+import { registerCourseRoutes } from "./routes/courses";
 import { registerFeedRoutes } from "./routes/feed";
 import { registerJournalRoutes } from "./routes/journal";
 import { registerMemberRoutes } from "./routes/members";
@@ -200,6 +201,7 @@ export function createApp(deps: AppDependencies): OpenAPIHono<AppEnv> {
   registerMemberRoutes(app, deps);
   registerWantToPlayRoutes(app, deps);
   registerTopListRoutes(app, deps);
+  registerCourseRoutes(app, deps);
   registerFeedRoutes(app, deps);
   registerClientRoutes(app, deps);
   registerSharePageRoutes(app, deps, logger);

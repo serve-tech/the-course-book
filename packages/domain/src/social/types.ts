@@ -142,3 +142,30 @@ export interface TopListDetail {
   standing: TopListStanding;
   entries: TopListCourse[];
 }
+
+/** A friend with a course on their ranking, and where they rank it. */
+export interface CourseFriendRank {
+  member: PublicMember;
+  rank: number;
+  /** How many courses their ranking holds, for "#3 of 42". */
+  outOf: number;
+}
+
+/** The viewer's own standing with a course. */
+export interface CourseStanding {
+  /** Their rank for it; null when it is not on their ranking. */
+  rank: number | null;
+  /** How many courses their ranking holds. */
+  outOf: number;
+  wantToPlay: boolean;
+}
+
+/** One course for the viewer: its page (decision 2026-11-13). */
+export interface CoursePage {
+  course: Course;
+  you: CourseStanding;
+  /** Friends with it on their ranking, best rank first. */
+  friendsRanked: CourseFriendRank[];
+  /** Friends who want to play it, by display name. */
+  friendsWantToPlay: PublicMember[];
+}

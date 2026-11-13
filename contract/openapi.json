@@ -1244,6 +1244,83 @@
           "friendsPlayed"
         ]
       },
+      "CoursePage": {
+        "type": "object",
+        "properties": {
+          "course": {
+            "$ref": "#/components/schemas/Course"
+          },
+          "you": {
+            "$ref": "#/components/schemas/CourseStanding"
+          },
+          "friendsRanked": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CourseFriendRank"
+            },
+            "description": "Friends with the course on their ranking, best rank first."
+          },
+          "friendsWantToPlay": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Member"
+            },
+            "description": "Friends who want to play it, by display name."
+          }
+        },
+        "required": [
+          "course",
+          "you",
+          "friendsRanked",
+          "friendsWantToPlay"
+        ]
+      },
+      "CourseStanding": {
+        "type": "object",
+        "properties": {
+          "rank": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 1,
+            "description": "The member's rank for the course; null when it is not on their ranking."
+          },
+          "outOf": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "How many courses the member's ranking holds."
+          },
+          "wantToPlay": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "rank",
+          "outOf",
+          "wantToPlay"
+        ]
+      },
+      "CourseFriendRank": {
+        "type": "object",
+        "properties": {
+          "member": {
+            "$ref": "#/components/schemas/Member"
+          },
+          "rank": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "outOf": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "How many courses the friend's ranking holds, for `#3 of 42`."
+          }
+        },
+        "required": [
+          "member",
+          "rank",
+          "outOf"
+        ]
+      },
       "Feed": {
         "type": "object",
         "properties": {
@@ -3430,6 +3507,94 @@
           },
           "404": {
             "description": "No published list with that type and scope: `top_list_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Another member holds the Clerk account's username: `username_taken`. Choose a different username.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/courses/{courseId}": {
+      "get": {
+        "operationId": "getCourse",
+        "tags": [
+          "Catalog"
+        ],
+        "summary": "One catalog course with the member's standing and their friends'",
+        "description": "The course with its published ranks; the member's rank and Want to play; friends who rank it, best rank first; and friends who want to play it. Only the member's accepted friends appear.",
+        "security": [
+          {
+            "ClerkSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "courseId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The course.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CoursePage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters: `validation_failed`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session: `unauthenticated`, or `account_deleted` after the account was deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The Clerk account cannot use the app: `username_invalid`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such catalog course: `course_not_found`.",
             "content": {
               "application/json": {
                 "schema": {

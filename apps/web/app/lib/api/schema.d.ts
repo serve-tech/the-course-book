@@ -433,6 +433,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/courses/{courseId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * One catalog course with the member's standing and their friends'
+         * @description The course with its published ranks; the member's rank and Want to play; friends who rank it, best rank first; and friends who want to play it. Only the member's accepted friends appear.
+         */
+        get: operations["getCourse"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/feed": {
         parameters: {
             query?: never;
@@ -851,6 +871,27 @@ export interface components {
             wantToPlay: boolean;
             /** @description Friends who have played it, by display name. */
             friendsPlayed: components["schemas"]["Member"][];
+        };
+        CoursePage: {
+            course: components["schemas"]["Course"];
+            you: components["schemas"]["CourseStanding"];
+            /** @description Friends with the course on their ranking, best rank first. */
+            friendsRanked: components["schemas"]["CourseFriendRank"][];
+            /** @description Friends who want to play it, by display name. */
+            friendsWantToPlay: components["schemas"]["Member"][];
+        };
+        CourseStanding: {
+            /** @description The member's rank for the course; null when it is not on their ranking. */
+            rank: number | null;
+            /** @description How many courses the member's ranking holds. */
+            outOf: number;
+            wantToPlay: boolean;
+        };
+        CourseFriendRank: {
+            member: components["schemas"]["Member"];
+            rank: number;
+            /** @description How many courses the friend's ranking holds, for `#3 of 42`. */
+            outOf: number;
         };
         Feed: {
             /** @description Newest first. */
@@ -2447,6 +2488,73 @@ export interface operations {
                 };
             };
             /** @description No published list with that type and scope: `top_list_not_found`. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Another member holds the Clerk account's username: `username_taken`. Choose a different username. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    getCourse: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                courseId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The course. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoursePage"];
+                };
+            };
+            /** @description Invalid parameters: `validation_failed`. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description No valid session: `unauthenticated`, or `account_deleted` after the account was deleted. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description The Clerk account cannot use the app: `username_invalid`. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description No such catalog course: `course_not_found`. */
             404: {
                 headers: {
                     [name: string]: unknown;

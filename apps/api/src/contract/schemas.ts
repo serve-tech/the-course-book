@@ -310,6 +310,31 @@ export const TopListEntrySchema = z
   })
   .openapi("TopListEntry");
 
+export const CourseFriendRankSchema = z
+  .object({
+    member: MemberSchema,
+    rank,
+    outOf: z.number().int().min(1).openapi({ description: "How many courses the friend's ranking holds, for `#3 of 42`." }),
+  })
+  .openapi("CourseFriendRank");
+
+export const CourseStandingSchema = z
+  .object({
+    rank: optionalRank.openapi({ description: "The member's rank for the course; null when it is not on their ranking." }),
+    outOf: z.number().int().min(0).openapi({ description: "How many courses the member's ranking holds." }),
+    wantToPlay: z.boolean(),
+  })
+  .openapi("CourseStanding");
+
+export const CoursePageSchema = z
+  .object({
+    course: CourseSchema,
+    you: CourseStandingSchema,
+    friendsRanked: z.array(CourseFriendRankSchema).openapi({ description: "Friends with the course on their ranking, best rank first." }),
+    friendsWantToPlay: z.array(MemberSchema).openapi({ description: "Friends who want to play it, by display name." }),
+  })
+  .openapi("CoursePage");
+
 export const TopListDetailSchema = z
   .object({ progress: TopListProgressSchema, entries: z.array(TopListEntrySchema).openapi({ description: "In rank order." }) })
   .openapi("TopListDetail");

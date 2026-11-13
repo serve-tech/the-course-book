@@ -1,7 +1,7 @@
 import type { Course, RankedCourse } from "@coursebook/domain/catalog/course";
 import type { SearchResult } from "@coursebook/domain/catalog/search-results";
 import type { MemberList, MemberListRow, PublicRanking } from "@coursebook/domain/friends/types";
-import type { FeedItem, Profile, TimelineMonthCount, TimelineRound, TopListDetail, TopListStanding, WantToPlayEntry } from "@coursebook/domain/social/types";
+import type { CoursePage, FeedItem, Profile, TimelineMonthCount, TimelineRound, TopListDetail, TopListStanding, WantToPlayEntry } from "@coursebook/domain/social/types";
 import type { ListEntry, RoundEntry } from "@coursebook/domain/journal/types";
 import { UNKNOWN_LOCATION } from "../domain/course-view";
 import type {
@@ -149,6 +149,16 @@ export function toWantToPlay(entries: readonly WantToPlayEntry[]) {
 
 export function toTopListProgress(standing: TopListStanding) {
   return { list: standing.list, mine: standing.mine, friends: standing.friends };
+}
+
+/** A course's page for the member: the course in contract form, the rest as the domain has it. */
+export function toCoursePage(page: CoursePage) {
+  return {
+    course: toContractCourse(page.course),
+    you: page.you,
+    friendsRanked: page.friendsRanked,
+    friendsWantToPlay: page.friendsWantToPlay,
+  };
 }
 
 export function toTopListDetail(detail: TopListDetail) {

@@ -7,6 +7,7 @@ import {
   ApiErrorSchema,
   ClientConfigSchema,
   CourseIdParamsSchema,
+  CoursePageSchema,
   DeletedRoundSchema,
   FeedSchema,
   FriendRequestsSchema,
@@ -250,6 +251,27 @@ export const getTopList = createRoute({
     401: unauthenticated,
     403: forbidden,
     404: failure("No published list with that type and scope: `top_list_not_found`."),
+    409: usernameTaken,
+  },
+});
+
+export const getCourse = createRoute({
+  method: "get",
+  path: "/v1/courses/{courseId}",
+  operationId: "getCourse",
+  tags: ["Catalog"],
+  summary: "One catalog course with the member's standing and their friends'",
+  description:
+    "The course with its published ranks; the member's rank and Want to play; friends who rank it, best rank first; " +
+    "and friends who want to play it. Only the member's accepted friends appear.",
+  security: MEMBER,
+  request: { params: CourseIdParamsSchema },
+  responses: {
+    200: json(CoursePageSchema, "The course."),
+    400: invalid,
+    401: unauthenticated,
+    403: forbidden,
+    404: failure("No such catalog course: `course_not_found`."),
     409: usernameTaken,
   },
 });
