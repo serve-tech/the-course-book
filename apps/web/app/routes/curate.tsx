@@ -3,19 +3,21 @@ import { canCurate, MemberRole, roleFrom, type CommonsCandidate } from "@courseb
 import { data } from "react-router";
 import { z } from "zod";
 import type { Route } from "./+types/curate";
-import { commonsQuery, CurationTab } from "../features/curation/curation";
+import { commonsQuery, curationList, CurationTab, membersNote, type CurationEntry } from "../features/curation/curation";
+import { listEntries } from "../features/top-lists/lists";
 import { CurationPage, type CurationReply } from "../features/curation/CurationPage";
 import { api, ApiError, unwrap } from "../lib/api";
-import { fromApiCourse, fromCoursePage } from "../lib/api/mappers";
+import { fromApiCourse, fromCoursePage, fromRankingEntry } from "../lib/api/mappers";
 import { apiFailureMessage } from "../shared/lib/errors";
 import { RouteError } from "../shared/ui/RouteError";
 import { useShell } from "../shared/ui/shell";
 
 /**
- * The curator screen (`/curate`): courses on members' rankings and their
- * photos, a Wikimedia Commons search for one course (`?course=<id>`, with
- * `q` to search for something other than its name), and, for admins, who
- * curates (`?tab=curators`). Decision 2026-11-13.
+ * The curator screen (`/curate`): courses on members' rankings, or on a
+ * national published list (`?from=world`), and their photos; a Wikimedia
+ * Commons search for one course (`?course=<id>`, with `q` to search for
+ * something other than its name); and, for admins, who curates
+ * (`?tab=curators`). Decision 2026-11-13.
  */
 export async function clientLoader({ request }: Route.ClientLoaderArgs) {
   if (!(await getToken())) return null;
@@ -29,9 +31,18 @@ export async function clientLoader({ request }: Route.ClientLoaderArgs) {
     return { role, tab: CurationTab.Curators, members: members.map((entry) => ({ member: entry.member, role: roleFrom(entry.role) })) } as const;
   }
 
-  const listed = unwrap(await api.GET("/v1/curation/courses")).courses.map((entry) => ({ course: fromApiCourse(entry.course), members: entry.members }));
+  const source = curationList(url.searchParams.get("from"));
+  // Revalidate (ETag) instead of using the browser's copy, which may be an
+  // hour old: a curator must see the photo they just set. The fresh copy
+  // then replaces the cached one for the rest of the app.
+  const listed: CurationEntry[] = source
+    ? listEntries(unwrap(await api.GET("/v1/rankings", { cache: "no-cache" })).entries.map(fromRankingEntry), source).entries.map((entry) => ({
+        course: entry.course,
+        note: "#" + String(entry.rank),
+      }))
+    : unwrap(await api.GET("/v1/curation/courses")).courses.map((entry) => ({ course: fromApiCourse(entry.course), note: membersNote(entry.members) }));
   const courseId = url.searchParams.get("course");
-  if (!courseId) return { role, tab: CurationTab.Photos, courses: listed, picking: null } as const;
+  if (!courseId) return { role, tab: CurationTab.Photos, source, courses: listed, picking: null } as const;
 
   const course =
     listed.find((entry) => entry.course.id === courseId)?.course ??
@@ -48,7 +59,7 @@ export async function clientLoader({ request }: Route.ClientLoaderArgs) {
       searchError = error.message;
     }
   }
-  return { role, tab: CurationTab.Photos, courses: listed, picking: { course, query, candidates, searchError } } as const;
+  return { role, tab: CurationTab.Photos, source, courses: listed, picking: { course, query, candidates, searchError } } as const;
 }
 
 const intentSchema = z.discriminatedUnion("intent", [

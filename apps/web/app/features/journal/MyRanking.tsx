@@ -9,13 +9,14 @@ import { RoundHistory } from "../rounds/RoundHistory";
 import type { RankingImageContent } from "../share/ranking-image";
 import { viewRows, type ShareView } from "@coursebook/domain/sharing/view";
 import { TopChoices, ViewHeader } from "../share/ViewHeader";
-import { CourseSummary, PlayedMarks, type PlayedMark } from "../top-lists/CourseRow";
+import { coursePath } from "../courses/paths";
+import { CourseRow, CourseSummary, PlayedMarks, type PlayedMark } from "../top-lists/CourseRow";
+import { isFeatured } from "../top-lists/lists";
 import styles from "../top-lists/top-lists.module.css";
 import { CountEditor } from "./CountEditor";
 import { CourseDetails } from "./CourseDetails";
 import { coursesLabel, RankingLayout, rankingRows, roundsLabel } from "./ranking";
-import { RankingCards } from "./RankingCards";
-import cardStyles from "./ranking-cards.module.css";
+import toolbarStyles from "./ranking-toolbar.module.css";
 import { RankingFilters } from "./RankingFilters";
 import { useCourseDrag } from "./use-course-drag";
 import { replyMessage, useJournalFetcher } from "./use-journal-fetcher";
@@ -51,7 +52,7 @@ export interface RankingHeading {
  * @param searchFrom - Views with this many courses or fewer offer no search. Defaults to always offering it.
  * @param heading - The page's header, when this is the page rather than a tab: the view's title and share buttons become its panel.
  * @param showRounds - Whether each row shows its round count. Defaults to true.
- * @param initialLayout - Photo cards or the compact Reorder rows. Defaults to cards; only Reorder drags.
+ * @param initialLayout - Browsing (the top three as photo cards, rows that open each course) or Reorder (rows to drag). Defaults to browsing.
  * @param renderImage - Draws the saved image; for tests, because jsdom has no canvas.
  */
 export function MyRanking({
@@ -67,7 +68,7 @@ export function MyRanking({
   searchFrom = 0,
   heading,
   showRounds = true,
-  initialLayout = RankingLayout.Cards,
+  initialLayout = RankingLayout.Browse,
   renderImage,
 }: {
   rows: readonly ListEntry[];
@@ -121,7 +122,8 @@ export function MyRanking({
   );
   const viewed = useMemo(() => viewRows(courses, shown), [courses, shown]);
   const searchable = viewed.length > searchFrom;
-  const visible = rankingRows(viewed, { region: RegionFilter.All, state: "", query: searchable ? query : "" });
+  const searching = searchable && query.trim() !== "";
+  const visible = rankingRows(viewed, { region: RegionFilter.All, state: "", query: searching ? query : "" });
   const stateMissing = region === RegionFilter.State && !selectedState;
 
   const { drag, start, suppressClick } = useCourseDrag(reordering && !readOnly && !move.busy, (id, target, after) => {
@@ -178,7 +180,7 @@ export function MyRanking({
       </RankingFilters>
       {!heading && viewHeader(false)}
       {courses.length > 0 && !stateMissing && (
-        <div className={cardStyles.toolbar}>
+        <div className={toolbarStyles.toolbar}>
           {reordering && (
             <p className={styles.hint}>{readOnly ? "Switch to All to reorder." : "Drag a course to change your ranking."}</p>
           )}
@@ -188,7 +190,7 @@ export function MyRanking({
               className={styles.filter}
               aria-pressed={reordering}
               onClick={() => {
-                setLayout(reordering ? RankingLayout.Cards : RankingLayout.Reorder);
+                setLayout(reordering ? RankingLayout.Browse : RankingLayout.Reorder);
               }}
             >
               {reordering ? "Done" : "Reorder"}
@@ -207,7 +209,19 @@ export function MyRanking({
       ) : !visible.length ? (
         <div className={styles.empty}>No courses here match.</div>
       ) : !reordering ? (
-        <RankingCards rows={visible} />
+        <ol id="ranking" className={styles.list} aria-label="Ranking">
+          {visible.map(({ course, rank, played: count }, index) => (
+            <CourseRow
+              key={course.id}
+              course={course}
+              rank={rank}
+              current={null}
+              href={coursePath(course.id)}
+              featured={isFeatured(index, !searching)}
+              marks={marks(course, count)}
+            />
+          ))}
+        </ol>
       ) : (
         <ol id="ranking" className={styles.list} aria-label="Ranking">
           {visible.map(({ course, rank, played: count }) => {

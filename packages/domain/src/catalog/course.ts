@@ -7,8 +7,10 @@ import { z } from "zod";
  * shown wherever it appears (decision 2026-11-13, course photos in R2).
  */
 export const coursePhotoSchema = z.object({
-  /** Where the image is served from. */
+  /** Where the image is served from, at display width. */
   url: z.string().min(1),
+  /** The same image at thumbnail width, for rows and small tiles. */
+  thumbUrl: z.string().min(1),
   /** The photographer, as the source names them. */
   credit: z.string().min(1),
   /** The license's short name, e.g. "CC BY-SA 4.0" or "Public domain". */

@@ -61,8 +61,8 @@ export function coursesLabel(count: number): string {
 
 /** How the member's own ranking is laid out (decision 2026-11-13). */
 export enum RankingLayout {
-  /** Photo cards for reading; each opens the course's page. */
-  Cards = "cards",
-  /** Compact rows with drag handles, for changing the order. */
+  /** For reading: the top three as photo cards, then rows; each opens the course's page. */
+  Browse = "browse",
+  /** Rows with drag handles, for changing the order. */
   Reorder = "reorder",
 }

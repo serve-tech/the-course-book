@@ -55,7 +55,8 @@ export const CourseRanksSchema = z
 
 export const CoursePhotoSchema = z
   .object({
-    url: z.url().openapi({ description: "Where the image is served from." }),
+    url: z.url().openapi({ description: "Where the image is served from, at display width (1280 px, or the original when narrower)." }),
+    thumbUrl: z.url().openapi({ description: "The same image at thumbnail width (330 px, or the original when narrower), for rows and small tiles." }),
     credit: z.string().openapi({ description: "The photographer, as the source names them. Show it with the photo." }),
     license: z.string().openapi({ description: "The license's short name, e.g. `CC BY-SA 4.0` or `Public domain`." }),
     licenseUrl: z.url().nullable().openapi({ description: "The license's text; null for public domain." }),

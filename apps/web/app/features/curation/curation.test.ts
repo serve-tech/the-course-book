@@ -1,8 +1,8 @@
 import { courseSchema, type CoursePhoto } from "@coursebook/domain/catalog/course";
 import { describe, expect, it } from "vitest";
-import { commonsQuery, CurationFilter, filterCourses, openingFilter, photoProgress } from "./curation";
+import { commonsQuery, curatePath, curationList, CurationFilter, filterCourses, membersNote, openingFilter, photoProgress } from "./curation";
 
-const photo: CoursePhoto = { url: "https://x/a.jpg", credit: "Ana", license: "CC BY 2.0", licenseUrl: null, sourceUrl: "https://x" };
+const photo: CoursePhoto = { url: "https://x/a.jpg", thumbUrl: "https://x/a-330.jpg", credit: "Ana", license: "CC BY 2.0", licenseUrl: null, sourceUrl: "https://x" };
 const entry = (id: string, withPhoto: boolean, members = 1) => ({ course: courseSchema.parse({ id, name: id, location: "", photo: withPhoto ? photo : null }), members });
 
 describe("filterCourses", () => {
@@ -39,5 +39,39 @@ describe("commonsQuery", () => {
     ["  Whistling  Straits: Straits ", "Whistling Straits"],
   ])("searches %s as %s", (name, query) => {
     expect(commonsQuery(name)).toBe(query);
+  });
+});
+
+describe("curationList", () => {
+  it.each([
+    { slug: "world", list: { type: "global", scope: "GLOBAL" } },
+    { slug: "usa-public", list: { type: "usa_public", scope: "USA_PUBLIC" } },
+    { slug: "international", list: { type: "world", scope: "WORLD" } },
+    { slug: "state-mi", list: null },
+    { slug: "nonsense", list: null },
+    { slug: null, list: null },
+  ])("reads $slug as $list", ({ slug, list }) => {
+    expect(curationList(slug)).toEqual(list);
+  });
+});
+
+describe("curatePath", () => {
+  const usa = { type: "usa", scope: "USA" };
+  it.each([
+    { args: {}, path: "/curate" },
+    { args: { list: usa }, path: "/curate?from=usa" },
+    { args: { courseId: "c1" }, path: "/curate?course=c1" },
+    { args: { list: usa, courseId: "c1" }, path: "/curate?course=c1&from=usa" },
+  ])("builds $path", ({ args, path }) => {
+    expect(curatePath(args)).toBe(path);
+  });
+});
+
+describe("membersNote", () => {
+  it.each([
+    [1, "1 member"],
+    [3, "3 members"],
+  ])("%i reads %s", (members, note) => {
+    expect(membersNote(members)).toBe(note);
   });
 });

@@ -67,6 +67,7 @@ describe("contract course mapping", () => {
   it("carries a course's photo with its credit and license", () => {
     const photo = {
       url: "https://upload.wikimedia.org/wikipedia/commons/8/8a/ArcadiaBluffs1011.jpg",
+      thumbUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/ArcadiaBluffs1011.jpg/330px-ArcadiaBluffs1011.jpg",
       credit: "Benscripps",
       license: "CC BY-SA 3.0",
       licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",

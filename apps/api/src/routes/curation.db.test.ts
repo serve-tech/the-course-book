@@ -117,6 +117,8 @@ describe("photo curation", () => {
     expect(set.status).toBe(200);
     const photo = {
       url: arcadiaPhoto.url,
+      // 330 px, built from the original behind the stored 1280 px URL.
+      thumbUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Pine_Valley_18th.jpg/330px-Pine_Valley_18th.jpg",
       credit: "Ana",
       license: "CC BY-SA 4.0",
       licenseUrl: arcadiaPhoto.licenseUrl,

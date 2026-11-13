@@ -98,3 +98,16 @@
 @media (min-width: 761px) {
   .current { grid-template-columns: minmax(0, 420px) minmax(0, 1fr); align-items: start; }
 }
+
+/* Where the course list comes from: members' rankings or a published list. */
+.source { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 14px; color: var(--muted); font-size: 13px; font-weight: 700; }
+.source select {
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 9px;
+  border: 1px solid rgba(199, 170, 107, 0.45);
+  background: var(--panel);
+  color: var(--cream);
+  font: 600 13px "DM Sans", Arial, sans-serif;
+}
+.source select:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }

@@ -75,6 +75,16 @@ export function plainText(html: string): string {
     .trim();
 }
 
+/**
+ * A file's credit as text: its Artist field without the link to the
+ * uploader's talk page that Commons often adds ("Frjlove (talk)").
+ */
+export function creditText(html: string): string {
+  return plainText(html)
+    .replace(/\s*\(\s*talk(\s*\|\s*contribs)?\s*\)$/i, "")
+    .trim();
+}
+
 /** An absolute https URL from Commons metadata, which sometimes omits the scheme; null when unusable. */
 export function absoluteUrl(value: string | undefined): string | null {
   const text = plainText(value ?? "");
@@ -109,6 +119,20 @@ export function thumbnailUrl(originalUrl: string, originalWidth: number, width: 
   return url.toString();
 }
 
+/**
+ * The original file behind a Commons thumbnail URL
+ * (`…/commons/thumb/a/ab/F.jpg/1280px-F.jpg` → `…/commons/a/ab/F.jpg`);
+ * any other URL is returned unchanged.
+ */
+export function originalUrl(imageUrl: string): string {
+  const url = new URL(imageUrl);
+  const parts = url.pathname.split("/");
+  const thumb = parts.indexOf("thumb");
+  if (thumb < 1 || parts[thumb - 1] !== "commons" || parts.length < thumb + 3) return imageUrl;
+  url.pathname = [...parts.slice(0, thumb), ...parts.slice(thumb + 1, -1)].join("/");
+  return url.toString();
+}
+
 /** A Commons file the app can use: its candidate details and the URL to show. */
 export interface CommonsPhoto extends CommonsCandidate {
   /** The image at display width, or the original when narrower. */
@@ -135,7 +159,7 @@ export function commonsPhoto(page: CommonsPage): CommonsPhoto | null {
     thumbUrl: info.thumburl ?? thumbnailUrl(info.url, info.width, PREVIEW_WIDTH),
     width: info.width,
     height: info.height,
-    credit: plainText(meta.Artist?.value ?? "") || "Wikimedia Commons",
+    credit: creditText(meta.Artist?.value ?? "") || "Wikimedia Commons",
     license,
     licenseUrl: absoluteUrl(meta.LicenseUrl?.value),
     sourceUrl: info.descriptionurl,

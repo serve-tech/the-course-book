@@ -104,6 +104,24 @@ export function listTab(list: TopListRef): ListTab | null {
   return tabs.find((tab) => sameList(NATIONAL[tab], list)) ?? null;
 }
 
+/** How many courses a ranked list features as photo cards: its top three (decision 2026-11-13). */
+export const FEATURED = 3;
+
+/**
+ * Whether the course at `index` (0-based, in the order shown) is one of the
+ * featured top three. Only a list shown whole features any: a search or a
+ * played filter's first results aren't the list's best.
+ *
+ * Example:
+ *     >>> isFeatured(2, true)
+ *     true
+ *     >>> isFeatured(0, false)
+ *     false
+ */
+export function isFeatured(index: number, whole: boolean): boolean {
+  return whole && index < FEATURED;
+}
+
 /** Where the State tab points when no state is known yet. */
 export const STATE_WITHOUT_SCOPE = "state";
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { absoluteUrl, commonsPhoto, isAcceptedLicense, plainText, thumbnailUrl, type CommonsPage } from "./commons";
+import { absoluteUrl, commonsPhoto, creditText, isAcceptedLicense, originalUrl, plainText, thumbnailUrl, type CommonsPage } from "./commons";
 
 const page = (overrides: { mime?: string; width?: number; license?: string; artist?: string; missing?: boolean } = {}): CommonsPage => ({
   title: "File:ArcadiaBluffs1011.jpg",
@@ -64,6 +64,19 @@ describe("thumbnailUrl", () => {
   });
 });
 
+describe("originalUrl", () => {
+  it.each([
+    [
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/Arcadia.jpg/1280px-Arcadia.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/8/8a/Arcadia.jpg",
+    ],
+    ["https://upload.wikimedia.org/wikipedia/commons/8/8a/Arcadia.jpg", "https://upload.wikimedia.org/wikipedia/commons/8/8a/Arcadia.jpg"],
+    ["https://photos.example.com/thumb/a.jpg", "https://photos.example.com/thumb/a.jpg"],
+  ])("reads %s as %s", (url, original) => {
+    expect(originalUrl(url)).toBe(original);
+  });
+});
+
 describe("absoluteUrl", () => {
   it.each([
     { value: "https://creativecommons.org/licenses/by/2.0", expected: "https://creativecommons.org/licenses/by/2.0" },
@@ -79,6 +92,17 @@ describe("absoluteUrl", () => {
 describe("plainText", () => {
   it("drops tags and decodes the common entities", () => {
     expect(plainText('<a href="x">Dan&nbsp;Perry</a> &amp; <i>friends</i>')).toBe("Dan Perry & friends");
+  });
+});
+
+describe("creditText", () => {
+  it.each([
+    ['<a href="//commons.wikimedia.org/wiki/User:Frjlove">Frjlove</a> (<a href="//commons.wikimedia.org/wiki/User_talk:Frjlove">talk</a>)', "Frjlove"],
+    ['<a href="x">Ana</a> (<a href="y">talk</a> | <a href="z">contribs</a>)', "Ana"],
+    ["Benscripps", "Benscripps"],
+    ["Talk Radio (talking heads)", "Talk Radio (talking heads)"],
+  ])("reads %s as %s", (html, credit) => {
+    expect(creditText(html)).toBe(credit);
   });
 });
 
