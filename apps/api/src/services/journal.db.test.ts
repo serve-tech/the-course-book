@@ -340,6 +340,70 @@ describe("Played courses (on the list without a rank)", () => {
   });
 });
 
+describe("when a course was ranked (ranked_at, for #54)", () => {
+  const OLD = new Date("2026-01-01T00:00:00Z");
+  /** Each course's ranked_at, with every existing one first set to a known old time. */
+  const rankedAt = async (courseId: string) => {
+    const [row] = await db
+      .select({ rankedAt: userCourses.rankedAt })
+      .from(userCourses)
+      .where(and(eq(userCourses.userId, USER), eq(userCourses.courseId, courseId)));
+    return row?.rankedAt ?? null;
+  };
+  const backdate = () => db.update(userCourses).set({ rankedAt: OLD }).where(eq(userCourses.userId, USER));
+  const isNew = (value: Date | null) => value !== null && value.getTime() > OLD.getTime();
+
+  it("is set when a member moves a course, and not on the courses the move shifts", async () => {
+    const [a, b, c] = (await Promise.all(["usa1", "usa2", "usa3"].map(seeded))) as [string, string, string];
+    for (const id of [a, b, c]) await logRounds(db, USER, { courseId: id }, 1);
+    await backdate();
+    await moveCourse(db, USER, c, 1);
+    expect(isNew(await rankedAt(c))).toBe(true);
+    expect([await rankedAt(a), await rankedAt(b)]).toEqual([OLD, OLD]);
+  });
+
+  it("is set when a Played course is placed into the ranking, and stays empty while it is Played", async () => {
+    const [a, b, p] = (await Promise.all(["usa1", "usa2", "usa4"].map(seeded))) as [string, string, string];
+    await logRounds(db, USER, { courseId: a }, 1);
+    await logRounds(db, USER, { courseId: b }, 1);
+    await insertPlayed(db, USER, p);
+    await moveCourse(db, USER, b, 1);
+    expect(await rankedAt(p)).toBeNull();
+    await backdate();
+    await db.update(userCourses).set({ rankedAt: null }).where(eq(userCourses.courseId, p));
+    await moveCourse(db, USER, p, 1);
+    expect(isNew(await rankedAt(p))).toBe(true);
+    expect([await rankedAt(a), await rankedAt(b)]).toEqual([OLD, OLD]);
+  });
+
+  it("is set when an older operation puts a course in the ranking, and left alone when it is already Ranked", async () => {
+    const [a, b] = (await Promise.all(["usa1", "usa2"].map(seeded))) as [string, string];
+    await logRounds(db, USER, { courseId: a }, 1);
+    expect(await rankedAt(a)).not.toBeNull();
+    await backdate();
+    await logRounds(db, USER, { courseId: a }, 1);
+    await addToList(db, USER, a);
+    expect(await rankedAt(a)).toEqual(OLD);
+    const custom = await addCourseByDetails(db, USER, { ...blob("Ranked At Links", "Hometown, OH, USA", { state: "OH", country: "USA" }), isCustom: true }, { rank: 1, quantity: 1 });
+    expect(isNew(await rankedAt(custom.courseId))).toBe(true);
+    expect(await rankedAt(a)).toEqual(OLD);
+    await addToList(db, USER, b);
+    expect(isNew(await rankedAt(b))).toBe(true);
+  });
+
+  it("is left alone by count changes, round deletions and removing another course", async () => {
+    const [a, b] = (await Promise.all(["usa1", "usa2"].map(seeded))) as [string, string];
+    await logRounds(db, USER, { courseId: a }, 2);
+    await logRounds(db, USER, { courseId: b }, 1);
+    await backdate();
+    await setCount(db, USER, a, 3);
+    const [round] = await roundHistory(db, USER, a);
+    await deleteRound(db, USER, round?.id ?? "");
+    await deleteCourse(db, USER, b);
+    expect(await rankedAt(a)).toEqual(OLD);
+  });
+});
+
 describe("catalog cache after creating a course", () => {
   /** Wait until some statement in this database is blocked on a lock. */
   const waitForLockWait = async () => {

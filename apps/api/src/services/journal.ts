@@ -204,9 +204,30 @@ async function putInRanking(
   if (current?.rank != null) return { created: false, rank: current.rank };
   if (!current) await tx.insert(userCourses).values({ userId, courseId, personalRank: null });
   const ranking = await rankingIds(tx, userId);
-  const order = placeInRanking(ranking, courseId, rank ?? ranking.length + 1);
+  return { created: !current, rank: await rankCourse(tx, userId, courseId, ranking, rank ?? ranking.length + 1) };
+}
+
+/**
+ * Place a course into the ranking, or move it there if it is Ranked, and
+ * record when (`ranked_at`, for #54). The courses this shifts are
+ * renumbered but keep their own `ranked_at`: only the course the member
+ * placed counts as ranked now.
+ *
+ * Args:
+ *     ranking: The whole ranking as read under the member's lock.
+ *     rank: The requested position; clamped by `placeInRanking`.
+ *
+ * Returns:
+ *     The course's rank afterwards.
+ */
+async function rankCourse(tx: Transaction, userId: string, courseId: string, ranking: readonly string[], rank: number): Promise<number> {
+  const order = placeInRanking(ranking, courseId, rank);
   await renumber(tx, userId, order);
-  return { created: !current, rank: order.indexOf(courseId) + 1 };
+  await tx
+    .update(userCourses)
+    .set({ rankedAt: sql`now()` })
+    .where(and(eq(userCourses.userId, userId), eq(userCourses.courseId, courseId)));
+  return order.indexOf(courseId) + 1;
 }
 
 /** Delete a membership (rounds cascade) and, if it was Ranked, close the gap in the ranks. */
@@ -318,9 +339,8 @@ export async function moveCourse(
 ): Promise<{ rank: number } & PersonalList> {
   return withJournalLock(db, userId, async (tx) => {
     if (!(await listing(tx, userId, courseId))) throw new AppError(404, ErrorCode.NotOnList, "That course is not on your list.");
-    const order = placeInRanking(await rankingIds(tx, userId), courseId, rank);
-    await renumber(tx, userId, order);
-    return { rank: order.indexOf(courseId) + 1, ...(await wholeList(tx, userId)) };
+    const placed = await rankCourse(tx, userId, courseId, await rankingIds(tx, userId), rank);
+    return { rank: placed, ...(await wholeList(tx, userId)) };
   });
 }
 
