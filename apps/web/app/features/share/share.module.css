@@ -13,44 +13,12 @@
   display: flex;
   margin: 0;
 }
-.panel .actions { flex: 1 1 100%; justify-items: stretch; }
-.panel .viewImage { justify-self: center; }
+.panel .actions { flex: 1 1 100%; }
+.panel .actions > button { flex: 1 1 0; }
 .heading { composes: sectionTitle from "../../shared/ui/page-header.module.css"; }
 .caption { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
 
-/* Share, with the quieter View image link under it. */
-.actions { display: grid; gap: 6px; justify-items: end; }
-.viewImage {
-  padding: 2px 0;
-  border: 0;
-  background: none;
-  color: var(--muted);
-  font: inherit;
-  font-size: 12.5px;
-  text-decoration: underline;
-  text-decoration-color: rgba(255, 255, 255, 0.25);
-  text-underline-offset: 3px;
-  cursor: pointer;
-}
-.viewImage:hover { color: var(--gold); }
-.viewImage:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; border-radius: 3px; }
-
-/* The image by itself: the whole tall image, scrolling inside the dialog. */
-.preview {
-  /* Short enough that the dialog itself never scrolls: one scroll, the image's. */
-  max-height: min(50vh, 600px);
-  margin: 4px 0 14px;
-  overflow: auto;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: rgba(0, 0, 0, 0.25);
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.28) transparent;
-  -webkit-overflow-scrolling: touch;
-}
-.previewImage { display: block; width: 100%; height: auto; }
-.previewNote { margin: 0; padding: 36px 16px; color: var(--muted); text-align: center; }
-.previewActions { display: flex; justify-content: flex-end; }
+.actions { display: flex; gap: 8px; }
 
 .invite {
   display: flex;
@@ -70,6 +38,6 @@
 @media (max-width: 760px) {
   /* One Share button at its own size beside the view's title, with no panel around them: a phone has no room to spare, and the courses stay on the first screen. */
   .panel { padding: 0; border: 0; border-radius: 0; background: none; }
-  .panel .actions { flex: 0 0 auto; justify-items: end; }
-  .panel .viewImage { justify-self: end; }
+  .panel .actions { flex: 0 0 auto; }
+  .panel .actions > button { flex: 0 0 auto; }
 }
