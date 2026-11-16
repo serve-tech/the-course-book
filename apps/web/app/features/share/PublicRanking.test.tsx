@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { courseSchema, RegionFilter, type Course } from "@coursebook/domain/catalog/course";
 import type { PublicRanking as Ranking } from "@coursebook/domain/friends/types";
 import { PublicRanking } from "./PublicRanking";
+import { ImageStatus } from "./deliver";
 import type { RankingImageContent } from "./ranking-image";
 import { WHOLE_RANKING, type ShareView } from "@coursebook/domain/sharing/view";
 
@@ -74,7 +75,13 @@ afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
   Reflect.deleteProperty(navigator, "clipboard");
+  Reflect.deleteProperty(window, "matchMedia");
 });
+
+/** jsdom has no media queries, so the main input is stood in for: a finger when `coarse`, else a mouse. */
+function stubPointer(coarse: boolean) {
+  Object.defineProperty(window, "matchMedia", { configurable: true, value: vi.fn(() => ({ matches: coarse })) });
+}
 
 /** jsdom has no clipboard, so the browser's is stood in for. */
 function stubClipboard(implementation: (text: string) => Promise<void>) {
@@ -142,10 +149,10 @@ describe("PublicRanking", () => {
     expect(listed()).toHaveLength(5);
   });
 
-  it("says so when the member has ranked nothing, and offers no image", () => {
+  it("says so when the member has ranked nothing, and has no image to share", () => {
     show({ subject: { member: ranking.member, rows: [] } });
     expect(screen.getByText("Josh Linneburg hasn't ranked any courses yet.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Save image" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Share" })).toHaveAttribute("data-image", ImageStatus.None);
     expect(renderImage).not.toHaveBeenCalled();
   });
 
@@ -163,7 +170,7 @@ describe("sharing", () => {
   it("draws the current view with its numbers and link, and redraws when the view changes", async () => {
     show({ initial: { region: RegionFilter.State, state: "MI", top: 5 } });
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Save image" })).toBeEnabled();
+      expect(screen.getByRole("button", { name: "Share" })).toHaveAttribute("data-image", ImageStatus.Ready);
     });
     expect(renderImage.mock.lastCall?.[0]).toEqual({
       memberName: "Josh Linneburg",
@@ -183,41 +190,38 @@ describe("sharing", () => {
   it("does not draw again while someone types in the search", async () => {
     show({ subject: long });
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Save image" })).toBeEnabled();
+      expect(screen.getByRole("button", { name: "Share" })).toHaveAttribute("data-image", ImageStatus.Ready);
     });
     const draws = renderImage.mock.calls.length;
     fireEvent.change(screen.getByRole("searchbox", { name: "Search this ranking" }), { target: { value: "pine" } });
     expect(renderImage.mock.calls.length).toBe(draws);
   });
 
-  it("shows why when the image could not be drawn", async () => {
+  it("copies the current view's link when the image could not be drawn, and says why", async () => {
     vi.spyOn(console, "warn").mockImplementation(() => undefined);
-    renderImage.mockRejectedValue(new Error("This ranking is too long for this browser to draw."));
-    show();
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Save image" })).toBeEnabled();
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Save image" }));
-    expect(notify).toHaveBeenCalledWith("This ranking is too long for this browser to draw.");
-  });
-
-  it("copies the link to the current view", async () => {
+    stubPointer(false);
     const writeText = stubClipboard(() => Promise.resolve());
+    renderImage.mockRejectedValue(new Error("This ranking is too long for this browser to draw."));
     show({ initial: { ...WHOLE_RANKING, top: 10 } });
-    fireEvent.click(screen.getByRole("button", { name: "Copy link" }));
+    const share = screen.getByRole("button", { name: "Share" });
     await waitFor(() => {
-      expect(notify).toHaveBeenCalledWith("Link copied");
+      expect(share).toHaveAttribute("data-image", ImageStatus.Failed);
     });
+    fireEvent.click(share);
     expect(writeText).toHaveBeenCalledWith(window.location.origin + "/r/josh?top=10");
+    await waitFor(() => {
+      expect(notify).toHaveBeenCalledWith("Link copied. This ranking is too long for this browser to draw.");
+    });
   });
 
   it("shows the link when the clipboard refuses", async () => {
     vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    stubPointer(false);
     stubClipboard(() => Promise.reject(new Error("denied")));
-    show();
-    fireEvent.click(screen.getByRole("button", { name: "Copy link" }));
+    show({ subject: { member: ranking.member, rows: [] } });
+    fireEvent.click(screen.getByRole("button", { name: "Share" }));
     await waitFor(() => {
-      expect(notify).toHaveBeenCalledWith("Couldn't copy it. The link is " + window.location.origin + "/r/josh");
+      expect(notify).toHaveBeenCalledWith("Couldn't copy the link. It's " + window.location.origin + "/r/josh");
     });
   });
 });

@@ -4,6 +4,7 @@ import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { courseSchema, type Course } from "@coursebook/domain/catalog/course";
 import type { ListEntry } from "@coursebook/domain/journal/types";
+import { ImageStatus } from "../share/deliver";
 import type { RankingImageContent } from "../share/ranking-image";
 import { MyRanking } from "./MyRanking";
 
@@ -70,13 +71,14 @@ afterEach(() => {
 });
 
 describe("MyRanking sharing", () => {
-  it("offers Copy link and Save image on the ranking itself, with no separate Share link", async () => {
+  it("offers one Share button on the ranking itself, and draws its image before the tap", async () => {
     show();
-    expect(screen.getByRole("button", { name: "Copy link" })).toBeInTheDocument();
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Save image" })).toBeEnabled();
+      expect(screen.getByRole("button", { name: "Share" })).toHaveAttribute("data-image", ImageStatus.Ready);
     });
     expect(screen.queryByRole("link", { name: "Share" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Copy link" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Save image" })).not.toBeInTheDocument();
   });
 
   it("numbers a tab's courses within the tab, so the screen matches the image", async () => {
@@ -117,7 +119,7 @@ describe("MyRanking sharing", () => {
   it("does not draw again while someone types in the search", async () => {
     show();
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Save image" })).toBeEnabled();
+      expect(screen.getByRole("button", { name: "Share" })).toHaveAttribute("data-image", ImageStatus.Ready);
     });
     const draws = renderImage.mock.calls.length;
     fireEvent.change(screen.getByRole("searchbox", { name: "Search this ranking" }), { target: { value: "pine" } });
@@ -166,7 +168,7 @@ describe("MyRanking sharing", () => {
   it("offers nothing to share until a state is picked", () => {
     show("");
     fireEvent.click(screen.getByRole("tab", { name: "Best in State" }));
-    expect(screen.queryByRole("button", { name: "Copy link" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Share" })).not.toBeInTheDocument();
     expect(screen.getByText("Pick a state to see the courses you've played there.")).toBeInTheDocument();
   });
 });

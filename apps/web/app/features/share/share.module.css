@@ -7,7 +7,7 @@
   margin: 18px 0 12px;
 }
 .viewTitle { flex: 1 1 240px; min-width: 0; }
-/* Beside a page's title: the same panel as the Courses page's progress, buttons sharing its width. */
+/* Beside a page's title: the same panel as the Courses page's progress, the Share button across its width. */
 .panel {
   composes: progress from "../top-lists/top-lists.module.css";
   display: flex;
@@ -36,8 +36,8 @@
 .invite p { margin: 0; }
 
 @media (max-width: 760px) {
-  /* Two equal tap targets under the title, with no panel around them: a phone has no room to spare. */
-  .actions { flex: 1 1 100%; }
-  .actions > button { flex: 1 1 0; justify-content: center; }
+  /* One Share button at its own size beside the view's title, with no panel around them: a phone has no room to spare, and the courses stay on the first screen. */
   .panel { padding: 0; border: 0; border-radius: 0; background: none; }
+  .panel .actions { flex: 0 0 auto; }
+  .panel .actions > button { flex: 0 0 auto; }
 }

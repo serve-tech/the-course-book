@@ -37,9 +37,9 @@ export function TopChoices({ top, onTop }: { top: number | null; onTop: (top: nu
 }
 
 /**
- * A view's title and caption beside its Copy link and Save image, the same on
- * the member's own ranking and their public page, so what a member sees is
- * what the link and the image show.
+ * A view's title and caption beside its Share button, the same on the
+ * member's own ranking and their public page, so what a member sees is what
+ * the link and the image show.
  *
  * @param username - Whose ranking, for the link and the file name.
  * @param memberName - The name the image shows.
