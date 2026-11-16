@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react";
-import { NavLink, useNavigate } from "react-router";
+import { Link, NavLink, useMatch, useNavigate } from "react-router";
 import { ProfileRelationship, type Profile } from "@coursebook/domain/social/types";
 import { cx } from "../../shared/lib/cx";
 import { useActionFetcher } from "../../shared/lib/use-action-fetcher";
@@ -10,6 +10,7 @@ import { FriendIntent, UnfriendReason } from "../friends/friend-actions";
 import { Avatar } from "./Avatar";
 import { displayName, profilePath } from "./paths";
 import { AvatarSize } from "./sizes";
+import { Stat } from "./Stat";
 import { monthLabel } from "./format";
 import profileStyles from "./profile.module.css";
 import styles from "./social.module.css";
@@ -20,13 +21,27 @@ import styles from "./social.module.css";
  * found it was the loudest control on the old friend page).
  *
  * @param profile - Whose profile.
+ * @param places - How many U.S. states and countries their courses are in, counted from their ranking.
  * @param notify - Shows a toast.
  * @param onLog - Opens the Log a round dialog over the profile.
  */
-export function ProfileHeader({ profile, notify, onLog }: { profile: Profile; notify: (message: string) => void; onLog: () => void }) {
+export function ProfileHeader({
+  profile,
+  places,
+  notify,
+  onLog,
+}: {
+  profile: Profile;
+  places: { states: number; countries: number };
+  notify: (message: string) => void;
+  onLog: () => void;
+}) {
   const self = profile.relationship === ProfileRelationship.Self;
   const name = displayName(profile.member);
   const { stats } = profile;
+  // A list's page (/u/<username>/lists/usa) opens from Stats and belongs to it, so Stats stays the current tab there.
+  const onList = useMatch("/u/:username/lists/:list") !== null;
+  const statsPath = profilePath(profile.member.username, "stats");
   return (
     <>
       <div className={profileStyles.hero}>
@@ -50,10 +65,12 @@ export function ProfileHeader({ profile, notify, onLog }: { profile: Profile; no
             )}
           </div>
           <dl className={profileStyles.stats} aria-label="Stats">
-            <Stat value={stats.courses} label="Courses" />
-            <Stat value={stats.rounds} label="Rounds" />
+            <Stat value={stats.rounds} label="Round" plural="Rounds" />
+            <Stat value={stats.courses} label="Course" plural="Courses" />
             <Stat value={stats.roundsThisYear} label={"In " + String(new Date().getFullYear())} />
-            <Stat value={stats.friends} label="Friends" />
+            <Stat value={places.states} label="State" plural="States" />
+            <Stat value={places.countries} label="Country" plural="Countries" />
+            <Stat value={stats.friends} label="Friend" plural="Friends" />
           </dl>
         </div>
       </div>
@@ -61,28 +78,23 @@ export function ProfileHeader({ profile, notify, onLog }: { profile: Profile; no
         <NavLink className={cx(profileStyles.tab)} to={profilePath(profile.member.username, "ranking")}>
           Ranking
         </NavLink>
-        <NavLink className={cx(profileStyles.tab)} to={profilePath(profile.member.username, "lists")}>
-          Lists
-        </NavLink>
-        <NavLink className={cx(profileStyles.tab)} to={profilePath(profile.member.username, "stats")}>
-          Stats
+        {onList ? (
+          <Link className={profileStyles.tab} to={statsPath} aria-current="page">
+            Stats
+          </Link>
+        ) : (
+          <NavLink className={cx(profileStyles.tab)} to={statsPath}>
+            Stats
+          </NavLink>
+        )}
+        <NavLink className={cx(profileStyles.tab)} to={profilePath(profile.member.username, "want-to-play")}>
+          Want to play
         </NavLink>
         <NavLink className={cx(profileStyles.tab)} to={profilePath(profile.member.username, "timeline")}>
           Timeline
         </NavLink>
       </nav>
     </>
-  );
-}
-
-function Stat({ value, label }: { value: number; label: string }) {
-  return (
-    <div className={profileStyles.stat}>
-      <dd className={profileStyles.statValue} style={{ margin: 0 }}>
-        {value.toLocaleString()}
-      </dd>
-      <dt className={profileStyles.statLabel}>{label}</dt>
-    </div>
   );
 }
 

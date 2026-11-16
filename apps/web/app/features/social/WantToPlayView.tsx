@@ -1,7 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router";
 import type { Course } from "@coursebook/domain/catalog/course";
-import type { TopListProgress } from "@coursebook/domain/social/top-lists";
 import type { WantToPlayEntry } from "@coursebook/domain/social/types";
 import type { ViewerCourses } from "../../lib/api/viewer";
 import { localDate } from "../../shared/lib/local-date";
@@ -10,29 +8,24 @@ import { LogRoundDialog } from "../rounds/LogRoundDialog";
 import { RoundHistory } from "../rounds/RoundHistory";
 import { CourseActions } from "../top-lists/CourseActions";
 import { CourseRow, type PlayedMark } from "../top-lists/CourseRow";
-import { topListSlug } from "../top-lists/lists";
 import topListStyles from "../top-lists/top-lists.module.css";
 import { shortDate } from "./format";
-import { profilePath } from "./paths";
 import profileStyles from "./profile.module.css";
 import styles from "./social.module.css";
 
 /**
- * The Lists tab: progress through the published Top lists, each opening
- * the list with the member's ticks; the member's Want to play list; and the
- * lists members make, which are still to come.
+ * The Want to play tab: the courses a member has saved to play, newest
+ * first, each with the viewer's own buttons.
  *
- * @param progress - One row per list, in display order.
- * @param username - Whose tab it is.
- * @param name - Their display name.
+ * @param name - The member's display name.
  * @param self - Whether it is the viewer's own profile.
  * @param wantToPlay - Their Want to play list, newest first.
  * @param memberPlayed - Ids of the courses they played.
  * @param viewer - The viewer's courses and Want to play list, for the row buttons.
+ * @param notify - Shows a toast.
+ * @param openAuth - Opens sign-in.
  */
-export function TopListsView({
-  progress,
-  username,
+export function WantToPlayView({
   name,
   self,
   wantToPlay,
@@ -41,8 +34,6 @@ export function TopListsView({
   notify,
   openAuth,
 }: {
-  progress: readonly TopListProgress[];
-  username: string;
   name: string;
   self: boolean;
   wantToPlay: readonly WantToPlayEntry[];
@@ -71,34 +62,6 @@ export function TopListsView({
   return (
     <div className={profileStyles.columns}>
       <div>
-        <section className={profileStyles.section} aria-labelledby="top-lists">
-          <h2 id="top-lists" className={styles.sectionLabel}>
-            Top lists
-          </h2>
-          <div className={profileStyles.progressList}>
-            {progress.map((list) => (
-              <Link key={list.type + list.scope} className={profileStyles.progressRow} to={profilePath(username, "lists/" + topListSlug(list))}>
-                <div className={profileStyles.progressHead}>
-                  <span className={profileStyles.progressTitle}>{list.title}</span>
-                  <span className={profileStyles.progressCount}>
-                    {list.played}
-                    <small> / {list.size}</small>
-                  </span>
-                </div>
-                <div
-                  className={profileStyles.bar}
-                  role="progressbar"
-                  aria-label={list.title}
-                  aria-valuemin={0}
-                  aria-valuemax={list.size}
-                  aria-valuenow={list.played}
-                >
-                  <span style={{ width: String(list.size ? (100 * list.played) / list.size : 0) + "%" }} />
-                </div>
-              </Link>
-            ))}
-          </div>
-        </section>
         <section className={profileStyles.section} aria-labelledby="want-to-play">
           <h2 id="want-to-play" className={styles.sectionLabel}>
             Want to play <span>{wantToPlay.length}</span>

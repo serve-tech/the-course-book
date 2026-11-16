@@ -78,7 +78,7 @@ export default function ProfileTimeline({ loaderData, params }: Route.ComponentP
         {profile.comparison && <ComparisonCard comparison={profile.comparison} name={name} />}
         <section aria-labelledby="progress">
           <h2 id="progress" className={styles.sectionLabel}>
-            Top lists <Link to={profilePath(profile.member.username, "lists")}>All</Link>
+            Top lists <Link to={profilePath(profile.member.username, "stats")}>All</Link>
           </h2>
           <div className={profileStyles.progressList}>
             {nationalProgress(list.rows).map((item) => (

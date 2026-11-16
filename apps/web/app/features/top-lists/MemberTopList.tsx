@@ -35,7 +35,7 @@ enum MemberFilter {
  * @param self - Whether it is the viewer's own page.
  * @param memberPlayed - Ids of the courses the member played.
  * @param viewer - The viewer's courses and Want to play list.
- * @param backTo - The member's Lists tab.
+ * @param backTo - The member's Stats tab, which lists their progress through every list.
  */
 export function MemberTopList({
   list,
@@ -99,7 +99,7 @@ export function MemberTopList({
       <div className={styles.head}>
         <div>
           <Link className={styles.back} to={backTo}>
-            ← Lists
+            ← Stats
           </Link>
           <h2 id="memberListTitle" className={styles.title}>
             {title}

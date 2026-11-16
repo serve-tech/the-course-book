@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { topListProgress, topListTitle, type TopListEntry } from "./top-lists";
+import { compareTopLists, isNationalList, isStateList, topListTitle } from "./top-lists";
 
 describe("topListTitle", () => {
   it.each([
@@ -15,31 +15,35 @@ describe("topListTitle", () => {
   });
 });
 
-describe("topListProgress", () => {
-  const entries: TopListEntry[] = [
-    { courseId: "pine", type: "usa", scope: "USA" },
-    { courseId: "old", type: "global", scope: "GLOBAL" },
-    { courseId: "sand", type: "usa", scope: "USA" },
-    { courseId: "old", type: "world", scope: "WORLD" },
-    { courseId: "pac", type: "usa_public", scope: "USA_PUBLIC" },
-    { courseId: "sand", type: "state", scope: "NE" },
-    { courseId: "kings", type: "state", scope: "MI" },
-    { courseId: "arc", type: "state", scope: "MI" },
-    { courseId: "fl1", type: "state", scope: "FL" },
-  ];
-
-  it("counts played courses per list and keeps national lists even when unplayed", () => {
-    expect(topListProgress(entries, new Set(["sand", "kings", "arc"]))).toEqual([
-      { type: "global", scope: "GLOBAL", title: "World Top 100", size: 1, played: 0 },
-      { type: "usa", scope: "USA", title: "USA Top 100", size: 2, played: 1 },
-      { type: "usa_public", scope: "USA_PUBLIC", title: "USA Public Top 100", size: 1, played: 0 },
-      { type: "world", scope: "WORLD", title: "International Top 100", size: 1, played: 0 },
-      { type: "state", scope: "MI", title: "Best in Michigan", size: 2, played: 2 },
-      { type: "state", scope: "NE", title: "Best in Nebraska", size: 1, played: 1 },
-    ]);
+describe("list kinds", () => {
+  it.each([
+    ["global", true, false],
+    ["usa_public", true, false],
+    ["state", false, true],
+    ["future_list", false, false],
+  ])("%s: national %s, state %s", (type, national, state) => {
+    expect(isNationalList(type)).toBe(national);
+    expect(isStateList(type)).toBe(state);
   });
+});
 
-  it("shows only the national lists for a member with no courses", () => {
-    expect(topListProgress(entries, new Set()).map((list) => list.type)).toEqual(["global", "usa", "usa_public", "world"]);
+describe("compareTopLists", () => {
+  it("puts the national lists first in a fixed order, then the rest by title", () => {
+    const lists = [
+      { type: "state", title: "Best in Nebraska" },
+      { type: "world", title: "International Top 100" },
+      { type: "state", title: "Best in Florida" },
+      { type: "usa", title: "USA Top 100" },
+      { type: "global", title: "World Top 100" },
+      { type: "usa_public", title: "USA Public Top 100" },
+    ];
+    expect(lists.sort(compareTopLists).map((list) => list.title)).toEqual([
+      "World Top 100",
+      "USA Top 100",
+      "USA Public Top 100",
+      "International Top 100",
+      "Best in Florida",
+      "Best in Nebraska",
+    ]);
   });
 });
