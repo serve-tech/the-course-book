@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import {
   AddedCourseSchema,
@@ -165,7 +165,7 @@ describe("PUT /v1/me/played-courses/{courseId} (markPlayed)", () => {
     expect(first.courses.map((entry) => entry.rank)).toEqual([1]);
     const again = AddedToListSchema.parse((await t.send("PUT", `/v1/me/played-courses/${pine}`, undefined, auth)).body);
     expect(again).toMatchObject({ added: false, unranked: first.unranked, courses: first.courses });
-    expect(await db.select().from(rounds).where(eq(rounds.courseId, pine))).toHaveLength(1);
+    expect(await db.select().from(rounds).where(and(eq(rounds.userId, "user_1"), eq(rounds.courseId, pine)))).toEqual([]);
   });
 
   it("answers course_not_found for an unknown course and rejects a malformed id", async () => {
@@ -269,7 +269,11 @@ describe("older clients, once a member has Played courses", () => {
       MovedCourseSchema.parse((await t.send("PUT", `/v1/me/courses/${augusta}/rank`, { rank: 1 }, auth)).body).courses,
       PlayCountSchema.parse((await t.send("PUT", `/v1/me/courses/${shinnecock}/play-count`, { count: 2 }, auth)).body).courses,
     ];
-    const [round] = await db.select({ id: rounds.id }).from(rounds).where(eq(rounds.courseId, augusta));
+    // The viewer's own round: Bravo has one at Augusta too, and row order is not guaranteed.
+    const [round] = await db
+      .select({ id: rounds.id })
+      .from(rounds)
+      .where(and(eq(rounds.userId, "user_1"), eq(rounds.courseId, augusta)));
     responses.push(DeletedRoundSchema.parse((await t.send("DELETE", `/v1/me/rounds/${round?.id ?? ""}`, undefined, auth)).body).courses);
     responses.push(MyCoursesSchema.parse((await t.send("DELETE", `/v1/me/courses/${pine}`, undefined, auth)).body).courses);
     for (const courses of responses) {
