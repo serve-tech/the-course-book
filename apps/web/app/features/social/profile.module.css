@@ -202,21 +202,6 @@
 .entryDelete:disabled { opacity: 0.5; cursor: default; }
 .more { display: flex; justify-content: center; margin-top: 18px; }
 
-/* The most-played course row on the Stats tab. */
-.rankRow {
-  display: grid;
-  grid-template-columns: 34px 26px minmax(0, 1fr) auto;
-  gap: 12px;
-  align-items: center;
-  padding: 10px 0;
-  border-top: 1px solid var(--line);
-}
-.rankRow:first-of-type { border-top: 0; }
-.rankPlace { color: var(--muted); font-size: 12.5px; margin-top: 2px; }
-.you { text-align: right; font-size: 12px; color: var(--muted); white-space: nowrap; }
-.you b { color: var(--cream); font-variant-numeric: tabular-nums; }
-.editHint { margin: 0 0 14px; color: var(--muted); font-size: 14px; }
-
 /* Comparison. */
 .compare { display: grid; gap: 12px; padding: 16px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); }
 .compareTop { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }

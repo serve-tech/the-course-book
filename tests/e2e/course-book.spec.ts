@@ -518,6 +518,38 @@ test.describe("signed in", () => {
     await expect(page.getByRole("list", { name: "Friends' progress" })).toContainText(friend.displayName);
   });
 
+  test("Stats shows which states and countries a member played, on their own profile and a friend's", async ({ page }) => {
+    const { owner, friend } = members();
+    // A course in Scotland and Shinnecock Hills (New York, USA Top 100) join the owner's two Michigan courses.
+    await addHiddenCourse(db, owner);
+    await addPlayed(db, owner, await catalogCourse(db, "usa4"));
+    await signInAs(page, owner);
+    await page.goto(`/u/${owner.username}/stats`);
+
+    const states = page.getByRole("region", { name: /^States/ });
+    await page.getByRole("link", { name: "See the 2 states" }).click();
+    await expect(page).toHaveURL(new RegExp(`/u/${owner.username}/stats#states$`));
+    await expect(states).toBeInViewport();
+    await expect(states.getByRole("listitem")).toHaveText(["Michigan 2 courses", "New York 1 course"]);
+    await expect(page.getByRole("region", { name: /^Countries/ }).getByRole("listitem")).toHaveText(["USA 3 courses", "Scotland 1 course"]);
+    await expect(page.getByRole("link", { name: "1 of the USA Top 100" })).toHaveAttribute("href", `/u/${owner.username}/lists/usa`);
+    // One round per course: nothing about rounds.
+    await expect(page.getByRole("heading", { name: "Most played" })).toHaveCount(0);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+
+    // A state opens the member's ranking in that state.
+    await states.getByRole("link", { name: "Michigan 2 courses" }).click();
+    await expect(page).toHaveURL(new RegExp(`/r/${owner.username}\\?view=state-mi$`));
+    await expect(page.getByRole("heading", { level: 2, name: "Best in Michigan" })).toBeVisible();
+    await expect.poll(() => rankingOrder(page)).toEqual(["Test Beta Links", "Test Alpha Links"]);
+
+    // A friend with courses in one state and one country gets no country list.
+    await page.goto(`/u/${friend.username}/stats`);
+    await expect(page.getByRole("heading", { level: 2, name: "Where they've played" })).toBeVisible();
+    await expect(page.getByRole("region", { name: /^States/ }).getByRole("listitem")).toHaveText(["Michigan 2 courses"]);
+    await expect(page.getByRole("region", { name: /^Countries/ })).toHaveCount(0);
+  });
+
   test("members befriend by username, accept, and remove a friend from their profile", async ({ page }) => {
     const { owner, friend } = members();
     await unfriend(db, owner, friend);
