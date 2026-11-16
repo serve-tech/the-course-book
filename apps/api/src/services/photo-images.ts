@@ -1,6 +1,7 @@
 import type { Sharp, SharpOptions } from "sharp";
 import { imageProblem, ImageProblem, megabytes, PHOTO_WIDTHS, PhotoSize, type UploadLimits } from "../domain/stored-photo";
 import { AppError, ErrorCode } from "./errors";
+import { oneAtATime } from "./one-at-a-time";
 
 /**
  * Turns a photo into the files the app stores (issue #67, decision
@@ -70,8 +71,8 @@ type SharpFactory = (input?: Uint8Array, options?: SharpOptions) => Sharp;
  * An image processor over sharp.
  *
  * Photos are processed one at a time per process: the API has 512 MB, and
- * the most costly accepted photo (a 48 MP progressive JPEG) needs about
- * 150 MB while it is decoded.
+ * the most costly accepted photo (a 48 MP progressive JPEG) needs up to
+ * about 220 MB above the API's baseline while it is decoded.
  *
  * Args:
  *     sharp: The sharp module's default export.
@@ -79,7 +80,7 @@ type SharpFactory = (input?: Uint8Array, options?: SharpOptions) => Sharp;
  *         request body before this runs.
  */
 export function createImageProcessor(sharp: SharpFactory, limits: UploadLimits): ImageProcessor {
-  let queue: Promise<unknown> = Promise.resolve();
+  const queue = oneAtATime();
 
   async function convert(input: Uint8Array): Promise<ProcessedPhoto> {
     let header: Awaited<ReturnType<Sharp["metadata"]>>;
@@ -113,13 +114,7 @@ export function createImageProcessor(sharp: SharpFactory, limits: UploadLimits):
     return { [PhotoSize.Hero]: await encode(PhotoSize.Hero), [PhotoSize.Card]: await encode(PhotoSize.Card) };
   }
 
-  return {
-    process(input) {
-      const result = queue.then(() => convert(input));
-      queue = result.catch(() => undefined);
-      return result;
-    },
-  };
+  return { process: (input) => queue(() => convert(input)) };
 }
 
 /**
@@ -127,7 +122,8 @@ export function createImageProcessor(sharp: SharpFactory, limits: UploadLimits):
  *
  * libvips' operation cache is turned off, because it keeps decoded images
  * for reuse that a photo upload never has, and its thread pool is kept to
- * two, which measured as fast as more on Render's half CPU.
+ * two: the API has half a CPU on Render's starter plan, so more threads
+ * would add memory rather than speed.
  *
  * Raises:
  *     Error: When sharp's native module can't be loaded (for example a

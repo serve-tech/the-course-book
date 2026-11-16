@@ -29,6 +29,7 @@ import {
   type LeftoverLog,
 } from "../services/curation";
 import { AppError, ErrorCode } from "../services/errors";
+import { oneAtATime } from "../services/one-at-a-time";
 import { tooManyBytesError } from "../services/photo-images";
 import { guarded } from "./guard";
 
@@ -46,16 +47,20 @@ export function registerCurationRoutes(app: OpenAPIHono<AppEnv>, deps: AppDepend
       else logger.error(message, loggableError(error), fields);
     };
 
+  /** Uploads are received and processed one at a time, so only one photo's body is in memory. */
+  const uploads = oneAtATime();
+
   /**
    * Refuse an upload before its file is read: when uploads are off, or the
-   * member isn't a curator. The service checks the role again in its
-   * transaction.
+   * member isn't a curator (the service checks the role again in its
+   * transaction). Then wait for any upload already in progress before
+   * reading this one's body.
    */
   const uploadGate: MiddlewareHandler<AppEnv> = async (c, next) => {
     if (!storage) throw new AppError(503, ErrorCode.PhotoUploadsOff, "Photo uploads aren't switched on yet. Pick a photo from Wikimedia Commons instead.");
     const user = await requireUser(c, deps.provisioner);
     await requireCurator(deps.db, user.id);
-    await next();
+    await uploads(next);
   };
 
   app.openapi(guarded(listCurationCourses), async (c) => {
