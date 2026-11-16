@@ -104,6 +104,26 @@ export function shareViewTitle(view: ShareView): string {
 }
 
 /**
+ * The words that go with a shared link, as a shop's Share button sends
+ * "Check out this product" with its link.
+ *
+ * Args:
+ *     view: The view being shared.
+ *     owner: Whose ranking it is, by name; null when members share their own.
+ *
+ * Example:
+ *     >>> shareMessage({ region: RegionFilter.USA, state: "", top: 10 }, null)
+ *     "Check out my Top 10 golf courses in the USA on The Course Book"
+ *     >>> shareMessage(WHOLE_RANKING, "Josh Linneburg")
+ *     "Check out Josh Linneburg's golf course ranking on The Course Book"
+ */
+export function shareMessage(view: ShareView, owner: string | null): string {
+  const where = regionWords(view);
+  const what = view.top !== null ? "Top " + String(view.top) + " golf courses" : where ? "best golf courses" : "golf course ranking";
+  return ["Check out", owner === null ? "my" : owner + "'s", what, ...(where ? [where] : []), "on The Course Book"].join(" ");
+}
+
+/**
  * The rows of a ranking in a view, numbered within it.
  *
  * Args:

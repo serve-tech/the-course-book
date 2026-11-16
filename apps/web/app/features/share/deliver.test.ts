@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { chooseDelivery, ImageStatus, ShareDelivery, shareNotice, ShareOutcome, type ShareSupport } from "./deliver";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { chooseDelivery, ImageStatus, ShareDelivery, shareNotice, ShareOutcome, type ShareSupport, deliverShare } from "./deliver";
 
 const support = (canShareImage: boolean, canShareLink: boolean, coarsePointer: boolean): ShareSupport => ({ canShareImage, canShareLink, coarsePointer });
 
@@ -43,5 +43,53 @@ describe("shareNotice", () => {
 
   it("explains a failed drawing even without its reason", () => {
     expect(shareNotice(ShareDelivery.CopyLink, ShareOutcome.Copied, ImageStatus.Failed, null, url)).toBe("Link copied. The image couldn't be drawn.");
+  });
+});
+
+describe("deliverShare", () => {
+  const URL_SHARED = "https://coursebook.golf/r/josh?top=5";
+  const MESSAGE = "Check out my Top 5 golf courses on The Course Book";
+  const file = new File(["png"], "josh-top-5.png", { type: "image/png" });
+  const sheet = vi.fn<(data: ShareData) => Promise<void>>();
+  const clipboard = vi.fn<(text: string) => Promise<void>>();
+
+  const browser = () => {
+    sheet.mockReset().mockResolvedValue();
+    clipboard.mockReset().mockResolvedValue();
+    vi.stubGlobal("navigator", { share: sheet, clipboard: { writeText: clipboard } });
+  };
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("hands the share sheet the image, the message and the link", async () => {
+    browser();
+    await expect(deliverShare(ShareDelivery.ShareSheetWithImage, file, URL_SHARED, MESSAGE)).resolves.toBe(ShareOutcome.Shared);
+    expect(sheet).toHaveBeenCalledWith({ files: [file], text: MESSAGE, url: URL_SHARED });
+  });
+
+  it("hands the share sheet the message and the link when there is no image", async () => {
+    browser();
+    await expect(deliverShare(ShareDelivery.ShareSheetWithLink, null, URL_SHARED, MESSAGE)).resolves.toBe(ShareOutcome.Shared);
+    expect(sheet).toHaveBeenCalledWith({ text: MESSAGE, url: URL_SHARED });
+  });
+
+  it("copies the link alone, so it pastes cleanly anywhere", async () => {
+    browser();
+    await expect(deliverShare(ShareDelivery.CopyLink, null, URL_SHARED, MESSAGE)).resolves.toBe(ShareOutcome.Copied);
+    expect(clipboard).toHaveBeenCalledWith(URL_SHARED);
+    expect(sheet).not.toHaveBeenCalled();
+  });
+
+  it("treats a closed share sheet as cancelled, not as a failure", async () => {
+    browser();
+    sheet.mockRejectedValue(new DOMException("closed", "AbortError"));
+    await expect(deliverShare(ShareDelivery.ShareSheetWithLink, null, URL_SHARED, MESSAGE)).resolves.toBe(ShareOutcome.Cancelled);
+  });
+
+  it("refuses to share an image it does not have", async () => {
+    browser();
+    await expect(deliverShare(ShareDelivery.ShareSheetWithImage, null, URL_SHARED, MESSAGE)).rejects.toThrow("There is no image to share.");
   });
 });

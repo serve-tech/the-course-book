@@ -151,7 +151,7 @@ export function MyRanking({
 
   const viewHeader = (panel: boolean) =>
     courses.length > 0 && !stateMissing ? (
-      <ViewHeader username={username} memberName={name} view={shown} rows={viewed} notify={notify} panel={panel} render={renderImage}>
+      <ViewHeader username={username} memberName={name} own view={shown} rows={viewed} notify={notify} panel={panel} render={renderImage}>
         <span id="rankingCount">{coursesLabel(viewed.length)}</span>
       </ViewHeader>
     ) : null;

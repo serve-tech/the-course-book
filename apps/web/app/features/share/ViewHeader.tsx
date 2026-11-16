@@ -4,7 +4,7 @@ import { cx } from "../../shared/lib/cx";
 import listStyles from "../top-lists/top-lists.module.css";
 import type { RankingImageContent } from "./ranking-image";
 import { ShareActions } from "./ShareActions";
-import { imageFileName, sharePath, shareViewTitle, TOP_CHOICES, type ShareView } from "@coursebook/domain/sharing/view";
+import { imageFileName, shareMessage, sharePath, type ShareView, shareViewTitle, TOP_CHOICES } from "@coursebook/domain/sharing/view";
 import styles from "./share.module.css";
 
 /** Views with this many courses or fewer need no search, and on a phone it pushes the courses off the first screen. */
@@ -43,6 +43,8 @@ export function TopChoices({ top, onTop }: { top: number | null; onTop: (top: nu
  *
  * @param username - Whose ranking, for the link and the file name.
  * @param memberName - The name the image shows.
+ * @param own - Whether members share their own ranking here ("my Top 10"),
+ *   as on Home; false where anyone may be sharing, as on the public page.
  * @param view - The view on screen.
  * @param rows - The view's rows, numbered within it. Memoize them: a new array
  *   draws the image again.
@@ -54,6 +56,7 @@ export function TopChoices({ top, onTop }: { top: number | null; onTop: (top: nu
 export function ViewHeader({
   username,
   memberName,
+  own,
   view,
   rows,
   notify,
@@ -63,6 +66,7 @@ export function ViewHeader({
 }: {
   username: string;
   memberName: string;
+  own: boolean;
   view: ShareView;
   rows: readonly { course: Course; rank: number }[];
   notify: (message: string) => void;
@@ -89,6 +93,7 @@ export function ViewHeader({
       </div>
       <ShareActions
         path={sharePath(username, view)}
+        message={shareMessage(view, own ? null : memberName)}
         image={image}
         fileName={imageFileName(username, title)}
         notify={notify}

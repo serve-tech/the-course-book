@@ -41,6 +41,7 @@ function imageStatus(hasRows: boolean, current: PreparedImage | null): ImageStat
  * the image stands.
  *
  * @param path - The app path of this view, for the link.
+ * @param message - The words a phone's share sheet sends with the link.
  * @param image - What the image says, without the link. Memoize it: a new
  *   object draws the image again.
  * @param fileName - The name to save the image under.
@@ -49,12 +50,14 @@ function imageStatus(hasRows: boolean, current: PreparedImage | null): ImageStat
  */
 export function ShareActions({
   path,
+  message,
   image,
   fileName,
   notify,
   render = renderRankingImage,
 }: {
   path: string;
+  message: string;
   image: Omit<RankingImageContent, "link">;
   fileName: string;
   notify: (message: string) => void;
@@ -91,7 +94,7 @@ export function ShareActions({
     const url = window.location.origin + path;
     const file = current?.blob ? new File([current.blob], fileName, { type: "image/png" }) : null;
     const delivery = chooseDelivery(status, shareSupport(file, url));
-    deliverShare(delivery, file, url).then(
+    deliverShare(delivery, file, url, message).then(
       (outcome) => {
         const message = shareNotice(delivery, outcome, status, current?.error ?? null, url);
         if (message) notify(message);

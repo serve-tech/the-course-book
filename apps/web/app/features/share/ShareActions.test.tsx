@@ -8,7 +8,7 @@ import { ShareActions } from "./ShareActions";
 /** The browser boundary: what the browser offers and what it does with a share. The rules stay real. */
 const browser = vi.hoisted(() => ({
   support: vi.fn<(file: File | null, url: string) => ShareSupport>(),
-  deliver: vi.fn<(delivery: ShareDelivery, file: File | null, url: string) => Promise<ShareOutcome>>(),
+  deliver: vi.fn<(delivery: ShareDelivery, file: File | null, url: string, text: string) => Promise<ShareOutcome>>(),
 }));
 vi.mock("./deliver", async (importOriginal) => {
   const original = await importOriginal<typeof import("./deliver")>();
@@ -18,13 +18,14 @@ vi.mock("./deliver", async (importOriginal) => {
 const PHONE: ShareSupport = { canShareImage: true, canShareLink: true, coarsePointer: true };
 const COMPUTER: ShareSupport = { canShareImage: false, canShareLink: false, coarsePointer: false };
 
+const MESSAGE = "Check out my Top 5 golf courses on The Course Book";
 const image = (name: string) => ({ memberName: "Josh", title: "Ranking", rows: [{ rank: 1, name, place: "Somewhere" }] });
 const empty = { memberName: "Josh", title: "Ranking", rows: [] };
 const notify = vi.fn<(message: string) => void>();
 const renderImage = vi.fn<(content: RankingImageContent) => Promise<Blob>>();
 
 const actions = (content: Omit<RankingImageContent, "link">) => (
-  <ShareActions path="/r/josh?top=5" image={content} fileName="josh-top-5.png" notify={notify} render={renderImage} />
+  <ShareActions path="/r/josh?top=5" message={MESSAGE} image={content} fileName="josh-top-5.png" notify={notify} render={renderImage} />
 );
 const share = () => screen.getByRole("button", { name: "Share" });
 const url = () => window.location.origin + "/r/josh?top=5";
@@ -55,7 +56,7 @@ describe("ShareActions", () => {
       expect(share()).toHaveAttribute("data-image", ImageStatus.Ready);
     });
     fireEvent.click(share());
-    expect(browser.deliver).toHaveBeenCalledWith(ShareDelivery.ShareSheetWithImage, expect.any(File), url());
+    expect(browser.deliver).toHaveBeenCalledWith(ShareDelivery.ShareSheetWithImage, expect.any(File), url(), MESSAGE);
     const file = browser.deliver.mock.lastCall?.[1];
     expect([file?.name, file?.type]).toEqual(["josh-top-5.png", "image/png"]);
     await Promise.resolve();
@@ -68,7 +69,7 @@ describe("ShareActions", () => {
       expect(share()).toHaveAttribute("data-image", ImageStatus.Ready);
     });
     fireEvent.click(share());
-    expect(browser.deliver).toHaveBeenCalledWith(ShareDelivery.SaveImageAndCopyLink, expect.any(File), url());
+    expect(browser.deliver).toHaveBeenCalledWith(ShareDelivery.SaveImageAndCopyLink, expect.any(File), url(), MESSAGE);
     await waitFor(() => {
       expect(notify).toHaveBeenCalledWith("Image saved and link copied");
     });
@@ -97,7 +98,7 @@ describe("ShareActions", () => {
     rerender(actions(image("Crystal Downs")));
     expect(share()).toHaveAttribute("data-image", ImageStatus.Drawing);
     fireEvent.click(share());
-    expect(browser.deliver).toHaveBeenCalledWith(ShareDelivery.CopyLink, null, url());
+    expect(browser.deliver).toHaveBeenCalledWith(ShareDelivery.CopyLink, null, url(), MESSAGE);
     await waitFor(() => {
       expect(notify).toHaveBeenCalledWith("Link copied. The image wasn't ready yet.");
     });
@@ -113,7 +114,7 @@ describe("ShareActions", () => {
       expect(share()).toHaveAttribute("data-image", ImageStatus.Failed);
     });
     fireEvent.click(share());
-    expect(browser.deliver).toHaveBeenCalledWith(ShareDelivery.ShareSheetWithLink, null, url());
+    expect(browser.deliver).toHaveBeenCalledWith(ShareDelivery.ShareSheetWithLink, null, url(), MESSAGE);
     await waitFor(() => {
       expect(notify).toHaveBeenCalledWith("Shared the link only. This ranking is too long for this browser to draw.");
     });
@@ -123,7 +124,7 @@ describe("ShareActions", () => {
     render(actions(empty));
     expect(share()).toHaveAttribute("data-image", ImageStatus.None);
     fireEvent.click(share());
-    expect(browser.deliver).toHaveBeenCalledWith(ShareDelivery.CopyLink, null, url());
+    expect(browser.deliver).toHaveBeenCalledWith(ShareDelivery.CopyLink, null, url(), MESSAGE);
     await waitFor(() => {
       expect(notify).toHaveBeenCalledWith("Link copied");
     });

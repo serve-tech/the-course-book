@@ -16,8 +16,11 @@
  *   Until a fix on 2025-10-31 (crbug 451280345) it put only `url` there and
  *   dropped `text`, so older Chrome keeps the link only if it is in `url`.
  *
- * So the sheet gets `{ files, url }`: `url` is the field both platforms carry
- * with an image, and a title would be dropped on both. No combination reaches
+ * So the sheet gets `{ files, text, url }`. The link stays in `url`, the
+ * field both platforms carry with an image. `text` holds the message ("Check
+ * out my Top 10 golf courses on The Course Book"): Messages and current
+ * Chrome keep it, older Chrome and some apps drop it, and none of them loses
+ * the link for it. A title would be dropped on both. No combination reaches
  * every app; the image prints the link too.
  */
 
@@ -202,6 +205,8 @@ async function copy(url: string): Promise<ShareOutcome> {
  *     delivery: What to do.
  *     file: The image; required by the deliveries that send it.
  *     url: The link.
+ *     text: The message the share sheet sends with the link. The clipboard
+ *         gets the link alone, so it pastes cleanly anywhere.
  *
  * Returns:
  *     How it ended.
@@ -210,13 +215,13 @@ async function copy(url: string): Promise<ShareOutcome> {
  *     Error: When the share sheet fails for a reason other than the member
  *         closing it, or an image delivery has no image.
  */
-export async function deliverShare(delivery: ShareDelivery, file: File | null, url: string): Promise<ShareOutcome> {
+export async function deliverShare(delivery: ShareDelivery, file: File | null, url: string, text: string): Promise<ShareOutcome> {
   switch (delivery) {
     case ShareDelivery.ShareSheetWithImage:
       if (!file) throw new Error("There is no image to share.");
-      return openSheet({ files: [file], url });
+      return openSheet({ files: [file], text, url });
     case ShareDelivery.ShareSheetWithLink:
-      return openSheet({ url });
+      return openSheet({ text, url });
     case ShareDelivery.SaveImageAndCopyLink:
       if (!file) throw new Error("There is no image to save.");
       download(file);
