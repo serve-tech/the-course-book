@@ -3,7 +3,6 @@ import socialStyles from "../social/social.module.css";
 import { errorMessage } from "../../shared/lib/errors";
 import { chooseDelivery, deliverShare, ImageStatus, shareNotice, shareSupport } from "./deliver";
 import type { RankingImageContent } from "./ranking-image";
-import { RankingImagePreview } from "./RankingImagePreview";
 import { renderRankingImage } from "./render-ranking-image";
 import styles from "./share.module.css";
 
@@ -36,11 +35,6 @@ function imageStatus(hasRows: boolean, current: PreparedImage | null): ImageStat
  * on a computer (`chooseDelivery`). Without an image (still drawing, failed,
  * or an empty view) it sends the link alone and says why.
  *
- * Under it, View image opens the image by itself (`RankingImagePreview`), to
- * see what will be sent and to save the picture. It is a link, not a second
- * button, so Share stays the one thing to press; an empty view has no image
- * and no link.
- *
  * The image is drawn before the button is pressed, not after: a phone's share
  * sheet opens only directly from a tap, and iOS Safari can refuse it once the
  * tap has waited on drawing the image. The button's `data-image` says where
@@ -70,7 +64,6 @@ export function ShareActions({
   render?: (content: RankingImageContent) => Promise<Blob>;
 }) {
   const [prepared, setPrepared] = useState<PreparedImage | null>(null);
-  const [previewing, setPreviewing] = useState(false);
   const hasRows = image.rows.length > 0;
 
   useEffect(() => {
@@ -118,32 +111,6 @@ export function ShareActions({
       <button type="button" className={[socialStyles.button, socialStyles.buttonSolid].join(" ")} data-image={status} onClick={onShare}>
         Share
       </button>
-      {hasRows && (
-        <button
-          type="button"
-          className={styles.viewImage}
-          aria-haspopup="dialog"
-          onClick={() => {
-            setPreviewing(true);
-          }}
-        >
-          View image
-        </button>
-      )}
-      {previewing && (
-        <RankingImagePreview
-          title={image.title}
-          memberName={image.memberName}
-          status={status}
-          blob={current?.blob ?? null}
-          error={current?.error ?? null}
-          fileName={fileName}
-          notify={notify}
-          onClose={() => {
-            setPreviewing(false);
-          }}
-        />
-      )}
     </div>
   );
 }

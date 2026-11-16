@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { chooseDelivery, ImageStatus, ShareDelivery, shareNotice, ShareOutcome, type ShareSupport, deliverShare, chooseImageSave, ImageSave, saveImage } from "./deliver";
+import { chooseDelivery, ImageStatus, ShareDelivery, shareNotice, ShareOutcome, type ShareSupport, deliverShare } from "./deliver";
 
 const support = (canShareImage: boolean, canShareLink: boolean, coarsePointer: boolean): ShareSupport => ({ canShareImage, canShareLink, coarsePointer });
 
@@ -17,17 +17,6 @@ describe("chooseDelivery", () => {
     ["a computer copies the link of an empty view", ImageStatus.None, support(false, false, false), ShareDelivery.CopyLink],
   ])("%s", (_case, image, browser, expected) => {
     expect(chooseDelivery(image, browser)).toBe(expected);
-  });
-});
-
-describe("chooseImageSave", () => {
-  it.each([
-    ["a phone that shares files saves through its share sheet", support(true, true, true), ImageSave.ShareSheet],
-    ["a phone that cannot share files downloads", support(false, true, true), ImageSave.Download],
-    ["a computer downloads, even one that can share files", support(true, true, false), ImageSave.Download],
-    ["a browser with no share sheet downloads", support(false, false, false), ImageSave.Download],
-  ])("%s", (_case, offered, save) => {
-    expect(chooseImageSave(offered)).toBe(save);
   });
 });
 
@@ -97,18 +86,6 @@ describe("deliverShare", () => {
     browser();
     sheet.mockRejectedValue(new DOMException("closed", "AbortError"));
     await expect(deliverShare(ShareDelivery.ShareSheetWithLink, null, URL_SHARED, MESSAGE)).resolves.toBe(ShareOutcome.Cancelled);
-  });
-
-  it("hands the share sheet the image and nothing else when saving it, so the phone offers Save Image", async () => {
-    browser();
-    await expect(saveImage(ImageSave.ShareSheet, file)).resolves.toBe(ShareOutcome.Shared);
-    expect(sheet).toHaveBeenCalledWith({ files: [file] });
-  });
-
-  it("treats a closed share sheet as cancelled when saving too", async () => {
-    browser();
-    sheet.mockRejectedValue(new DOMException("closed", "AbortError"));
-    await expect(saveImage(ImageSave.ShareSheet, file)).resolves.toBe(ShareOutcome.Cancelled);
   });
 
   it("refuses to share an image it does not have", async () => {

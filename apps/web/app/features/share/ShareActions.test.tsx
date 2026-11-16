@@ -31,9 +31,6 @@ const share = () => screen.getByRole("button", { name: "Share" });
 const url = () => window.location.origin + "/r/josh?top=5";
 
 beforeEach(() => {
-  // jsdom has no object URLs; the image preview makes one.
-  URL.createObjectURL = vi.fn(() => "blob:ranking-image");
-  URL.revokeObjectURL = vi.fn();
   browser.support.mockReset().mockReturnValue(COMPUTER);
   browser.deliver.mockReset().mockResolvedValue(ShareOutcome.Copied);
   renderImage.mockReset().mockResolvedValue(new Blob(["png"], { type: "image/png" }));
@@ -46,25 +43,8 @@ afterEach(() => {
 });
 
 describe("ShareActions", () => {
-  it("offers one Share button, with View image as a quieter link under it", () => {
+  it("offers one Share button, never two", () => {
     render(actions(image("Pine Valley")));
-    expect(screen.getAllByRole("button").map((button) => button.textContent)).toEqual(["Share", "View image"]);
-  });
-
-  it("opens the image by itself from View image, and closes it again", async () => {
-    render(actions(image("Pine Valley")));
-    await waitFor(() => {
-      expect(share()).toHaveAttribute("data-image", ImageStatus.Ready);
-    });
-    fireEvent.click(screen.getByRole("button", { name: "View image" }));
-    expect(screen.getByRole("dialog", { name: "Ranking" })).toBeVisible();
-    expect(screen.getByRole("img", { name: "Josh's Ranking as an image" })).toBeVisible();
-    fireEvent.click(screen.getByRole("button", { name: "Close" }));
-    expect(screen.queryByRole("dialog")).toBeNull();
-  });
-
-  it("offers no View image for an empty view, which has no image", () => {
-    render(actions(empty));
     expect(screen.getAllByRole("button")).toEqual([share()]);
   });
 
