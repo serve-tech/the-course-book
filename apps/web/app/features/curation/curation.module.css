@@ -111,3 +111,40 @@
   font: 600 13px "DM Sans", Arial, sans-serif;
 }
 .source select:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+/* Uploading a photo (#67). One column; the photo picker is the large target. */
+.upload { display: grid; gap: 12px; padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: rgba(255, 255, 255, 0.025); }
+.uploadForm { display: grid; gap: 12px; max-width: 560px; }
+.filePick {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 3 / 2;
+  border: 1.5px dashed rgba(199, 170, 107, 0.55);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  cursor: pointer;
+  overflow: hidden;
+}
+.filePick:hover, .filePick:focus-within { border-color: var(--gold); }
+.filePick:focus-within { outline: 2px solid var(--gold); outline-offset: 2px; }
+.filePicked { border-style: solid; }
+.filePick img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.filePick input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.filePrompt { color: var(--gold); font-weight: 700; font-size: 15px; }
+.fileMeta { margin: -4px 0 0; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.field { display: grid; gap: 6px; font-size: 13px; font-weight: 700; color: var(--cream); }
+.field em { font-style: normal; font-weight: 400; color: var(--muted); }
+.field input {
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--cream);
+  /* 16px or more, or iOS Safari zooms the page when the field is focused. */
+  font: 400 16px "DM Sans", Arial, sans-serif;
+}
+.field input:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
+.uploadProgress { display: grid; gap: 6px; color: var(--muted); font-size: 13px; }
+.uploadProgress progress { width: 100%; height: 8px; accent-color: var(--gold); }

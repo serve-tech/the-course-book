@@ -6,6 +6,7 @@ import { courseSchema } from "@coursebook/domain/catalog/course";
 import { MemberRole } from "@coursebook/domain/curation/types";
 import { CurationTab } from "./curation";
 import { CurationPage, type CurationView } from "./CurationPage";
+import { UPLOADS_OFF } from "./photo-upload";
 
 const photo = {
   url: "https://upload.wikimedia.org/a.jpg",
@@ -29,7 +30,7 @@ const candidate = (file: string, sourceUrl: string) => ({
 });
 
 function show(view: CurationView) {
-  const router = createMemoryRouter([{ path: "/curate", element: <CurationPage view={view} notify={() => undefined} />, action: () => ({ ok: true }) }], {
+  const router = createMemoryRouter([{ path: "/curate", element: <CurationPage view={view} notify={() => undefined} upload={() => Promise.resolve()} />, action: () => ({ ok: true }) }], {
     initialEntries: ["/curate"],
   });
   return render(<RouterProvider router={router} />);
@@ -68,6 +69,7 @@ describe("CurationPage", () => {
         candidates: [candidate("File:ArcadiaBluffs1011.jpg", photo.sourceUrl), candidate("File:ArcadiaBluffs18th.jpg", "https://commons.wikimedia.org/wiki/File:ArcadiaBluffs18th.jpg")],
         searchError: null,
         backToCourse: false,
+        uploads: UPLOADS_OFF,
       },
     });
     expect(screen.getByRole("heading", { level: 2, name: "Arcadia Bluffs" })).toBeInTheDocument();
@@ -97,7 +99,7 @@ describe("CurationPage", () => {
       tab: CurationTab.Photos,
       source: world,
       courses: listed,
-      picking: { course: pine, query: "Pine Valley Golf Club", candidates: [], searchError: null, backToCourse: false },
+      picking: { course: pine, query: "Pine Valley Golf Club", candidates: [], searchError: null, backToCourse: false, uploads: UPLOADS_OFF },
     });
     expect(screen.getByRole("link", { name: "← World Top 100" })).toHaveAttribute("href", "/curate?from=world");
   });
@@ -108,7 +110,7 @@ describe("CurationPage", () => {
       tab: CurationTab.Photos,
       source: null,
       courses,
-      picking: { course: course("b", "Pacific Dunes"), query: "Pacific Dunes", candidates: [], searchError: "Wikimedia Commons isn't answering right now.", backToCourse: false },
+      picking: { course: course("b", "Pacific Dunes"), query: "Pacific Dunes", candidates: [], searchError: "Wikimedia Commons isn't answering right now.", backToCourse: false, uploads: UPLOADS_OFF },
     });
     expect(screen.getByRole("alert")).toHaveTextContent("Wikimedia Commons isn't answering right now.");
     expect(screen.queryByRole("button", { name: "Remove photo" })).not.toBeInTheDocument();

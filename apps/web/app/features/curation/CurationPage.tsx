@@ -2,6 +2,7 @@ import type { Course } from "@coursebook/domain/catalog/course";
 import { MemberRole, type CommonsCandidate, type RoledMember } from "@coursebook/domain/curation/types";
 import { useState } from "react";
 import { Form, Link, useNavigate } from "react-router";
+import type { PhotoUploader } from "../../lib/api/upload";
 import { cx } from "../../shared/lib/cx";
 import { useActionFetcher } from "../../shared/lib/use-action-fetcher";
 import { PageHeader } from "../../shared/ui/PageHeader";
@@ -26,6 +27,8 @@ import {
   type CurationEntry,
 } from "./curation";
 import styles from "./curation.module.css";
+import type { UploadSettings } from "./photo-upload";
+import { PhotoUpload } from "./PhotoUpload";
 
 /** Reply shape of the curator screen's action. */
 export interface CurationReply {
@@ -45,21 +48,30 @@ export type CurationView =
       /** The published list being worked through; null for members' rankings. */
       source: TopListRef | null;
       courses: CurationEntry[];
-      picking: { course: Course; query: string; candidates: CommonsCandidate[]; searchError: string | null; backToCourse: boolean } | null;
+      picking: {
+        course: Course;
+        query: string;
+        candidates: CommonsCandidate[];
+        searchError: string | null;
+        backToCourse: boolean;
+        /** Whether the API takes uploads, and its limits; uploads are hidden when off. */
+        uploads: UploadSettings;
+      } | null;
     };
 
 const ACTION = "/curate";
 
 /**
  * The curator screen (decision 2026-11-13): the courses members rank, or a
- * national published list's, with how far their photos have come; a
- * Wikimedia Commons search for one course; and, for admins, who curates.
- * Photos come only from Commons until uploads arrive with R2 (#67).
+ * national published list's, with how far their photos have come; for one
+ * course, an upload (once the API has photo storage, #67) and a Wikimedia
+ * Commons search; and, for admins, who curates.
  *
  * @param view - What the route's loader found.
  * @param notify - Shows the outcome of a change as a toast.
+ * @param upload - Sends an uploaded photo (`uploadCoursePhoto` from `lib/api`).
  */
-export function CurationPage({ view, notify }: { view: CurationView; notify: (message: string) => void }) {
+export function CurationPage({ view, notify, upload }: { view: CurationView; notify: (message: string) => void; upload: PhotoUploader }) {
   const admin = view.role === MemberRole.Admin;
   const progress = view.tab === CurationTab.Photos ? { ...photoProgress(view.courses), label: sourceTitle(view.source) } : null;
   return (
@@ -96,7 +108,7 @@ export function CurationPage({ view, notify }: { view: CurationView; notify: (me
       {view.tab === CurationTab.Curators ? (
         <Curators members={view.members} notify={notify} />
       ) : view.picking ? (
-        <PhotoPicker {...view.picking} source={view.source} notify={notify} />
+        <PhotoPicker {...view.picking} source={view.source} notify={notify} upload={upload} />
       ) : (
         <CourseList key={view.source ? topListSlug(view.source) : MEMBERS} courses={view.courses} source={view.source} />
       )}
@@ -164,23 +176,27 @@ function CourseList({ courses, source }: { courses: readonly CurationEntry[]; so
   );
 }
 
-/** One course: its photo now, and Commons photos to choose from. */
+/** One course: its photo now, an upload when the API takes them, and Commons photos to choose from. */
 function PhotoPicker({
   course,
   query,
   candidates,
   searchError,
   backToCourse,
+  uploads,
   source,
   notify,
+  upload,
 }: {
   course: Course;
   query: string;
   candidates: CommonsCandidate[];
   searchError: string | null;
   backToCourse: boolean;
+  uploads: UploadSettings;
   source: TopListRef | null;
   notify: (message: string) => void;
+  upload: PhotoUploader;
 }) {
   const navigate = useNavigate();
   const back = pickerReturn(course, source, backToCourse);
@@ -219,6 +235,18 @@ function PhotoPicker({
           </div>
         </div>
       </div>
+
+      {uploads.enabled && (
+        <PhotoUpload
+          course={course}
+          settings={uploads}
+          upload={upload}
+          notify={notify}
+          onUploaded={() => {
+            void navigate(back.path);
+          }}
+        />
+      )}
 
       <section className={styles.results} aria-labelledby="commons-heading">
         <h3 id="commons-heading" className={styles.subheading}>
