@@ -46,7 +46,20 @@ jobs:
       - name: API contract drift gate
         run: pnpm contract:check
       - run: pnpm db:migrate
+      # The photo storage tests (*.s3.test.ts) send real signed requests to
+      # VersityGW, an S3-compatible server that checks signatures as R2 does.
+      - name: Start the S3-compatible storage emulator
+        run: |
+          docker run -d --name photos -p 127.0.0.1:7070:7070 --tmpfs /data \
+            -e ROOT_ACCESS_KEY=ci-access -e ROOT_SECRET_KEY=ci-secret-key -e VGW_REGION=auto \
+            versity/versitygw:v1.11.0 posix /data
+          curl --retry 15 --retry-delay 1 --retry-connrefused -s -o /dev/null 127.0.0.1:7070
       - run: pnpm test
+        env:
+          PHOTO_STORAGE_TEST_ENDPOINT: http://127.0.0.1:7070
+          PHOTO_STORAGE_TEST_ACCESS_KEY_ID: ci-access
+          PHOTO_STORAGE_TEST_SECRET_ACCESS_KEY: ci-secret-key
+          PHOTO_STORAGE_TEST_REQUIRED: '1'
       - run: pnpm build
   browser:
     runs-on: ubuntu-latest
@@ -108,9 +121,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: docker build -f apps/api/Dockerfile -t coursebook-api:ci .
-      # Proves the bundle starts with no node_modules, migrates on start and
-      # serves the seeded catalog. Clerk keys are placeholders; no token is sent.
-      # The image runs with NODE_ENV=production, which requires a web origin.
+      # Proves the bundle starts with no node_modules but sharp's (dist/node_modules),
+      # migrates on start and serves the seeded catalog, with photo storage off
+      # as production has it until R2 is set up. Clerk keys are placeholders; no
+      # token is sent. The image runs with NODE_ENV=production, which requires a
+      # web origin.
       - name: Smoke test the API image
         run: |
           docker run -d --name api --network host \
@@ -129,5 +144,36 @@ jobs:
           test "$stored" -gt 0
           test "$served" = "$stored"
           test "$(curl -s -o /dev/null -w '%{http_code}' localhost:3001/v1/me)" = 401
+          docker logs api 2>&1 | grep -q '"photoStorage":"off"'
+      # Photo uploads (#67) need sharp's native module for musl, the one
+      # package the image carries outside the bundle. With storage configured
+      # (to an address nothing answers; startup never calls it) the API loads
+      # sharp through the bundle; then sharp converts a JPEG to WebP.
+      - name: Check sharp in the API image
+        run: |
+          docker run -d --name api-photos --network host \
+            -e DATABASE_URL="$DATABASE_URL" \
+            -e CLERK_PUBLISHABLE_KEY="pk_test_$(printf 'example.clerk.accounts.dev$' | base64)" \
+            -e CLERK_SECRET_KEY="sk_test_000000000000000000000000000000000000000000000000" \
+            -e WEB_ORIGINS=http://localhost:5173 \
+            -e PORT=3002 \
+            -e PHOTO_STORAGE_ENDPOINT=http://127.0.0.1:9 \
+            -e PHOTO_STORAGE_BUCKET=coursebook-photos \
+            -e PHOTO_STORAGE_ACCESS_KEY_ID=ci \
+            -e PHOTO_STORAGE_SECRET_ACCESS_KEY=ci \
+            -e PHOTO_PUBLIC_URL=https://photos.example.com \
+            coursebook-api:ci
+          curl --retry 30 --retry-delay 1 --retry-all-errors -fsS localhost:3002/healthz
+          docker logs api-photos 2>&1 | grep -q '"photoStorage":"ready"'
+          docker run --rm -w /app/dist coursebook-api:ci node --input-type=module -e "
+            const { default: sharp } = await import('sharp');
+            const jpeg = await sharp({ create: { width: 640, height: 480, channels: 3, background: '#3a7d44' } }).jpeg().toBuffer();
+            const webp = await sharp(jpeg).resize({ width: 330 }).webp().toBuffer();
+            const { format, width } = await sharp(webp).metadata();
+            if (format !== 'webp' || width !== 330) throw new Error('sharp made ' + format + ' at ' + width + ' px');
+            console.log('sharp ' + sharp.versions.sharp + ', libvips ' + sharp.versions.vips + ': JPEG to WebP works');
+          "
       - if: always()
-        run: docker logs api
+        run: |
+          docker logs api
+          docker logs api-photos || true

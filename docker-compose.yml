@@ -15,5 +15,22 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+  # Course photo storage without Cloudflare (#67): VersityGW, an S3-compatible
+  # server that checks request signatures as R2 does. Optional, so it only
+  # starts with `docker compose --profile photos up -d photos`; then run
+  # `pnpm photos:local-bucket` once. .env.example has the matching values.
+  photos:
+    image: versity/versitygw:v1.11.0
+    profiles: [photos]
+    command: ["posix", "/data"]
+    environment:
+      ROOT_ACCESS_KEY: coursebook
+      ROOT_SECRET_KEY: coursebook-local-secret
+      VGW_REGION: auto
+    ports:
+      - "127.0.0.1:9000:7070"
+    volumes:
+      - photos-data:/data
 volumes:
   db-data:
+  photos-data:

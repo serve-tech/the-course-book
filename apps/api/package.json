@@ -22,7 +22,9 @@
     "import:supabase": "tsx scripts/import-supabase.ts",
     "seed:dev": "tsx scripts/seed-dev.ts",
     "role:set": "tsx scripts/set-role.ts",
-    "contract:emit": "tsx scripts/emit-openapi.ts"
+    "contract:emit": "tsx scripts/emit-openapi.ts",
+    "test:s3": "vitest run --project s3",
+    "photos:local-bucket": "tsx scripts/prepare-photo-bucket.ts"
   },
   "dependencies": {
     "@clerk/backend": "^3.18.1",
