@@ -43,6 +43,16 @@ export enum ErrorCode {
   /** The Commons file is missing, not a photo, too small, or under a license the app does not accept. */
   PhotoNotUsable = "photo_not_usable",
   CommonsUnavailable = "commons_unavailable",
+  /** Photo storage isn't configured, so photos can't be uploaded (#67). */
+  PhotoUploadsOff = "photo_uploads_off",
+  /** The photo bucket refused a request or didn't answer. */
+  PhotoStorageUnavailable = "photo_storage_unavailable",
+  /** An upload has more bytes or pixels than the upload limits allow. */
+  PhotoTooLarge = "photo_too_large",
+  /** An upload isn't a JPEG, PNG or WebP image (HEIC included), or can't be read. */
+  PhotoUnsupported = "photo_unsupported",
+  /** An upload is narrower than the narrowest photo the app accepts. */
+  PhotoTooNarrow = "photo_too_narrow",
   /** An admin's role is changed by command, never through the API. */
   RoleProtected = "role_protected",
   Internal = "internal",
