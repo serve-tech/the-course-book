@@ -56,7 +56,7 @@
         "properties": {
           "code": {
             "type": "string",
-            "description": "Stable machine-readable code. Current values: bad_request, validation_failed, us_state_required, unauthenticated, account_deleted, username_invalid, username_taken, not_found, course_not_found, not_on_list, round_not_found, member_not_found, friendship_not_found, top_list_not_found, payload_too_large, unsupported_media_type, account_deletion_incomplete, search_unavailable, curator_required, admin_required, photo_not_usable, commons_unavailable, role_protected, internal. New codes may appear; treat unknown codes by HTTP status.",
+            "description": "Stable machine-readable code. Current values: bad_request, validation_failed, us_state_required, unauthenticated, account_deleted, username_invalid, username_taken, not_found, course_not_found, not_on_list, round_not_found, member_not_found, friendship_not_found, top_list_not_found, payload_too_large, unsupported_media_type, account_deletion_incomplete, search_unavailable, curator_required, admin_required, photo_not_usable, commons_unavailable, photo_uploads_off, photo_storage_unavailable, photo_too_large, photo_unsupported, photo_too_narrow, role_protected, internal. New codes may appear; treat unknown codes by HTTP status.",
             "example": "not_on_list"
           },
           "message": {
@@ -261,7 +261,7 @@
           "sourceUrl": {
             "type": "string",
             "format": "uri",
-            "description": "The photo's source page, e.g. its Wikimedia Commons file page."
+            "description": "The photo's source page, e.g. its Wikimedia Commons file page. An uploaded photo with no source page gives its own address (`url`)."
           }
         },
         "required": [
@@ -1482,6 +1482,82 @@
         },
         "required": [
           "commonsFile"
+        ]
+      },
+      "PhotoUploadSettings": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether `uploadCoursePhoto` works. False until the API's photo storage is configured; offer Commons only."
+          },
+          "maxBytes": {
+            "type": "integer",
+            "description": "The largest photo file accepted, in bytes."
+          },
+          "maxPixels": {
+            "type": "integer",
+            "description": "The most pixels (width × height) a photo may have."
+          },
+          "minWidth": {
+            "type": "integer",
+            "description": "The narrowest photo accepted, in pixels, once upright."
+          },
+          "contentTypes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Content types accepted, JPEG first. Use them in this order for a file picker's `accept`: iOS Safari converts a HEIC photo to the first."
+          }
+        },
+        "required": [
+          "enabled",
+          "maxBytes",
+          "maxPixels",
+          "minWidth",
+          "contentTypes"
+        ]
+      },
+      "UploadCoursePhotoRequest": {
+        "type": "object",
+        "properties": {
+          "photo": {
+            "type": "string",
+            "format": "binary",
+            "description": "The photo: JPEG, PNG or WebP within `PhotoUploadSettings`' limits."
+          },
+          "credit": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "The photographer or owner, shown with the photo."
+          },
+          "license": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "A license's short name (`CC BY 4.0`) or the permission given (`Used with permission`)."
+          },
+          "licenseUrl": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 500,
+            "format": "uri",
+            "description": "The license's text, when it has one."
+          },
+          "sourceUrl": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 500,
+            "format": "uri",
+            "description": "Where the photo came from. Without one, the photo's own address is its `sourceUrl`."
+          }
+        },
+        "required": [
+          "photo",
+          "credit",
+          "license"
         ]
       },
       "RoledMembers": {
@@ -3981,7 +4057,7 @@
           "Curation"
         ],
         "summary": "Make a Wikimedia Commons file a course's photo",
-        "description": "Replaces any photo the course had. The credit and license come from Commons. Curators and admins only.",
+        "description": "Replaces any photo the course had. The credit and license come from Commons. When the API has photo storage, it keeps its own copy and serves the photo from there. Curators and admins only.",
         "security": [
           {
             "ClerkSession": []
@@ -4070,7 +4146,7 @@
             }
           },
           "503": {
-            "description": "Wikimedia Commons did not answer: `commons_unavailable`. Try again shortly.",
+            "description": "Wikimedia Commons (`commons_unavailable`) or photo storage (`photo_storage_unavailable`) did not answer. Try again shortly.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4157,6 +4233,191 @@
           },
           "409": {
             "description": "Another member holds the Clerk account's username: `username_taken`. Choose a different username.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/curation/photo-uploads": {
+      "get": {
+        "operationId": "getPhotoUploadSettings",
+        "tags": [
+          "Curation"
+        ],
+        "summary": "Whether curators can upload photos, and the limits",
+        "description": "Uploads need the API's photo storage; until it is configured `enabled` is false. Curators and admins only.",
+        "security": [
+          {
+            "ClerkSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Upload availability and limits.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhotoUploadSettings"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session: `unauthenticated`, or `account_deleted` after the account was deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The Clerk account cannot use the app (`username_invalid`), or the member is not a curator or admin (`curator_required`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Another member holds the Clerk account's username: `username_taken`. Choose a different username.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/courses/{courseId}/photo/upload": {
+      "post": {
+        "operationId": "uploadCoursePhoto",
+        "tags": [
+          "Curation"
+        ],
+        "summary": "Upload a course's photo",
+        "description": "Replaces any photo the course had. The API stores it upright as WebP at 1280 and 330 px and removes its metadata, location included. Credit and license (or permission) are required. Curators and admins only.",
+        "security": [
+          {
+            "ClerkSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "courseId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/UploadCoursePhotoRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The course with its new photo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Course"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid form (`validation_failed`, `bad_request`), a file that isn't a JPEG, PNG or WebP photo (`photo_unsupported`, HEIC included), or a photo narrower than `minWidth` (`photo_too_narrow`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session: `unauthenticated`, or `account_deleted` after the account was deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The Clerk account cannot use the app (`username_invalid`), or the member is not a curator or admin (`curator_required`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such catalog course: `course_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Another member holds the Clerk account's username: `username_taken`. Choose a different username.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "More bytes or pixels than `PhotoUploadSettings` allows: `photo_too_large`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Not sent as multipart/form-data: `unsupported_media_type`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Uploads aren't switched on (`photo_uploads_off`), or photo storage didn't answer (`photo_storage_unavailable`). Try again shortly.",
             "content": {
               "application/json": {
                 "schema": {

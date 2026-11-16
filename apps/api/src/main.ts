@@ -7,7 +7,8 @@ import { createDatabase, REQUEST_POOL_TIMEOUTS } from "./db/client";
 import { runMigrations } from "./db/migrate";
 import { loggableError } from "./http/loggable-error";
 import { allCourses, catalog } from "./services/catalog";
-import { apiEnv, clerkEnv, databaseEnv, searchEnv } from "./services/env";
+import { apiEnv, clerkEnv, databaseEnv, photoStorageEnv, searchEnv } from "./services/env";
+import { startPhotoStorage } from "./services/photo-storage";
 import { createProvisioner, identityFromClerkUser, provisionUser } from "./services/provisioning";
 import { createCommonsClient } from "./services/commons";
 import { createCourseSearch } from "./services/search";
@@ -19,7 +20,8 @@ import { createWebShell } from "./services/web-shell";
  * Migrations run here because free Render plans have no pre-deploy step;
  * they hold an advisory lock, so overlapping deploys are safe. Missing or
  * malformed settings stop the process before it listens, which fails the
- * deploy instead of serving errors. SIGTERM (Render's stop signal) closes the
+ * deploy instead of serving errors; photo storage is the exception, and
+ * turns uploads off instead (#67). SIGTERM (Render's stop signal) closes the
  * server, then idle keep-alive sockets, then the database pool.
  */
 
@@ -27,6 +29,17 @@ const database = databaseEnv();
 const clerk = clerkEnv();
 const search = searchEnv();
 const api = apiEnv();
+const photos = await startPhotoStorage(photoStorageEnv(), {
+  info: (message, detail) => {
+    console.log(JSON.stringify({ ...detail, level: "info", message }));
+  },
+  warn: (message, detail) => {
+    consoleLogger.warn(message, detail);
+  },
+  error: (message, error) => {
+    consoleLogger.error(message, loggableError(error));
+  },
+});
 
 await runMigrations(database.DATABASE_URL);
 
@@ -58,6 +71,7 @@ const app = createApp({
     csvUrl: search.OPENGOLF_CSV_URL,
   }),
   commons: createCommonsClient(),
+  photos,
   webOrigins: api.WEB_ORIGINS,
   clientConfig: {
     minimumVersions: { ios: api.MIN_IOS_VERSION, android: api.MIN_ANDROID_VERSION },
