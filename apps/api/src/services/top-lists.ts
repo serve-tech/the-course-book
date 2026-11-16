@@ -35,7 +35,10 @@ async function loadLists(db: Executor): Promise<PublishedList[]> {
   return publishedLists(rows);
 }
 
-/** The viewer's and their friends' list courses, keyed for the rules. */
+/**
+ * The viewer's and their friends' list courses, keyed for the rules: every
+ * course on each list, Ranked or Played (#52), since both mean played.
+ */
 async function whoPlayedWhat(db: Executor, viewerId: string): Promise<{ mine: Set<string>; friends: FriendCourses[] }> {
   const friends = await friendMembers(db, viewerId);
   const ids = [viewerId, ...friends.map((friend) => friend.id)];
@@ -91,6 +94,7 @@ export async function topListDetail(db: Executor, viewerId: string, type: string
               course,
               rank: entry.rank,
               played: roundsAt.get(entry.courseId) ?? 0,
+              onMyList: played.mine.has(entry.courseId),
               wantToPlay: wanted.has(entry.courseId),
               friendsPlayed: friendsWhoPlayed(entry.courseId, played.friends),
             },

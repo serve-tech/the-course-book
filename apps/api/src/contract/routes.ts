@@ -2,7 +2,9 @@ import { createRoute, type z } from "@hono/zod-openapi";
 import {
   AddCourseRequestSchema,
   AddedCourseSchema,
+  AddedPlayedCourseSchema,
   AddedToListSchema,
+  AddPlayedCourseRequestSchema,
   AddToListRequestSchema,
   ApiErrorSchema,
   ClientConfigSchema,
@@ -95,7 +97,7 @@ export const listMyCourses = createRoute({
   path: "/v1/me/courses",
   operationId: "listMyCourses",
   tags: ["My List"],
-  summary: "The signed-in member's list in personal rank order",
+  summary: "The signed-in member's list: their ranking in order, and the courses they have not ranked",
   security: MEMBER,
   responses: { 200: json(MyCoursesSchema, "The list."), 401: unauthenticated, 403: forbidden, 409: usernameTaken },
 });
@@ -184,7 +186,8 @@ export const getPublicRanking = createRoute({
   tags: ["Members"],
   summary: "Any member's ranking, for anyone",
   description:
-    "Public: needs no session and works for every active member. Carries the member and each course's rank, never rounds. " +
+    "Public: needs no session and works for every active member. Carries the member and each ranked course's rank, " +
+    "never rounds or the courses the member has not ranked. " +
     "Usernames match case-insensitively. Send no Authorization header.",
   security: PUBLIC,
   request: { params: UsernameParamsSchema },
@@ -380,7 +383,8 @@ export const addToList = createRoute({
   tags: ["My List"],
   summary: "Put a catalog course on the list",
   description:
-    "Adds the course at the bottom and logs one round when it has none. Repeating it changes nothing, so retrying is safe.",
+    "Adds the course at the bottom of the ranking, also when it is on the list unranked, and logs one round when it has none. " +
+    "Repeating it changes nothing, so retrying is safe. To add a course without ranking it, use `markPlayed`.",
   security: MEMBER,
   request: { params: CourseIdParamsSchema, ...jsonBody(AddToListRequestSchema) },
   responses: {
@@ -401,8 +405,9 @@ export const addCourse = createRoute({
   summary: "Add a course described by its details and log rounds",
   description:
     "For search hits without a catalog id and courses typed in by the member. The course is matched against the " +
-    "catalog or created, placed at `rank` if new to the list, and `quantity` rounds are logged. Not idempotent: " +
-    "retrying after a lost response logs the rounds again.",
+    "catalog or created, placed in the ranking at `rank` unless it is already ranked (an unranked course on the list is " +
+    "ranked too), and `quantity` rounds are logged. Not idempotent: retrying after a lost response logs the rounds again. " +
+    "To add a course without ranking it, use `addPlayedCourse`.",
   security: MEMBER,
   request: jsonBody(AddCourseRequestSchema),
   responses: { 200: json(AddedCourseSchema, "The course and the updated list."), 400: invalidBody, 401: unauthenticated, 403: forbidden, 409: usernameTaken },
@@ -414,7 +419,7 @@ export const logRounds = createRoute({
   operationId: "logRounds",
   tags: ["My List"],
   summary: "Log rounds at a catalog course",
-  description: "Adds the course at the bottom of the list if needed. Not idempotent.",
+  description: "Puts the course at the bottom of the ranking unless it is already ranked (an unranked course on the list is ranked too). Not idempotent.",
   security: MEMBER,
   request: { params: CourseIdParamsSchema, ...jsonBody(LogRoundsRequestSchema) },
   responses: {
@@ -432,13 +437,78 @@ export const moveCourse = createRoute({
   path: "/v1/me/courses/{courseId}/rank",
   operationId: "moveCourse",
   tags: ["My List"],
-  summary: "Move a course to a position on the list",
-  description: "The whole list is renumbered, including courses a client has filtered out.",
+  summary: "Move a course to a position in the ranking, or rank an unranked one there",
+  description:
+    "A ranked course moves there; an unranked course on the list is placed into the ranking there (up to one past the end). " +
+    "The whole ranking is renumbered, including courses a client has filtered out.",
   security: MEMBER,
   request: { params: CourseIdParamsSchema, ...jsonBody(MoveCourseRequestSchema) },
   responses: {
     200: json(MovedCourseSchema, "The course's new rank and the updated list."),
     400: invalidBody,
+    401: unauthenticated,
+    403: forbidden,
+    404: failure("The course is not on the list: `not_on_list`."),
+    409: usernameTaken,
+  },
+});
+
+export const markPlayed = createRoute({
+  method: "put",
+  path: "/v1/me/played-courses/{courseId}",
+  operationId: "markPlayed",
+  tags: ["My List"],
+  summary: "Put a catalog course on the list as played, without ranking it",
+  description:
+    "One tap, no date, no round: the course joins the list unranked (Played in the app) and comes off Want to play. " +
+    "A course already on the list, ranked or not, is unchanged, so retrying is safe. Rank it later with `moveCourse`.",
+  security: MEMBER,
+  request: { params: CourseIdParamsSchema },
+  responses: {
+    200: json(AddedToListSchema, "Whether it was added, and the updated list."),
+    400: invalid,
+    401: unauthenticated,
+    403: forbidden,
+    404: failure("No such catalog course: `course_not_found`."),
+    409: usernameTaken,
+  },
+});
+
+export const addPlayedCourse = createRoute({
+  method: "post",
+  path: "/v1/me/played-courses",
+  operationId: "addPlayedCourse",
+  tags: ["My List"],
+  summary: "Put a course described by its details on the list as played, without ranking it",
+  description:
+    "For search hits without a catalog id and courses typed in by the member. The course is matched against the catalog " +
+    "or created, as in `addCourse`, then joins the list unranked with no round and comes off Want to play. A course " +
+    "already on the list is unchanged, so retrying is safe.",
+  security: MEMBER,
+  request: jsonBody(AddPlayedCourseRequestSchema),
+  responses: {
+    200: json(AddedPlayedCourseSchema, "The course and the updated list."),
+    400: invalidBody,
+    401: unauthenticated,
+    403: forbidden,
+    409: usernameTaken,
+  },
+});
+
+export const unrankCourse = createRoute({
+  method: "delete",
+  path: "/v1/me/courses/{courseId}/rank",
+  operationId: "unrankCourse",
+  tags: ["My List"],
+  summary: "Take a course out of the ranking, keeping it on the list",
+  description:
+    "The course stays on the list unranked, with its rounds; the courses below it move up. An unranked course is " +
+    "unchanged, so retrying is safe.",
+  security: MEMBER,
+  request: { params: CourseIdParamsSchema },
+  responses: {
+    200: json(MyCoursesSchema, "The updated list."),
+    400: invalid,
     401: unauthenticated,
     403: forbidden,
     404: failure("The course is not on the list: `not_on_list`."),
@@ -570,8 +640,9 @@ export const listCurationCourses = createRoute({
   path: "/v1/curation/courses",
   operationId: "listCurationCourses",
   tags: ["Curation"],
-  summary: "Courses on members' rankings, for curators choosing photos",
-  description: "Every course on an active member's ranking with how many members rank it, most-ranked first. Curators and admins only.",
+  summary: "Courses on members' lists, for curators choosing photos",
+  description:
+    "Every course on an active member's list, ranked or not, with how many members have it, most first. Curators and admins only.",
   security: MEMBER,
   responses: { 200: json(CurationCoursesSchema, "The courses."), 401: unauthenticated, 403: notCurator, 409: usernameTaken },
 });

@@ -39,7 +39,7 @@ export async function clientLoader({ request }: Route.ClientLoaderArgs) {
     const rows = unwrap(await api.GET("/v1/rankings")).entries.map(fromRankingEntry);
     const choice = chooseList({ requested, remembered, state: chosenState, lists: availableLists(rows) });
     const entries: TopListCourse[] = choice.list
-      ? listEntries(rows, choice.list).entries.map((row) => ({ course: row.course, rank: row.rank, played: 0, wantToPlay: false, friendsPlayed: [] }))
+      ? listEntries(rows, choice.list).entries.map((row) => ({ course: row.course, rank: row.rank, played: 0, onMyList: false, wantToPlay: false, friendsPlayed: [] }))
       : [];
     return { ...choice, state: choice.list?.type === "state" ? choice.list.scope : chosenState, entries, standing: null, signedIn: false };
   }

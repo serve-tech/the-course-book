@@ -7,7 +7,7 @@ The authoritative description is [contract/openapi.json](../contract/openapi.jso
 - **Base URL:** the `coursebook-golf-api` Render service, `https://coursebook-golf-api.onrender.com` (`https://api.coursebook.golf` after cutover).
 - **Authentication:** `Authorization: Bearer <Clerk session token>` on member operations, exactly in that form: the scheme spelled `Bearer`, one space, then the token. Any other Authorization value (another scheme, a lowercase `bearer`, a bare token) is 401 `unauthenticated`, as is a token that does not verify, even on public operations. Omit the header on public operations. Cookies are ignored.
 - **Bodies:** JSON with `Content-Type: application/json`, at most 32 KB. Optional request fields may be missing or `null`.
-- **Responses:** every documented field is always present; absent values are `null`. Changes to your list return the whole updated list (`courses`), so clients replace their copy.
+- **Responses:** every documented field is always present; absent values are `null`. Changes to your list return the whole updated list, so clients replace their copy: `courses` is the ranking in rank order and `unranked` the courses on the list without a rank (Played in the app; see [the vocabulary](../contract/README.md#vocabulary-list-ranking-unranked)).
 - **Dates:** `playedOn` is `YYYY-MM-DD` in the member's time zone; send it, because the server's date is UTC.
 - **Compatibility:** the contract only grows. Unknown response fields and unknown error codes must be tolerated. Read `GET /v1/client-config` at launch and ask the member to update when the app is older than `minimumVersions`.
 
@@ -42,19 +42,22 @@ Every failure returns:
 | `GET /v1/rankings` | `listRankings` | public | Every published entry; `ETag` and `If-None-Match` (304), cacheable for an hour |
 | `GET /v1/me` | `getMe` | member | Username and display name |
 | `DELETE /v1/me` | `deleteMe` | member | Deletes the account; 204. Retry after a 502. Works even for an account other operations refuse with 403 `username_invalid` or 409 `username_taken` |
-| `GET /v1/me/courses` | `listMyCourses` | member | The list in personal rank order with play counts |
-| `PUT /v1/me/courses/{courseId}` | `addToList` | member | Add a catalog course; logs one round if it has none; idempotent |
-| `POST /v1/me/courses` | `addCourse` | member | Add a course by details (`source` `search` or `manual`), at `rank`, with `quantity` rounds; returns their `roundIds` |
-| `DELETE /v1/me/courses/{courseId}` | `removeCourse` | member | Remove a course and its rounds |
-| `PUT /v1/me/courses/{courseId}/rank` | `moveCourse` | member | Move to a position; renumbers the whole list |
+| `GET /v1/me/courses` | `listMyCourses` | member | The ranking in personal rank order with play counts (`courses`), and the unranked courses, most recently Played first (`unranked`) |
+| `PUT /v1/me/played-courses/{courseId}` | `markPlayed` | member | One tap: put a catalog course on the list unranked, with no round; takes it off Want to play; a course already on the list is unchanged |
+| `POST /v1/me/played-courses` | `addPlayedCourse` | member | The same for a course described by its details (`source` `search` or `manual`) |
+| `PUT /v1/me/courses/{courseId}` | `addToList` | member | Add a catalog course at the bottom of the ranking (an unranked one is ranked too); logs one round if it has none; idempotent |
+| `POST /v1/me/courses` | `addCourse` | member | Add a course by details (`source` `search` or `manual`), at `rank` unless already ranked, with `quantity` rounds; returns their `roundIds` |
+| `DELETE /v1/me/courses/{courseId}` | `removeCourse` | member | Remove a course, ranked or not, and its rounds |
+| `PUT /v1/me/courses/{courseId}/rank` | `moveCourse` | member | Move to a position, or rank an unranked course there; renumbers the whole ranking |
+| `DELETE /v1/me/courses/{courseId}/rank` | `unrankCourse` | member | Take a course out of the ranking; it stays on the list with its rounds; idempotent |
 | `PUT /v1/me/courses/{courseId}/play-count` | `setPlayCount` | member | Set the round count; zero removes the course |
 | `GET /v1/me/courses/{courseId}/rounds` | `listMyCourseRounds` | member | Rounds at a course, newest first |
 | `POST /v1/me/courses/{courseId}/rounds` | `logRounds` | member | Log rounds at a catalog course; returns their `roundIds`, so Undo is `deleteRound` for each (the last one takes the course off the list) |
 | `DELETE /v1/me/rounds/{roundId}` | `deleteRound` | member | Delete one round; the last one removes the course |
 | `GET /v1/course-search?q=&page=&source=` | `searchCourses` | member | Stored courses by default; `source=external` explicitly discovers more. Alphabetical pages of ten hits (`page` defaults to 1), with `page`, `pageSize` and `total`; catalog hits carry `courseId` |
 | `GET /v1/members?cursor=&limit=` | `listMembers` | member | The member's friends, paged by username (limit 1–200, default 50) |
-| `GET /v1/members/{username}` | `getMemberList` | member | The member's own list or a friend's, with `onMyList` flags; anyone else is 404 `member_not_found` |
-| `GET /v1/members/{username}/ranking` | `getPublicRanking` | public | Any active member's ranking: username, display name and each course's rank, never rounds; unknown or deleted is 404 `member_not_found`; `no-store` |
+| `GET /v1/members/{username}` | `getMemberList` | member | The member's own list or a friend's: their ranking (`courses`) and unranked courses (`unranked`), with the viewer's `onMyList` and `myRank`; anyone else is 404 `member_not_found` |
+| `GET /v1/members/{username}/ranking` | `getPublicRanking` | public | Any active member's ranking: username, display name and each ranked course's rank, never rounds or unranked courses; unknown or deleted is 404 `member_not_found`; `no-store` |
 | `GET /v1/members/{username}/rounds?cursor=&limit=` | `listMemberRounds` | member | The member's own or a friend's timeline, newest played first (limit 1–100, default 30), with `months`: the full round count of every month on the page, so a month split across pages shows its total from the first page; anyone else is 404 `member_not_found` |
 | `GET /v1/member-search?q=` | `searchMembers` | member | Up to 20 other members whose username contains `q` (3–64 characters), prefix matches first, each with the viewer's `relationship`; `no-store` |
 | `GET /v1/me/friend-requests` | `listFriendRequests` | member | Pending requests: `incoming` (they asked) and `outgoing` (the viewer asked) |

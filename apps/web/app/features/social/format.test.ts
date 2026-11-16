@@ -27,6 +27,7 @@ const round = (id: string, playedOn: string | null, courseId = id): TimelineRoun
   playedOn,
   visit: 1,
   rank: 1,
+  personalRank: 1,
 });
 
 describe("ordinals and visits", () => {

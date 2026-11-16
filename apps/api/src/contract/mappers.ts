@@ -1,8 +1,8 @@
 import type { Course, RankedCourse } from "@coursebook/domain/catalog/course";
 import type { SearchResult } from "@coursebook/domain/catalog/search-results";
-import type { MemberList, MemberListRow, PublicRanking } from "@coursebook/domain/friends/types";
+import type { MemberList, MemberListRow, MemberUnrankedRow, PublicRanking } from "@coursebook/domain/friends/types";
 import type { CoursePage, FeedItem, Profile, TimelineMonthCount, TimelineRound, TopListDetail, TopListStanding, WantToPlayEntry } from "@coursebook/domain/social/types";
-import type { ListEntry, RoundEntry } from "@coursebook/domain/journal/types";
+import type { ListEntry, PersonalList, RoundEntry, UnrankedEntry } from "@coursebook/domain/journal/types";
 import { UNKNOWN_LOCATION } from "../domain/course-view";
 import type {
   ContractCourse,
@@ -52,6 +52,16 @@ export function toMyCourse(entry: ListEntry) {
   return { course: toContractCourse(entry.course), rank: entry.rank, played: entry.played };
 }
 
+/** A Played course: on the list without a rank (`MyUnrankedCourse`). */
+export function toMyUnrankedCourse(entry: UnrankedEntry) {
+  return { course: toContractCourse(entry.course), played: entry.played };
+}
+
+/** A member's whole list as every list response carries it: `courses` (the ranking) and `unranked`. */
+export function toMyCourses(list: PersonalList) {
+  return { courses: list.courses.map(toMyCourse), unranked: list.unranked.map(toMyUnrankedCourse) };
+}
+
 export function toRound(round: RoundEntry) {
   return { id: round.id, playedOn: round.playedAt };
 }
@@ -78,11 +88,10 @@ export function toSearchHit(result: SearchResult) {
   };
 }
 
-/** A row of another member's ranking, relative to the viewer. */
-export function toMemberCourse(row: MemberListRow) {
+/** A Played course of another member, relative to the viewer. */
+export function toMemberUnrankedCourse(row: MemberUnrankedRow) {
   return {
     course: toContractCourse(row.course),
-    rank: row.rank,
     onMyList: row.onMyList,
     played: row.played,
     lastPlayedOn: row.lastPlayedOn,
@@ -90,8 +99,13 @@ export function toMemberCourse(row: MemberListRow) {
   };
 }
 
+/** A row of another member's ranking, relative to the viewer. */
+export function toMemberCourse(row: MemberListRow) {
+  return { ...toMemberUnrankedCourse(row), rank: row.rank };
+}
+
 export function toMemberList(list: MemberList) {
-  return { member: list.member, courses: list.rows.map(toMemberCourse) };
+  return { member: list.member, courses: list.rows.map(toMemberCourse), unranked: list.unranked.map(toMemberUnrankedCourse) };
 }
 
 export function toPublicRanking(ranking: PublicRanking) {
@@ -108,6 +122,7 @@ export function toTimelineRound(round: TimelineRound) {
     playedOn: round.playedOn,
     visit: round.visit,
     rank: round.rank,
+    personalRank: round.personalRank,
   };
 }
 
@@ -157,6 +172,7 @@ export function toCoursePage(page: CoursePage) {
     course: toContractCourse(page.course),
     you: page.you,
     friendsRanked: page.friendsRanked,
+    friendsUnranked: page.friendsUnranked,
     friendsWantToPlay: page.friendsWantToPlay,
   };
 }
@@ -168,6 +184,7 @@ export function toTopListDetail(detail: TopListDetail) {
       course: toContractCourse(entry.course),
       rank: entry.rank,
       played: entry.played,
+      onMyList: entry.onMyList,
       wantToPlay: entry.wantToPlay,
       friendsPlayed: entry.friendsPlayed,
     })),

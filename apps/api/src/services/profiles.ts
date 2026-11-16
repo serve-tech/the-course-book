@@ -7,7 +7,7 @@ import { friendships } from "../db/schema";
 import { FriendshipStatus } from "../domain/friendship";
 import { toPublicMember } from "./authz";
 import { memberRanking, relativeRows, visibleMember } from "./friends";
-import { personalList } from "./journal";
+import { wholeList } from "./journal";
 
 /**
  * Member profiles (decision 2026-09-29, social redesign): the header,
@@ -94,17 +94,18 @@ export async function memberProfile(db: Database, viewerId: string, username: st
   const self = member.id === viewerId;
   const [theirs, mine, stats, since] = await Promise.all([
     memberRanking(db, member.id),
-    self ? null : personalList(db, viewerId),
+    self ? null : wholeList(db, viewerId),
     profileStats(db, member.id),
     self ? null : friendsSince(db, viewerId, member.id),
   ]);
-  const rows = relativeRows(theirs, mine ?? theirs);
+  // On their own profile the member is the viewer, so their ranking is the viewer's list.
+  const rows = relativeRows(theirs, mine ?? { courses: theirs, unranked: [] });
   return {
     member: toPublicMember(member),
     relationship: self ? ProfileRelationship.Self : ProfileRelationship.Friends,
     friendsSince: since,
     stats,
     topFour: rows.slice(0, TOP_FOUR),
-    comparison: mine ? comparison(rows, mine.length) : null,
+    comparison: mine ? comparison(rows, mine.courses.length) : null,
   };
 }

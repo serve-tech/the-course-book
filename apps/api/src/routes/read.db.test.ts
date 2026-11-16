@@ -82,7 +82,7 @@ describe("GET /v1/me/courses", () => {
 
   it("is empty for a new member", async () => {
     const t = createTestApp(db);
-    expect((await t.get("/v1/me/courses", t.bearer("user_1", "golfer_1"))).body).toEqual({ courses: [] });
+    expect((await t.get("/v1/me/courses", t.bearer("user_1", "golfer_1"))).body).toEqual({ courses: [], unranked: [] });
   });
 });
 

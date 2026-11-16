@@ -10,13 +10,16 @@ import type {
   MemberList,
   MemberListRow,
   MemberRelationship,
+  MemberUnrankedRow,
   PublicMember,
   PublicRanking,
 } from "@coursebook/domain/friends/types";
+import type { PersonalList } from "@coursebook/domain/journal/types";
+import { splitList } from "../domain/personal-list";
 import { toPublicMember } from "./authz";
 import { rankedViews } from "./catalog";
 import { AppError, ErrorCode } from "./errors";
-import { personalList } from "./journal";
+import { wholeList } from "./journal";
 import { lockMembers } from "./member-lock";
 
 /**
@@ -144,16 +147,26 @@ export async function visibleMember(db: Executor, viewerId: string, username: st
   return friendship ? member : null;
 }
 
-/** One course on a member's ranking with their play history there. */
-export interface MemberRankingRow {
+/** One course on a member's list with their play history there. */
+export interface MemberPlayedRow {
   course: Course;
-  rank: number;
   played: number;
   lastPlayedOn: string | null;
 }
 
-/** A member's ranking in rank order, with play counts and latest dated round per course. */
-export async function memberRanking(db: Executor, userId: string): Promise<MemberRankingRow[]> {
+/** One course of a member's ranking with their play history there. */
+export interface MemberRankingRow extends MemberPlayedRow {
+  rank: number;
+}
+
+/** A member's whole list: the ranking in rank order, and the Played courses most recently Played first. */
+export interface MemberCourses {
+  ranking: MemberRankingRow[];
+  unranked: MemberPlayedRow[];
+}
+
+/** A member's whole list with play counts and the latest dated round per course; `splitList` orders both parts. */
+export async function memberCourses(db: Executor, userId: string): Promise<MemberCourses> {
   const playedRows = db
     .select({
       courseId: rounds.courseId,
@@ -171,25 +184,32 @@ export async function memberRanking(db: Executor, userId: string): Promise<Membe
       // bigint comes back as a string from pg.
       played: sql<string>`coalesce(${playedRows.played}, 0)`,
       lastPlayedOn: playedRows.lastPlayedOn,
+      updatedAt: userCourses.updatedAt,
     })
     .from(userCourses)
     .innerJoin(courses, eq(courses.id, userCourses.courseId))
     .leftJoin(playedRows, eq(playedRows.courseId, userCourses.courseId))
-    .where(eq(userCourses.userId, userId))
-    .orderBy(userCourses.personalRank);
+    .where(eq(userCourses.userId, userId));
   const views = await rankedViews(db, rows.map((row) => row.course));
-  return rows.map((row) => ({
+  const played = (row: (typeof rows)[number]): MemberPlayedRow => ({
     course: views.get(row.course.id) ?? courseView(row.course),
-    rank: row.rank,
     played: Number(row.played),
     lastPlayedOn: row.lastPlayedOn ?? null,
-  }));
+  });
+  const { ranked, unranked } = splitList(rows);
+  return { ranking: ranked.map((row) => ({ ...played(row), rank: row.rank })), unranked: unranked.map(played) };
+}
+
+/** A member's ranking in rank order: Ranked courses only, with play counts and the latest dated round. */
+export async function memberRanking(db: Executor, userId: string): Promise<MemberRankingRow[]> {
+  return (await memberCourses(db, userId)).ranking;
 }
 
 /**
  * A member's ranking as anyone may read it, signed in or not (decision
- * 2026-11-03, ranking-first product). Only courses and ranks leave here:
- * rounds stay behind the friends rule, so they are dropped before returning.
+ * 2026-11-03, ranking-first product). Only Ranked courses and their ranks
+ * leave here: Played courses and rounds stay behind the friends rule (#52),
+ * so they are dropped before returning.
  *
  * Returns:
  *     The ranking, or null when no active member has that username.
@@ -202,16 +222,21 @@ export async function publicRanking(db: Executor, username: string): Promise<Pub
 }
 
 /**
- * Rows of another member's ranking as the viewer sees them: whether each
- * course is on the viewer's list and at what rank. Matching uses the same
- * identity rule as the catalog, so a duplicate row for the same course still
- * reads as already listed.
+ * Rows of another member's list as the viewer sees them: whether each course
+ * is on the viewer's list (Ranked or Played) and the viewer's rank for it,
+ * null unless the viewer ranked it. Matching uses the same identity rule as
+ * the catalog, so a duplicate row for the same course still reads as
+ * already listed.
  */
-export function relativeRows(theirs: readonly MemberRankingRow[], mine: readonly { course: Course; rank: number }[]): MemberListRow[] {
-  const byId = new Map(mine.map((entry) => [entry.course.id, entry.rank]));
+export function relativeRows<T extends { course: Course }>(theirs: readonly T[], mine: PersonalList): (T & Pick<MemberListRow, "onMyList" | "myRank">)[] {
+  const listed: readonly { course: Course; rank: number | null }[] = [
+    ...mine.courses,
+    ...mine.unranked.map(({ course }) => ({ course, rank: null })),
+  ];
+  const byId = new Map(listed.map((entry) => [entry.course.id, entry]));
   return theirs.map((row) => {
-    const myRank = byId.get(row.course.id) ?? mine.find((entry) => equivalentCourses(entry.course, row.course))?.rank ?? null;
-    return { ...row, onMyList: myRank !== null, myRank };
+    const mineToo = byId.get(row.course.id) ?? listed.find((entry) => equivalentCourses(entry.course, row.course));
+    return { ...row, onMyList: mineToo !== undefined, myRank: mineToo?.rank ?? null };
   });
 }
 
@@ -230,8 +255,9 @@ export async function memberList(
 ): Promise<MemberList | null> {
   const member = await visibleMember(db, viewerId, username);
   if (!member) return null;
-  const [theirs, mine] = await Promise.all([memberRanking(db, member.id), personalList(db, viewerId)]);
-  return { member: toPublicMember(member), rows: relativeRows(theirs, mine) };
+  const [theirs, mine] = await Promise.all([memberCourses(db, member.id), wholeList(db, viewerId)]);
+  const unranked: MemberUnrankedRow[] = relativeRows(theirs.unranked, mine);
+  return { member: toPublicMember(member), rows: relativeRows(theirs.ranking, mine), unranked };
 }
 
 const MEMBER_SEARCH_LIMIT = 20;

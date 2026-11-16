@@ -32,12 +32,12 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The signed-in member's list in personal rank order */
+        /** The signed-in member's list: their ranking in order, and the courses they have not ranked */
         get: operations["listMyCourses"];
         put?: never;
         /**
          * Add a course described by its details and log rounds
-         * @description For search hits without a catalog id and courses typed in by the member. The course is matched against the catalog or created, placed at `rank` if new to the list, and `quantity` rounds are logged. Not idempotent: retrying after a lost response logs the rounds again.
+         * @description For search hits without a catalog id and courses typed in by the member. The course is matched against the catalog or created, placed in the ranking at `rank` unless it is already ranked (an unranked course on the list is ranked too), and `quantity` rounds are logged. Not idempotent: retrying after a lost response logs the rounds again. To add a course without ranking it, use `addPlayedCourse`.
          */
         post: operations["addCourse"];
         delete?: never;
@@ -61,7 +61,7 @@ export interface paths {
         put?: never;
         /**
          * Log rounds at a catalog course
-         * @description Adds the course at the bottom of the list if needed. Not idempotent.
+         * @description Puts the course at the bottom of the ranking unless it is already ranked (an unranked course on the list is ranked too). Not idempotent.
          */
         post: operations["logRounds"];
         delete?: never;
@@ -80,7 +80,7 @@ export interface paths {
         get?: never;
         /**
          * Put a catalog course on the list
-         * @description Adds the course at the bottom and logs one round when it has none. Repeating it changes nothing, so retrying is safe.
+         * @description Adds the course at the bottom of the ranking, also when it is on the list unranked, and logs one round when it has none. Repeating it changes nothing, so retrying is safe. To add a course without ranking it, use `markPlayed`.
          */
         put: operations["addToList"];
         post?: never;
@@ -89,6 +89,46 @@ export interface paths {
          * @description A 404 on retry means the course is already gone.
          */
         delete: operations["removeCourse"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/played-courses/{courseId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Put a catalog course on the list as played, without ranking it
+         * @description One tap, no date, no round: the course joins the list unranked (Played in the app) and comes off Want to play. A course already on the list, ranked or not, is unchanged, so retrying is safe. Rank it later with `moveCourse`.
+         */
+        put: operations["markPlayed"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/played-courses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Put a course described by its details on the list as played, without ranking it
+         * @description For search hits without a catalog id and courses typed in by the member. The course is matched against the catalog or created, as in `addCourse`, then joins the list unranked with no round and comes off Want to play. A course already on the list is unchanged, so retrying is safe.
+         */
+        post: operations["addPlayedCourse"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -103,12 +143,16 @@ export interface paths {
         };
         get?: never;
         /**
-         * Move a course to a position on the list
-         * @description The whole list is renumbered, including courses a client has filtered out.
+         * Move a course to a position in the ranking, or rank an unranked one there
+         * @description A ranked course moves there; an unranked course on the list is placed into the ranking there (up to one past the end). The whole ranking is renumbered, including courses a client has filtered out.
          */
         put: operations["moveCourse"];
         post?: never;
-        delete?: never;
+        /**
+         * Take a course out of the ranking, keeping it on the list
+         * @description The course stays on the list unranked, with its rounds; the courses below it move up. An unranked course is unchanged, so retrying is safe.
+         */
+        delete: operations["unrankCourse"];
         options?: never;
         head?: never;
         patch?: never;
@@ -203,7 +247,7 @@ export interface paths {
         };
         /**
          * Any member's ranking, for anyone
-         * @description Public: needs no session and works for every active member. Carries the member and each course's rank, never rounds. Usernames match case-insensitively. Send no Authorization header.
+         * @description Public: needs no session and works for every active member. Carries the member and each ranked course's rank, never rounds or the courses the member has not ranked. Usernames match case-insensitively. Send no Authorization header.
          */
         get: operations["getPublicRanking"];
         put?: never;
@@ -461,8 +505,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Courses on members' rankings, for curators choosing photos
-         * @description Every course on an active member's ranking with how many members rank it, most-ranked first. Curators and admins only.
+         * Courses on members' lists, for curators choosing photos
+         * @description Every course on an active member's list, ranked or not, with how many members have it, most first. Curators and admins only.
          */
         get: operations["listCurationCourses"];
         put?: never;
@@ -626,8 +670,10 @@ export interface components {
             message: string;
         };
         MyCourses: {
-            /** @description The member's list in personal rank order. */
+            /** @description The member's ranking in personal rank order: Ranked courses only. */
             courses: components["schemas"]["MyCourse"][];
+            /** @description Courses on the member's list that are not ranked (Played in the app), most recently Played first. */
+            unranked: components["schemas"]["MyUnrankedCourse"][];
         };
         MyCourse: {
             course: components["schemas"]["Course"];
@@ -686,6 +732,12 @@ export interface components {
              */
             sourceUrl: string;
         } | null;
+        /** @description A course on the member's list without a rank: Played in the app. A valid state, not a to-do. */
+        MyUnrankedCourse: {
+            course: components["schemas"]["Course"];
+            /** @description The member's rounds at this course; often none. */
+            played: number;
+        };
         Rounds: {
             /** @description Newest first. */
             rounds: components["schemas"]["Round"][];
@@ -699,8 +751,10 @@ export interface components {
         AddedToList: {
             /** @description False when the course was already on the list. */
             added: boolean;
-            /** @description The member's whole list after the change, read in the same transaction. */
+            /** @description The member's whole ranking after the change, read in the same transaction; `unranked` holds the rest of their list. */
             courses: components["schemas"]["MyCourse"][];
+            /** @description Courses on the member's list that are not ranked (Played in the app), most recently Played first. */
+            unranked: components["schemas"]["MyUnrankedCourse"][];
         };
         AddToListRequest: {
             /**
@@ -709,27 +763,20 @@ export interface components {
              */
             playedOn?: string | null;
         };
-        AddedCourse: {
+        AddedPlayedCourse: {
             /** Format: uuid */
             courseId: string;
-            rank: number;
-            /** @description Ids of the rounds just logged, so a client can offer Undo (`deleteRound` each one). */
-            roundIds: string[];
-            /** @description The member's whole list after the change, read in the same transaction. */
+            /** @description False when the course was already on the list, ranked or not; it is then unchanged. */
+            added: boolean;
+            /** @description The member's whole ranking after the change, read in the same transaction; `unranked` holds the rest of their list. */
             courses: components["schemas"]["MyCourse"][];
+            /** @description Courses on the member's list that are not ranked (Played in the app), most recently Played first. */
+            unranked: components["schemas"]["MyUnrankedCourse"][];
         };
-        AddCourseRequest: {
+        /** @description A course to add as played but not ranked, described by its details. */
+        AddPlayedCourseRequest: {
             course: components["schemas"]["CourseDetailsRequest"];
             source: components["schemas"]["CourseSource"];
-            /** @description Position for a course not yet on the list; the bottom when omitted. A course already on the list keeps its rank. */
-            rank?: number | null;
-            /** @description Rounds to log; 1 when omitted. */
-            quantity?: number | null;
-            /**
-             * Format: date
-             * @description Date played (YYYY-MM-DD) in the member's time zone. The server's date (UTC) when omitted, so clients should send it.
-             */
-            playedOn?: string | null;
         };
         CourseDetailsRequest: {
             name: string;
@@ -746,13 +793,39 @@ export interface components {
          * @enum {string}
          */
         CourseSource: "search" | "manual";
+        AddedCourse: {
+            /** Format: uuid */
+            courseId: string;
+            rank: number;
+            /** @description Ids of the rounds just logged, so a client can offer Undo (`deleteRound` each one). */
+            roundIds: string[];
+            /** @description The member's whole ranking after the change, read in the same transaction; `unranked` holds the rest of their list. */
+            courses: components["schemas"]["MyCourse"][];
+            /** @description Courses on the member's list that are not ranked (Played in the app), most recently Played first. */
+            unranked: components["schemas"]["MyUnrankedCourse"][];
+        };
+        AddCourseRequest: {
+            course: components["schemas"]["CourseDetailsRequest"];
+            source: components["schemas"]["CourseSource"];
+            /** @description Position for a course not yet on the list; the bottom when omitted. A course already on the list keeps its rank. */
+            rank?: number | null;
+            /** @description Rounds to log; 1 when omitted. */
+            quantity?: number | null;
+            /**
+             * Format: date
+             * @description Date played (YYYY-MM-DD) in the member's time zone. The server's date (UTC) when omitted, so clients should send it.
+             */
+            playedOn?: string | null;
+        };
         LoggedRounds: {
             /** @description Rounds logged. */
             added: number;
             /** @description Ids of the rounds just logged, so a client can offer Undo (`deleteRound` each one). */
             roundIds: string[];
-            /** @description The member's whole list after the change, read in the same transaction. */
+            /** @description The member's whole ranking after the change, read in the same transaction; `unranked` holds the rest of their list. */
             courses: components["schemas"]["MyCourse"][];
+            /** @description Courses on the member's list that are not ranked (Played in the app), most recently Played first. */
+            unranked: components["schemas"]["MyUnrankedCourse"][];
         };
         LogRoundsRequest: {
             /** @description Rounds to log; 1 when omitted. */
@@ -765,8 +838,10 @@ export interface components {
         };
         MovedCourse: {
             rank: number;
-            /** @description The member's whole list after the change, read in the same transaction. */
+            /** @description The member's whole ranking after the change, read in the same transaction; `unranked` holds the rest of their list. */
             courses: components["schemas"]["MyCourse"][];
+            /** @description Courses on the member's list that are not ranked (Played in the app), most recently Played first. */
+            unranked: components["schemas"]["MyUnrankedCourse"][];
         };
         MoveCourseRequest: {
             /** @description Target position; past the end means the bottom. */
@@ -776,8 +851,10 @@ export interface components {
             count: number;
             /** @description True when a count of zero removed the course from the list. */
             removed: boolean;
-            /** @description The member's whole list after the change, read in the same transaction. */
+            /** @description The member's whole ranking after the change, read in the same transaction; `unranked` holds the rest of their list. */
             courses: components["schemas"]["MyCourse"][];
+            /** @description Courses on the member's list that are not ranked (Played in the app), most recently Played first. */
+            unranked: components["schemas"]["MyUnrankedCourse"][];
         };
         SetPlayCountRequest: {
             /** @description Zero removes the course from the list. Lowering deletes the oldest rounds. */
@@ -788,8 +865,10 @@ export interface components {
             courseId: string;
             /** @description True when it was the course's last round, which removes the course. */
             removedCourse: boolean;
-            /** @description The member's whole list after the change, read in the same transaction. */
+            /** @description The member's whole ranking after the change, read in the same transaction; `unranked` holds the rest of their list. */
             courses: components["schemas"]["MyCourse"][];
+            /** @description Courses on the member's list that are not ranked (Played in the app), most recently Played first. */
+            unranked: components["schemas"]["MyUnrankedCourse"][];
         };
         Rankings: {
             entries: components["schemas"]["RankingEntry"][];
@@ -852,11 +931,15 @@ export interface components {
         };
         MemberList: {
             member: components["schemas"]["Member"];
+            /** @description The member's ranking in rank order: Ranked courses only. */
             courses: components["schemas"]["MemberCourse"][];
+            /** @description Courses on the member's list that are not ranked (Played in the app), most recently Played first. */
+            unranked: components["schemas"]["MemberUnrankedCourse"][];
         };
         MemberCourse: {
             course: components["schemas"]["Course"];
             rank: number;
+            /** @description Whether the course is on the viewer's list, ranked or not. */
             onMyList: boolean;
             /** @description The member's rounds at this course. */
             played: number;
@@ -865,7 +948,22 @@ export interface components {
              * @description The member's latest dated round here; null when none is dated.
              */
             lastPlayedOn: string | null;
-            /** @description The viewer's own rank for this course; null when it is not on the viewer's list. */
+            /** @description The viewer's own rank for this course; null when it is not in the viewer's ranking (not on their list, or unranked). */
+            myRank: number | null;
+        };
+        /** @description A course on another member's list without a rank (Played in the app), relative to the viewer. */
+        MemberUnrankedCourse: {
+            course: components["schemas"]["Course"];
+            /** @description Whether the course is on the viewer's list, ranked or not. */
+            onMyList: boolean;
+            /** @description The member's rounds at this course. */
+            played: number;
+            /**
+             * Format: date
+             * @description The member's latest dated round here; null when none is dated.
+             */
+            lastPlayedOn: string | null;
+            /** @description The viewer's own rank for this course; null when it is not in the viewer's ranking (not on their list, or unranked). */
             myRank: number | null;
         };
         Profile: {
@@ -883,6 +981,7 @@ export interface components {
             comparison: components["schemas"]["RankComparison"];
         };
         ProfileStats: {
+            /** @description Courses on the member's list, ranked or not. */
             courses: number;
             rounds: number;
             /** @description Rounds dated in the current calendar year (UTC). */
@@ -923,8 +1022,10 @@ export interface components {
             playedOn: string | null;
             /** @description 1 for the member's first round at this course, 2 for the second; undated rounds count as earliest. */
             visit: number;
-            /** @description The member's current personal rank for this course. */
+            /** @description The member's current personal rank for this course. For a course they have not ranked (Played in the app) it is one below their ranking (its size plus one), because this field cannot be null; read `personalRank` instead. */
             rank: number;
+            /** @description The member's current personal rank for this course; null when they have not ranked it. */
+            personalRank: number | null;
         };
         TimelineMonth: {
             /**
@@ -997,25 +1098,31 @@ export interface components {
         TopListEntry: {
             course: components["schemas"]["Course"];
             rank: number;
-            /** @description The member's rounds at this course. */
+            /** @description The member's rounds at this course. A course on their list may have none; tick with `onMyList`. */
             played: number;
+            /** @description Whether the course is on the member's list, ranked or not. */
+            onMyList: boolean;
             wantToPlay: boolean;
-            /** @description Friends who have played it, by display name. */
+            /** @description Friends who have played it (it is on their list), by display name. */
             friendsPlayed: components["schemas"]["Member"][];
         };
         CoursePage: {
             course: components["schemas"]["Course"];
             you: components["schemas"]["CourseStanding"];
-            /** @description Friends with the course on their ranking, best rank first. */
+            /** @description Friends with the course in their ranking, best rank first. */
             friendsRanked: components["schemas"]["CourseFriendRank"][];
+            /** @description Friends with the course on their list but not ranked (Played in the app), by display name. */
+            friendsUnranked: components["schemas"]["Member"][];
             /** @description Friends who want to play it, by display name. */
             friendsWantToPlay: components["schemas"]["Member"][];
         };
         CourseStanding: {
-            /** @description The member's rank for the course; null when it is not on their ranking. */
+            /** @description The member's rank for the course; null when it is not in their ranking (not on their list, or unranked). */
             rank: number | null;
-            /** @description How many courses the member's ranking holds. */
+            /** @description How many courses the member's ranking holds (ranked courses only). */
             outOf: number;
+            /** @description Whether the course is on the member's list, ranked or not. */
+            onMyList: boolean;
             wantToPlay: boolean;
         };
         CourseFriendRank: {
@@ -1025,12 +1132,12 @@ export interface components {
             outOf: number;
         };
         CurationCourses: {
-            /** @description Every course on a member's ranking, most-ranked first. */
+            /** @description Every course on a member's list, most-listed first. */
             courses: components["schemas"]["CurationCourse"][];
         };
         CurationCourse: {
             course: components["schemas"]["Course"];
-            /** @description Members with the course on their ranking. */
+            /** @description Members with the course on their list, ranked or not. */
             members: number;
         };
         CommonsCandidates: {
@@ -1582,6 +1689,133 @@ export interface operations {
             };
         };
     };
+    markPlayed: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                courseId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Whether it was added, and the updated list. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AddedToList"];
+                };
+            };
+            /** @description Invalid parameters: `validation_failed`. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description No valid session: `unauthenticated`, or `account_deleted` after the account was deleted. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description The Clerk account cannot use the app: `username_invalid`. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description No such catalog course: `course_not_found`. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Another member holds the Clerk account's username: `username_taken`. Choose a different username. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    addPlayedCourse: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddPlayedCourseRequest"];
+            };
+        };
+        responses: {
+            /** @description The course and the updated list. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AddedPlayedCourse"];
+                };
+            };
+            /** @description Invalid body: `validation_failed`, `us_state_required`, or `bad_request` for unreadable JSON. Also 413 `payload_too_large` above 32 KB and 415 `unsupported_media_type` without Content-Type: application/json. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description No valid session: `unauthenticated`, or `account_deleted` after the account was deleted. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description The Clerk account cannot use the app: `username_invalid`. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Another member holds the Clerk account's username: `username_taken`. Choose a different username. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
     moveCourse: {
         parameters: {
             query?: never;
@@ -1607,6 +1841,73 @@ export interface operations {
                 };
             };
             /** @description Invalid body: `validation_failed`, `us_state_required`, or `bad_request` for unreadable JSON. Also 413 `payload_too_large` above 32 KB and 415 `unsupported_media_type` without Content-Type: application/json. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description No valid session: `unauthenticated`, or `account_deleted` after the account was deleted. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description The Clerk account cannot use the app: `username_invalid`. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description The course is not on the list: `not_on_list`. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Another member holds the Clerk account's username: `username_taken`. Choose a different username. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    unrankCourse: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                courseId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The updated list. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyCourses"];
+                };
+            };
+            /** @description Invalid parameters: `validation_failed`. */
             400: {
                 headers: {
                     [name: string]: unknown;

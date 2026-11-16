@@ -67,9 +67,12 @@ describe("other API shapes", () => {
     expect(fromMyCourse({ course: arcadia, rank: 2, played: 5 })).toMatchObject({ rank: 2, played: 5, course: { id: arcadia.id } });
     expect(fromRound({ id: "r", playedOn: "2026-05-01" })).toEqual({ id: "r", playedAt: "2026-05-01" });
     const row = { course: arcadia, rank: 1, onMyList: true, played: 2, lastPlayedOn: "2026-09-01", myRank: 4 };
-    expect(fromMemberList({ member: { username: "a", displayName: "A" }, courses: [row] }).rows).toMatchObject([
+    const unranked = { course: arcadia, onMyList: false, played: 0, lastPlayedOn: null, myRank: null };
+    const list = fromMemberList({ member: { username: "a", displayName: "A" }, courses: [row], unranked: [unranked] });
+    expect(list.rows).toMatchObject([
       { rank: 1, onMyList: true, played: 2, lastPlayedOn: "2026-09-01", myRank: 4, course: { name: "Arcadia Bluffs" } },
     ]);
+    expect(list.unranked).toEqual([{ course: fromApiCourse(arcadia), onMyList: false, played: 0, lastPlayedOn: null, myRank: null }]);
   });
 
   it("maps a Top list with the viewer's and friends' progress", () => {
@@ -77,10 +80,10 @@ describe("other API shapes", () => {
     const list = { type: "usa", scope: "USA", title: "USA Top 100", size: 100, source: "Golf Digest", sourceYear: 2025 };
     const detail = fromTopListDetail({
       progress: { list, mine: 1, friends: [{ member: priya, played: 3 }] },
-      entries: [{ course: arcadia, rank: 4, played: 2, wantToPlay: true, friendsPlayed: [priya] }],
+      entries: [{ course: arcadia, rank: 4, played: 2, onMyList: true, wantToPlay: true, friendsPlayed: [priya] }],
     });
     expect(detail.standing).toEqual({ list, mine: 1, friends: [{ member: priya, played: 3 }] });
-    expect(detail.entries).toEqual([{ course: fromApiCourse(arcadia), rank: 4, played: 2, wantToPlay: true, friendsPlayed: [priya] }]);
+    expect(detail.entries).toEqual([{ course: fromApiCourse(arcadia), rank: 4, played: 2, onMyList: true, wantToPlay: true, friendsPlayed: [priya] }]);
   });
 
   it("maps a Want to play list, newest first as the API sends it", () => {
@@ -105,7 +108,7 @@ describe("other API shapes", () => {
   });
 
   it("drops feed items of types this client does not know", () => {
-    const round = { id: "r1", course: arcadia, playedOn: null, visit: 1, rank: 2 };
+    const round = { id: "r1", course: arcadia, playedOn: null, visit: 1, rank: 2, personalRank: 2 };
     const item = (type: string): ApiSchemas["FeedItem"] => ({
       id: type + ":1",
       type,
@@ -114,7 +117,7 @@ describe("other API shapes", () => {
       rounds: [round],
       count: 1,
     });
-    expect(fromFeedItem(item("round"))).toMatchObject({ type: FeedItemType.Round, rounds: [{ id: "r1", playedOn: null, rank: 2 }] });
+    expect(fromFeedItem(item("round"))).toMatchObject({ type: FeedItemType.Round, rounds: [{ id: "r1", playedOn: null, rank: 2, personalRank: 2 }] });
     expect(fromFeedItem(item("rating"))).toBeNull();
   });
 
@@ -158,15 +161,18 @@ describe("course photo", () => {
 describe("course page", () => {
   it("maps the course and keeps the member's and friends' standing", () => {
     const priya = { username: "priya", displayName: "Priya" };
+    const ben = { username: "ben", displayName: "Ben" };
     const page = fromCoursePage({
       course: arcadia,
-      you: { rank: null, outOf: 12, wantToPlay: true },
+      you: { rank: null, outOf: 12, onMyList: true, wantToPlay: true },
       friendsRanked: [{ member: priya, rank: 2, outOf: 30 }],
+      friendsUnranked: [ben],
       friendsWantToPlay: [priya],
     });
     expect(page.course).toMatchObject({ id: arcadia.id, name: "Arcadia Bluffs", michigan: 3, website: "https://arcadiabluffs.com" });
-    expect(page.you).toEqual({ rank: null, outOf: 12, wantToPlay: true });
+    expect(page.you).toEqual({ rank: null, outOf: 12, onMyList: true, wantToPlay: true });
     expect(page.friendsRanked).toEqual([{ member: priya, rank: 2, outOf: 30 }]);
+    expect(page.friendsUnranked).toEqual([ben]);
     expect(page.friendsWantToPlay).toEqual([priya]);
   });
 });

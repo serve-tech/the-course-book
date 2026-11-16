@@ -107,11 +107,19 @@
             "items": {
               "$ref": "#/components/schemas/MyCourse"
             },
-            "description": "The member's list in personal rank order."
+            "description": "The member's ranking in personal rank order: Ranked courses only."
+          },
+          "unranked": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MyUnrankedCourse"
+            },
+            "description": "Courses on the member's list that are not ranked (Played in the app), most recently Played first."
           }
         },
         "required": [
-          "courses"
+          "courses",
+          "unranked"
         ]
       },
       "MyCourse": {
@@ -274,6 +282,24 @@
         ],
         "description": "The course's photo, with the credit and license to show beside it; null until a curator picks one."
       },
+      "MyUnrankedCourse": {
+        "type": "object",
+        "properties": {
+          "course": {
+            "$ref": "#/components/schemas/Course"
+          },
+          "played": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The member's rounds at this course; often none."
+          }
+        },
+        "required": [
+          "course",
+          "played"
+        ],
+        "description": "A course on the member's list without a rank: Played in the app. A valid state, not a to-do."
+      },
       "Rounds": {
         "type": "object",
         "properties": {
@@ -318,12 +344,20 @@
             "items": {
               "$ref": "#/components/schemas/MyCourse"
             },
-            "description": "The member's whole list after the change, read in the same transaction."
+            "description": "The member's whole ranking after the change, read in the same transaction; `unranked` holds the rest of their list."
+          },
+          "unranked": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MyUnrankedCourse"
+            },
+            "description": "Courses on the member's list that are not ranked (Played in the app), most recently Played first."
           }
         },
         "required": [
           "added",
-          "courses"
+          "courses",
+          "unranked"
         ]
       },
       "AddToListRequest": {
@@ -337,41 +371,40 @@
           }
         }
       },
-      "AddedCourse": {
+      "AddedPlayedCourse": {
         "type": "object",
         "properties": {
           "courseId": {
             "type": "string",
             "format": "uuid"
           },
-          "rank": {
-            "type": "integer",
-            "minimum": 1
-          },
-          "roundIds": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "description": "Ids of the rounds just logged, so a client can offer Undo (`deleteRound` each one)."
+          "added": {
+            "type": "boolean",
+            "description": "False when the course was already on the list, ranked or not; it is then unchanged."
           },
           "courses": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/MyCourse"
             },
-            "description": "The member's whole list after the change, read in the same transaction."
+            "description": "The member's whole ranking after the change, read in the same transaction; `unranked` holds the rest of their list."
+          },
+          "unranked": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MyUnrankedCourse"
+            },
+            "description": "Courses on the member's list that are not ranked (Played in the app), most recently Played first."
           }
         },
         "required": [
           "courseId",
-          "rank",
-          "roundIds",
-          "courses"
+          "added",
+          "courses",
+          "unranked"
         ]
       },
-      "AddCourseRequest": {
+      "AddPlayedCourseRequest": {
         "type": "object",
         "properties": {
           "course": {
@@ -379,31 +412,13 @@
           },
           "source": {
             "$ref": "#/components/schemas/CourseSource"
-          },
-          "rank": {
-            "type": "integer",
-            "nullable": true,
-            "minimum": 1,
-            "description": "Position for a course not yet on the list; the bottom when omitted. A course already on the list keeps its rank."
-          },
-          "quantity": {
-            "type": "integer",
-            "nullable": true,
-            "minimum": 1,
-            "maximum": 100,
-            "description": "Rounds to log; 1 when omitted."
-          },
-          "playedOn": {
-            "type": "string",
-            "nullable": true,
-            "format": "date",
-            "description": "Date played (YYYY-MM-DD) in the member's time zone. The server's date (UTC) when omitted, so clients should send it."
           }
         },
         "required": [
           "course",
           "source"
-        ]
+        ],
+        "description": "A course to add as played but not ranked, described by its details."
       },
       "CourseDetailsRequest": {
         "type": "object",
@@ -451,6 +466,82 @@
         ],
         "description": "`search`: a course search hit; `manual`: a course the member typed in (shared with everyone as a custom course)."
       },
+      "AddedCourse": {
+        "type": "object",
+        "properties": {
+          "courseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "rank": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "roundIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Ids of the rounds just logged, so a client can offer Undo (`deleteRound` each one)."
+          },
+          "courses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MyCourse"
+            },
+            "description": "The member's whole ranking after the change, read in the same transaction; `unranked` holds the rest of their list."
+          },
+          "unranked": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MyUnrankedCourse"
+            },
+            "description": "Courses on the member's list that are not ranked (Played in the app), most recently Played first."
+          }
+        },
+        "required": [
+          "courseId",
+          "rank",
+          "roundIds",
+          "courses",
+          "unranked"
+        ]
+      },
+      "AddCourseRequest": {
+        "type": "object",
+        "properties": {
+          "course": {
+            "$ref": "#/components/schemas/CourseDetailsRequest"
+          },
+          "source": {
+            "$ref": "#/components/schemas/CourseSource"
+          },
+          "rank": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 1,
+            "description": "Position for a course not yet on the list; the bottom when omitted. A course already on the list keeps its rank."
+          },
+          "quantity": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Rounds to log; 1 when omitted."
+          },
+          "playedOn": {
+            "type": "string",
+            "nullable": true,
+            "format": "date",
+            "description": "Date played (YYYY-MM-DD) in the member's time zone. The server's date (UTC) when omitted, so clients should send it."
+          }
+        },
+        "required": [
+          "course",
+          "source"
+        ]
+      },
       "LoggedRounds": {
         "type": "object",
         "properties": {
@@ -472,13 +563,21 @@
             "items": {
               "$ref": "#/components/schemas/MyCourse"
             },
-            "description": "The member's whole list after the change, read in the same transaction."
+            "description": "The member's whole ranking after the change, read in the same transaction; `unranked` holds the rest of their list."
+          },
+          "unranked": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MyUnrankedCourse"
+            },
+            "description": "Courses on the member's list that are not ranked (Played in the app), most recently Played first."
           }
         },
         "required": [
           "added",
           "roundIds",
-          "courses"
+          "courses",
+          "unranked"
         ]
       },
       "LogRoundsRequest": {
@@ -511,12 +610,20 @@
             "items": {
               "$ref": "#/components/schemas/MyCourse"
             },
-            "description": "The member's whole list after the change, read in the same transaction."
+            "description": "The member's whole ranking after the change, read in the same transaction; `unranked` holds the rest of their list."
+          },
+          "unranked": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MyUnrankedCourse"
+            },
+            "description": "Courses on the member's list that are not ranked (Played in the app), most recently Played first."
           }
         },
         "required": [
           "rank",
-          "courses"
+          "courses",
+          "unranked"
         ]
       },
       "MoveCourseRequest": {
@@ -548,13 +655,21 @@
             "items": {
               "$ref": "#/components/schemas/MyCourse"
             },
-            "description": "The member's whole list after the change, read in the same transaction."
+            "description": "The member's whole ranking after the change, read in the same transaction; `unranked` holds the rest of their list."
+          },
+          "unranked": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MyUnrankedCourse"
+            },
+            "description": "Courses on the member's list that are not ranked (Played in the app), most recently Played first."
           }
         },
         "required": [
           "count",
           "removed",
-          "courses"
+          "courses",
+          "unranked"
         ]
       },
       "SetPlayCountRequest": {
@@ -587,13 +702,21 @@
             "items": {
               "$ref": "#/components/schemas/MyCourse"
             },
-            "description": "The member's whole list after the change, read in the same transaction."
+            "description": "The member's whole ranking after the change, read in the same transaction; `unranked` holds the rest of their list."
+          },
+          "unranked": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MyUnrankedCourse"
+            },
+            "description": "Courses on the member's list that are not ranked (Played in the app), most recently Played first."
           }
         },
         "required": [
           "courseId",
           "removedCourse",
-          "courses"
+          "courses",
+          "unranked"
         ]
       },
       "Rankings": {
@@ -813,12 +936,21 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/MemberCourse"
-            }
+            },
+            "description": "The member's ranking in rank order: Ranked courses only."
+          },
+          "unranked": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MemberUnrankedCourse"
+            },
+            "description": "Courses on the member's list that are not ranked (Played in the app), most recently Played first."
           }
         },
         "required": [
           "member",
-          "courses"
+          "courses",
+          "unranked"
         ]
       },
       "MemberCourse": {
@@ -832,7 +964,8 @@
             "minimum": 1
           },
           "onMyList": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "Whether the course is on the viewer's list, ranked or not."
           },
           "played": {
             "type": "integer",
@@ -849,7 +982,7 @@
             "type": "integer",
             "nullable": true,
             "minimum": 1,
-            "description": "The viewer's own rank for this course; null when it is not on the viewer's list."
+            "description": "The viewer's own rank for this course; null when it is not in the viewer's ranking (not on their list, or unranked)."
           }
         },
         "required": [
@@ -860,6 +993,43 @@
           "lastPlayedOn",
           "myRank"
         ]
+      },
+      "MemberUnrankedCourse": {
+        "type": "object",
+        "properties": {
+          "course": {
+            "$ref": "#/components/schemas/Course"
+          },
+          "onMyList": {
+            "type": "boolean",
+            "description": "Whether the course is on the viewer's list, ranked or not."
+          },
+          "played": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The member's rounds at this course."
+          },
+          "lastPlayedOn": {
+            "type": "string",
+            "nullable": true,
+            "format": "date",
+            "description": "The member's latest dated round here; null when none is dated."
+          },
+          "myRank": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 1,
+            "description": "The viewer's own rank for this course; null when it is not in the viewer's ranking (not on their list, or unranked)."
+          }
+        },
+        "required": [
+          "course",
+          "onMyList",
+          "played",
+          "lastPlayedOn",
+          "myRank"
+        ],
+        "description": "A course on another member's list without a rank (Played in the app), relative to the viewer."
       },
       "Profile": {
         "type": "object",
@@ -905,7 +1075,8 @@
         "properties": {
           "courses": {
             "type": "integer",
-            "minimum": 0
+            "minimum": 0,
+            "description": "Courses on the member's list, ranked or not."
           },
           "rounds": {
             "type": "integer",
@@ -1034,7 +1205,13 @@
           "rank": {
             "type": "integer",
             "minimum": 1,
-            "description": "The member's current personal rank for this course."
+            "description": "The member's current personal rank for this course. For a course they have not ranked (Played in the app) it is one below their ranking (its size plus one), because this field cannot be null; read `personalRank` instead."
+          },
+          "personalRank": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 1,
+            "description": "The member's current personal rank for this course; null when they have not ranked it."
           }
         },
         "required": [
@@ -1042,7 +1219,8 @@
           "course",
           "playedOn",
           "visit",
-          "rank"
+          "rank",
+          "personalRank"
         ]
       },
       "TimelineMonth": {
@@ -1276,7 +1454,11 @@
           "played": {
             "type": "integer",
             "minimum": 0,
-            "description": "The member's rounds at this course."
+            "description": "The member's rounds at this course. A course on their list may have none; tick with `onMyList`."
+          },
+          "onMyList": {
+            "type": "boolean",
+            "description": "Whether the course is on the member's list, ranked or not."
           },
           "wantToPlay": {
             "type": "boolean"
@@ -1286,13 +1468,14 @@
             "items": {
               "$ref": "#/components/schemas/Member"
             },
-            "description": "Friends who have played it, by display name."
+            "description": "Friends who have played it (it is on their list), by display name."
           }
         },
         "required": [
           "course",
           "rank",
           "played",
+          "onMyList",
           "wantToPlay",
           "friendsPlayed"
         ]
@@ -1311,7 +1494,14 @@
             "items": {
               "$ref": "#/components/schemas/CourseFriendRank"
             },
-            "description": "Friends with the course on their ranking, best rank first."
+            "description": "Friends with the course in their ranking, best rank first."
+          },
+          "friendsUnranked": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Member"
+            },
+            "description": "Friends with the course on their list but not ranked (Played in the app), by display name."
           },
           "friendsWantToPlay": {
             "type": "array",
@@ -1325,6 +1515,7 @@
           "course",
           "you",
           "friendsRanked",
+          "friendsUnranked",
           "friendsWantToPlay"
         ]
       },
@@ -1335,12 +1526,16 @@
             "type": "integer",
             "nullable": true,
             "minimum": 1,
-            "description": "The member's rank for the course; null when it is not on their ranking."
+            "description": "The member's rank for the course; null when it is not in their ranking (not on their list, or unranked)."
           },
           "outOf": {
             "type": "integer",
             "minimum": 0,
-            "description": "How many courses the member's ranking holds."
+            "description": "How many courses the member's ranking holds (ranked courses only)."
+          },
+          "onMyList": {
+            "type": "boolean",
+            "description": "Whether the course is on the member's list, ranked or not."
           },
           "wantToPlay": {
             "type": "boolean"
@@ -1349,6 +1544,7 @@
         "required": [
           "rank",
           "outOf",
+          "onMyList",
           "wantToPlay"
         ]
       },
@@ -1382,7 +1578,7 @@
             "items": {
               "$ref": "#/components/schemas/CurationCourse"
             },
-            "description": "Every course on a member's ranking, most-ranked first."
+            "description": "Every course on a member's list, most-listed first."
           }
         },
         "required": [
@@ -1398,7 +1594,7 @@
           "members": {
             "type": "integer",
             "minimum": 1,
-            "description": "Members with the course on their ranking."
+            "description": "Members with the course on their list, ranked or not."
           }
         },
         "required": [
@@ -1744,7 +1940,7 @@
         "tags": [
           "My List"
         ],
-        "summary": "The signed-in member's list in personal rank order",
+        "summary": "The signed-in member's list: their ranking in order, and the courses they have not ranked",
         "security": [
           {
             "ClerkSession": []
@@ -1799,7 +1995,7 @@
           "My List"
         ],
         "summary": "Add a course described by its details and log rounds",
-        "description": "For search hits without a catalog id and courses typed in by the member. The course is matched against the catalog or created, placed at `rank` if new to the list, and `quantity` rounds are logged. Not idempotent: retrying after a lost response logs the rounds again.",
+        "description": "For search hits without a catalog id and courses typed in by the member. The course is matched against the catalog or created, placed in the ranking at `rank` unless it is already ranked (an unranked course on the list is ranked too), and `quantity` rounds are logged. Not idempotent: retrying after a lost response logs the rounds again. To add a course without ranking it, use `addPlayedCourse`.",
         "security": [
           {
             "ClerkSession": []
@@ -1952,7 +2148,7 @@
           "My List"
         ],
         "summary": "Log rounds at a catalog course",
-        "description": "Adds the course at the bottom of the list if needed. Not idempotent.",
+        "description": "Puts the course at the bottom of the ranking unless it is already ranked (an unranked course on the list is ranked too). Not idempotent.",
         "security": [
           {
             "ClerkSession": []
@@ -2050,7 +2246,7 @@
           "My List"
         ],
         "summary": "Put a catalog course on the list",
-        "description": "Adds the course at the bottom and logs one round when it has none. Repeating it changes nothing, so retrying is safe.",
+        "description": "Adds the course at the bottom of the ranking, also when it is on the list unranked, and logs one round when it has none. Repeating it changes nothing, so retrying is safe. To add a course without ranking it, use `markPlayed`.",
         "security": [
           {
             "ClerkSession": []
@@ -2227,14 +2423,265 @@
         }
       }
     },
+    "/v1/me/played-courses/{courseId}": {
+      "put": {
+        "operationId": "markPlayed",
+        "tags": [
+          "My List"
+        ],
+        "summary": "Put a catalog course on the list as played, without ranking it",
+        "description": "One tap, no date, no round: the course joins the list unranked (Played in the app) and comes off Want to play. A course already on the list, ranked or not, is unchanged, so retrying is safe. Rank it later with `moveCourse`.",
+        "security": [
+          {
+            "ClerkSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "courseId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Whether it was added, and the updated list.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AddedToList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters: `validation_failed`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session: `unauthenticated`, or `account_deleted` after the account was deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The Clerk account cannot use the app: `username_invalid`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such catalog course: `course_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Another member holds the Clerk account's username: `username_taken`. Choose a different username.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/played-courses": {
+      "post": {
+        "operationId": "addPlayedCourse",
+        "tags": [
+          "My List"
+        ],
+        "summary": "Put a course described by its details on the list as played, without ranking it",
+        "description": "For search hits without a catalog id and courses typed in by the member. The course is matched against the catalog or created, as in `addCourse`, then joins the list unranked with no round and comes off Want to play. A course already on the list is unchanged, so retrying is safe.",
+        "security": [
+          {
+            "ClerkSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddPlayedCourseRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The course and the updated list.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AddedPlayedCourse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid body: `validation_failed`, `us_state_required`, or `bad_request` for unreadable JSON. Also 413 `payload_too_large` above 32 KB and 415 `unsupported_media_type` without Content-Type: application/json.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session: `unauthenticated`, or `account_deleted` after the account was deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The Clerk account cannot use the app: `username_invalid`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Another member holds the Clerk account's username: `username_taken`. Choose a different username.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/me/courses/{courseId}/rank": {
+      "delete": {
+        "operationId": "unrankCourse",
+        "tags": [
+          "My List"
+        ],
+        "summary": "Take a course out of the ranking, keeping it on the list",
+        "description": "The course stays on the list unranked, with its rounds; the courses below it move up. An unranked course is unchanged, so retrying is safe.",
+        "security": [
+          {
+            "ClerkSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "courseId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The updated list.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyCourses"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters: `validation_failed`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session: `unauthenticated`, or `account_deleted` after the account was deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The Clerk account cannot use the app: `username_invalid`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The course is not on the list: `not_on_list`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Another member holds the Clerk account's username: `username_taken`. Choose a different username.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
       "put": {
         "operationId": "moveCourse",
         "tags": [
           "My List"
         ],
-        "summary": "Move a course to a position on the list",
-        "description": "The whole list is renumbered, including courses a client has filtered out.",
+        "summary": "Move a course to a position in the ranking, or rank an unranked one there",
+        "description": "A ranked course moves there; an unranked course on the list is placed into the ranking there (up to one past the end). The whole ranking is renumbered, including courses a client has filtered out.",
         "security": [
           {
             "ClerkSession": []
@@ -2663,7 +3110,7 @@
           "Members"
         ],
         "summary": "Any member's ranking, for anyone",
-        "description": "Public: needs no session and works for every active member. Carries the member and each course's rank, never rounds. Usernames match case-insensitively. Send no Authorization header.",
+        "description": "Public: needs no session and works for every active member. Carries the member and each ranked course's rank, never rounds or the courses the member has not ranked. Usernames match case-insensitively. Send no Authorization header.",
         "security": [],
         "parameters": [
           {
@@ -3832,8 +4279,8 @@
         "tags": [
           "Curation"
         ],
-        "summary": "Courses on members' rankings, for curators choosing photos",
-        "description": "Every course on an active member's ranking with how many members rank it, most-ranked first. Curators and admins only.",
+        "summary": "Courses on members' lists, for curators choosing photos",
+        "description": "Every course on an active member's list, ranked or not, with how many members have it, most first. Curators and admins only.",
         "security": [
           {
             "ClerkSession": []

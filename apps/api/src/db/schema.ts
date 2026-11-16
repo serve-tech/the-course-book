@@ -24,11 +24,14 @@ import {
  *
  * Rules the schema enforces (see docs/architecture.md, "Schema"):
  * - A play count is COUNT(rounds); there is no stored counter.
- * - A round cannot exist without a membership (composite foreign key).
- * - Personal ranks are positive and unique per user. The uniqueness
- *   constraint is DEFERRABLE so a reorder can renumber a whole list in one
- *   statement; drizzle-kit cannot express deferrability, so that constraint
- *   lives in the custom migration 0002_deferred_rank_unique.sql.
+ * - A round cannot exist without a membership (composite foreign key). A
+ *   membership needs no round.
+ * - Personal ranks are positive and unique per user; a null rank is a Played
+ *   course (on the list, not ranked), and a member may have any number. The
+ *   uniqueness constraint is DEFERRABLE so a reorder can renumber a whole
+ *   ranking in one statement; drizzle-kit cannot express deferrability, so
+ *   that constraint lives in the custom migration 0002_deferred_rank_unique.sql.
+ *   Unique constraints treat nulls as distinct, so it allows many Played rows.
  */
 
 /**
@@ -174,7 +177,18 @@ export const courseRankings = pgTable(
   ],
 );
 
-/** A member's personal list entry. Ranks are contiguous 1..N per user. */
+/**
+ * A course on a member's list (#52): Ranked when `personal_rank` is set,
+ * Played when it is null. Ranks are contiguous 1..N per user over the Ranked
+ * rows only; the journal service keeps that by renumbering the whole ranking
+ * on every change to it.
+ *
+ * `updated_at` orders the Played line, most recent first. It works because
+ * only becoming Played (being added, or taken out of the ranking) writes a
+ * Played row: renumbering writes Ranked rows only. Anything else that
+ * updates a Played row moves it to the top of the Played line
+ * (journal.db.test.ts, "Played order").
+ */
 export const userCourses = pgTable(
   "user_courses",
   {
@@ -185,7 +199,15 @@ export const userCourses = pgTable(
     courseId: uuid("course_id")
       .notNull()
       .references(() => courses.id, { onDelete: "cascade" }),
-    personalRank: integer("personal_rank").notNull(),
+    /** 1..N in the member's ranking; null for a Played course. */
+    personalRank: integer("personal_rank"),
+    /**
+     * When the member last placed this course into the ranking or moved it
+     * (#54). A course that only shifts because another one moved keeps its
+     * time; taking it out of the ranking clears it. Null for Played courses
+     * and for placements made before the column existed.
+     */
+    rankedAt: timestamp("ranked_at", { withTimezone: true }),
     notes: text("notes"),
     ...timestamps,
   },

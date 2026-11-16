@@ -6,6 +6,7 @@ import type { Database, Executor } from "../db/client";
 import { courses } from "../db/schema";
 import { courseView } from "../domain/course-view";
 import { CURSOR_TIMESTAMP_FORMAT, cursorTimestamp } from "../domain/cursor";
+import { rankOrBelow } from "../domain/personal-list";
 import { monthWindow, type MonthWindow } from "../domain/timeline-months";
 import { rankedViews } from "./catalog";
 import { visibleMember, type VisibleMember } from "./friends";
@@ -145,12 +146,17 @@ interface RoundRow extends Record<string, unknown> {
   course_id: string;
   played_on: string | null;
   visit: string;
-  rank: number;
+  /** Null when the course is Played (on the list, not ranked). */
+  personal_rank: number | null;
+  /** How many courses the round's member has ranked; bigint, so a string. */
+  ranking_size: string;
 }
 
 /**
  * Timeline views of rounds by id: course, date, visit number and the
- * member's current rank for the course.
+ * member's current rank for the course (`personalRank`, null for a Played
+ * course; `rank` reports a Played course one below the ranking, see
+ * `rankOrBelow`).
  *
  * The visit number counts each member's rounds at a course in played order
  * (undated first, then by date, then by when they were logged), over all of
@@ -173,7 +179,8 @@ export async function timelineRounds(db: Executor, roundIds: readonly string[]):
       from rounds r
       where (r.user_id, r.course_id) in (select user_id, course_id from wanted)
     )
-    select w.id, w.course_id, r.played_at::text as played_on, v.visit::text as visit, uc.personal_rank as rank
+    select w.id, w.course_id, r.played_at::text as played_on, v.visit::text as visit, uc.personal_rank,
+      (select count(s.personal_rank) from user_courses s where s.user_id = w.user_id)::text as ranking_size
     from wanted w
     join rounds r on r.id = w.id
     join visits v on v.id = w.id
@@ -184,7 +191,14 @@ export async function timelineRounds(db: Executor, roundIds: readonly string[]):
     rows.flatMap((row) => {
       const course = views.get(row.course_id);
       if (!course) return [];
-      const round: TimelineRound = { id: row.id, course, playedOn: row.played_on, visit: Number(row.visit), rank: row.rank };
+      const round: TimelineRound = {
+        id: row.id,
+        course,
+        playedOn: row.played_on,
+        visit: Number(row.visit),
+        rank: rankOrBelow(row.personal_rank, Number(row.ranking_size)),
+        personalRank: row.personal_rank,
+      };
       return [[row.id, round] as const];
     }),
   );

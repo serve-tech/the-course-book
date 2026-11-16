@@ -26,6 +26,26 @@ export async function resetMemberData(db: Database): Promise<void> {
   await db.execute(sql`DELETE FROM users`);
 }
 
+/**
+ * The member's personal ranks, in order, ignoring Played courses (null
+ * ranks). After any change they must read 1..N: ranks are contiguous over
+ * Ranked courses only (#52).
+ */
+export async function rankNumbers(db: Database, userId: string): Promise<number[]> {
+  const { rows } = await db.execute<{ personal_rank: number }>(
+    sql`SELECT personal_rank FROM user_courses WHERE user_id = ${userId} AND personal_rank IS NOT NULL ORDER BY personal_rank`,
+  );
+  return rows.map((row) => row.personal_rank);
+}
+
+/**
+ * Put a course on a member's list as Played (no rank, no round), as
+ * `markPlayed` does, for tests that need one without going through it.
+ */
+export async function insertPlayed(db: Database, userId: string, courseId: string): Promise<void> {
+  await db.execute(sql`INSERT INTO user_courses (user_id, course_id, personal_rank) VALUES (${userId}, ${courseId}, NULL)`);
+}
+
 /** Walk an error's cause chain and join the messages for assertions. */
 export function errorChain(error: unknown): string {
   const messages: string[] = [];

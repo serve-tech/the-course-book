@@ -7,12 +7,13 @@ import type { AddCourseRequest } from "./schemas";
  */
 
 /**
- * The service's course input for an add-course request. Missing optional
- * details become empty strings (the service's convention); a missing
- * location is composed from city, state and country; `manual` courses are
- * stored as shared custom courses.
+ * The service's course input for a request that describes a course by its
+ * details (`addCourse`, `addPlayedCourse`). Missing optional details become
+ * empty strings (the service's convention); a missing location is composed
+ * from city, state and country; `manual` courses are stored as shared
+ * custom courses.
  */
-export function toCourseInput(body: AddCourseRequest): Exclude<CourseInput, { courseId: string }> {
+export function toCourseInput(body: Pick<AddCourseRequest, "course" | "source">): Exclude<CourseInput, { courseId: string }> {
   const { course } = body;
   const city = course.city ?? "";
   const state = course.state ?? "";
