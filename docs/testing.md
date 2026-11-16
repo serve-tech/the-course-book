@@ -74,6 +74,24 @@ Do not sign into production or create or delete real records as part of an autom
 
 ## CI and handoff
 
-[Verify application](../.github/workflows/ci.yml) runs lint, typecheck, the migration drift gate, the API contract drift gate, migrations against a Postgres service, all tests and the build on working branches and PRs, then a `browser` job with the Playwright suite and a `docker` job that builds and smoke-tests the API image.
+[Verify application](../.github/workflows/ci.yml) runs on every pull request and on `main`. Its `verify` job runs lint, typecheck, the migration drift gate, the API contract drift gate, migrations against a Postgres service, all tests and the build. A `docker` job builds and smoke-tests the API image, and a `browser` job runs the Playwright suite.
+
+GitHub bills each job rounded up to a whole minute, a full run is about nine minutes, and the Free plan has 2,000 a month ([issue #85](https://github.com/serve-tech/the-course-book/issues/85)). So CI spends them carefully ([decision](../.planning/decisions/2026-11-16-ci-runs-once-per-commit-and-the-browser-suite-runs-on-main.md)):
+
+- **One run per commit.** A push to a branch runs nothing by itself; CI starts when the branch has a pull request. A newer push to a pull request cancels the run before it. Runs on `main` are never cancelled, because Render deploys a commit only after its checks pass.
+- **The browser suite runs on `main`, not on pull requests.** It is about five of a run's nine minutes. After a merge it runs on `main`, and Render waits for it before deploying, so a broken flow holds the deploy and `main` needs a fix. **Run `pnpm test:e2e` locally before pushing an application change**: that is now the only browser run before the merge. For a change worth checking in CI first, start the workflow by hand on the branch ("Run workflow" on the Actions page, or `gh workflow run ci.yml --ref <branch>`), which runs every job.
+- **Only the jobs a change needs**, on pull requests and on `main`. `verify`'s first step lists the changed files and decides ([`.github/scripts/ci-jobs.mjs`](../.github/scripts/ci-jobs.mjs), tested by `ci-jobs.test.mjs`, which `pnpm test` runs):
+
+  | What changed | `verify` | `docker` | `browser` (on `main` or by hand) |
+  | --- | --- | --- | --- |
+  | Only Markdown, `docs/`, `.planning/`, `render.yaml`, `.env.example`, editor or repository settings | starts, runs nothing | skipped | skipped |
+  | Only unit tests (`*.test.ts`, `*.test.tsx` under `apps/` or `packages/`) | runs | skipped | skipped |
+  | The web app, the Playwright suite, the contract, root config | runs | skipped | runs |
+  | Anything the API image is built from: `apps/api/`, `packages/domain/`, the lockfile, the package manifests, `.dockerignore` | runs | runs | runs |
+  | The workflow or `.github/scripts/`, or a change whose files cannot be listed | runs | runs | runs |
+
+- **A skipped job counts as passed**, for the required checks and for Render's deploy gate, so the three check names never change. `verify` always starts, because Render does not deploy a commit that has no checks at all.
+
+To spend fewer minutes: run the checks locally first, and push when a unit of work is ready rather than after every commit.
 
 Report checks actually run, their outcomes and any remaining gaps.
