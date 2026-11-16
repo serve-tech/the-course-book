@@ -770,6 +770,18 @@ test.describe("public ranking", () => {
     expect(size.width).toBe(1080);
     expect(size.height).toBeGreaterThan(400);
 
+    // View image shows the same image by itself, and saves it without the link.
+    await page.getByRole("button", { name: "View image" }).click();
+    const preview = page.getByRole("dialog", { name: "Top 5 in Michigan" });
+    const picture = preview.getByRole("img", { name: `${owner.displayName}'s Top 5 in Michigan as an image` });
+    await expect(picture).toBeVisible();
+    await expect.poll(() => picture.evaluate((image: HTMLImageElement) => image.naturalWidth)).toBe(1080);
+    const [again] = await Promise.all([page.waitForEvent("download"), preview.getByRole("button", { name: "Save image" }).click()]);
+    expect(again.suggestedFilename()).toBe(download.suggestedFilename());
+    await expect(page.locator("#toast")).toHaveText("Image saved");
+    await page.keyboard.press("Escape");
+    await expect(preview).toHaveCount(0);
+
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   });
 
