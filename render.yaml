@@ -72,8 +72,15 @@ services:
         - pnpm-lock.yaml
         - pnpm-workspace.yaml
         - tsconfig.base.json
-    # Client-side routes (/friends/x, /account) load the app shell.
     routes:
+      # Shared ranking links get a preview card for that member and view from
+      # the API, which answers with the app's page plus the card. Before the
+      # catch-all below. Uses the API's onrender.com host, which stays valid
+      # whichever custom domain the API gets.
+      - type: rewrite
+        source: /r/*
+        destination: https://coursebook-golf-api.onrender.com/r/*
+      # Client-side routes (/friends/x, /account) load the app shell.
       - type: rewrite
         source: /*
         destination: /index.html
