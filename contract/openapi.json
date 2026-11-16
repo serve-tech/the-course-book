@@ -371,6 +371,101 @@
           }
         }
       },
+      "AddedPlayedCourse": {
+        "type": "object",
+        "properties": {
+          "courseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "added": {
+            "type": "boolean",
+            "description": "False when the course was already on the list, ranked or not; it is then unchanged."
+          },
+          "courses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MyCourse"
+            },
+            "description": "The member's whole ranking after the change, read in the same transaction; `unranked` holds the rest of their list."
+          },
+          "unranked": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MyUnrankedCourse"
+            },
+            "description": "Courses on the member's list that are not ranked (Played in the app), most recently Played first."
+          }
+        },
+        "required": [
+          "courseId",
+          "added",
+          "courses",
+          "unranked"
+        ]
+      },
+      "AddPlayedCourseRequest": {
+        "type": "object",
+        "properties": {
+          "course": {
+            "$ref": "#/components/schemas/CourseDetailsRequest"
+          },
+          "source": {
+            "$ref": "#/components/schemas/CourseSource"
+          }
+        },
+        "required": [
+          "course",
+          "source"
+        ],
+        "description": "A course to add as played but not ranked, described by its details."
+      },
+      "CourseDetailsRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "location": {
+            "type": "string",
+            "nullable": true
+          },
+          "city": {
+            "type": "string",
+            "nullable": true
+          },
+          "state": {
+            "type": "string",
+            "nullable": true,
+            "description": "Required, as a two-letter code, for U.S. courses whose location does not name the state."
+          },
+          "country": {
+            "type": "string",
+            "minLength": 1
+          },
+          "logoUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "websiteUrl": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "name",
+          "country"
+        ]
+      },
+      "CourseSource": {
+        "type": "string",
+        "enum": [
+          "search",
+          "manual"
+        ],
+        "description": "`search`: a course search hit; `manual`: a course the member typed in (shared with everyone as a custom course)."
+      },
       "AddedCourse": {
         "type": "object",
         "properties": {
@@ -446,52 +541,6 @@
           "course",
           "source"
         ]
-      },
-      "CourseDetailsRequest": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "minLength": 1
-          },
-          "location": {
-            "type": "string",
-            "nullable": true
-          },
-          "city": {
-            "type": "string",
-            "nullable": true
-          },
-          "state": {
-            "type": "string",
-            "nullable": true,
-            "description": "Required, as a two-letter code, for U.S. courses whose location does not name the state."
-          },
-          "country": {
-            "type": "string",
-            "minLength": 1
-          },
-          "logoUrl": {
-            "type": "string",
-            "nullable": true
-          },
-          "websiteUrl": {
-            "type": "string",
-            "nullable": true
-          }
-        },
-        "required": [
-          "name",
-          "country"
-        ]
-      },
-      "CourseSource": {
-        "type": "string",
-        "enum": [
-          "search",
-          "manual"
-        ],
-        "description": "`search`: a course search hit; `manual`: a course the member typed in (shared with everyone as a custom course)."
       },
       "LoggedRounds": {
         "type": "object",
@@ -1891,7 +1940,7 @@
         "tags": [
           "My List"
         ],
-        "summary": "The signed-in member's list in personal rank order",
+        "summary": "The signed-in member's list: their ranking in order, and the courses they have not ranked",
         "security": [
           {
             "ClerkSession": []
@@ -1946,7 +1995,7 @@
           "My List"
         ],
         "summary": "Add a course described by its details and log rounds",
-        "description": "For search hits without a catalog id and courses typed in by the member. The course is matched against the catalog or created, placed at `rank` if new to the list, and `quantity` rounds are logged. Not idempotent: retrying after a lost response logs the rounds again.",
+        "description": "For search hits without a catalog id and courses typed in by the member. The course is matched against the catalog or created, placed in the ranking at `rank` unless it is already ranked (an unranked course on the list is ranked too), and `quantity` rounds are logged. Not idempotent: retrying after a lost response logs the rounds again. To add a course without ranking it, use `addPlayedCourse`.",
         "security": [
           {
             "ClerkSession": []
@@ -2099,7 +2148,7 @@
           "My List"
         ],
         "summary": "Log rounds at a catalog course",
-        "description": "Adds the course at the bottom of the list if needed. Not idempotent.",
+        "description": "Puts the course at the bottom of the ranking unless it is already ranked (an unranked course on the list is ranked too). Not idempotent.",
         "security": [
           {
             "ClerkSession": []
@@ -2197,7 +2246,7 @@
           "My List"
         ],
         "summary": "Put a catalog course on the list",
-        "description": "Adds the course at the bottom and logs one round when it has none. Repeating it changes nothing, so retrying is safe.",
+        "description": "Adds the course at the bottom of the ranking, also when it is on the list unranked, and logs one round when it has none. Repeating it changes nothing, so retrying is safe. To add a course without ranking it, use `markPlayed`.",
         "security": [
           {
             "ClerkSession": []
@@ -2374,14 +2423,265 @@
         }
       }
     },
+    "/v1/me/played-courses/{courseId}": {
+      "put": {
+        "operationId": "markPlayed",
+        "tags": [
+          "My List"
+        ],
+        "summary": "Put a catalog course on the list as played, without ranking it",
+        "description": "One tap, no date, no round: the course joins the list unranked (Played in the app) and comes off Want to play. A course already on the list, ranked or not, is unchanged, so retrying is safe. Rank it later with `moveCourse`.",
+        "security": [
+          {
+            "ClerkSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "courseId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Whether it was added, and the updated list.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AddedToList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters: `validation_failed`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session: `unauthenticated`, or `account_deleted` after the account was deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The Clerk account cannot use the app: `username_invalid`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such catalog course: `course_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Another member holds the Clerk account's username: `username_taken`. Choose a different username.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/played-courses": {
+      "post": {
+        "operationId": "addPlayedCourse",
+        "tags": [
+          "My List"
+        ],
+        "summary": "Put a course described by its details on the list as played, without ranking it",
+        "description": "For search hits without a catalog id and courses typed in by the member. The course is matched against the catalog or created, as in `addCourse`, then joins the list unranked with no round and comes off Want to play. A course already on the list is unchanged, so retrying is safe.",
+        "security": [
+          {
+            "ClerkSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddPlayedCourseRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The course and the updated list.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AddedPlayedCourse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid body: `validation_failed`, `us_state_required`, or `bad_request` for unreadable JSON. Also 413 `payload_too_large` above 32 KB and 415 `unsupported_media_type` without Content-Type: application/json.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session: `unauthenticated`, or `account_deleted` after the account was deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The Clerk account cannot use the app: `username_invalid`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Another member holds the Clerk account's username: `username_taken`. Choose a different username.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/me/courses/{courseId}/rank": {
+      "delete": {
+        "operationId": "unrankCourse",
+        "tags": [
+          "My List"
+        ],
+        "summary": "Take a course out of the ranking, keeping it on the list",
+        "description": "The course stays on the list unranked, with its rounds; the courses below it move up. An unranked course is unchanged, so retrying is safe.",
+        "security": [
+          {
+            "ClerkSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "courseId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The updated list.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyCourses"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters: `validation_failed`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session: `unauthenticated`, or `account_deleted` after the account was deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The Clerk account cannot use the app: `username_invalid`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The course is not on the list: `not_on_list`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Another member holds the Clerk account's username: `username_taken`. Choose a different username.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
       "put": {
         "operationId": "moveCourse",
         "tags": [
           "My List"
         ],
-        "summary": "Move a course to a position on the list",
-        "description": "The whole list is renumbered, including courses a client has filtered out.",
+        "summary": "Move a course to a position in the ranking, or rank an unranked one there",
+        "description": "A ranked course moves there; an unranked course on the list is placed into the ranking there (up to one past the end). The whole ranking is renumbered, including courses a client has filtered out.",
         "security": [
           {
             "ClerkSession": []
@@ -2810,7 +3110,7 @@
           "Members"
         ],
         "summary": "Any member's ranking, for anyone",
-        "description": "Public: needs no session and works for every active member. Carries the member and each course's rank, never rounds. Usernames match case-insensitively. Send no Authorization header.",
+        "description": "Public: needs no session and works for every active member. Carries the member and each ranked course's rank, never rounds or the courses the member has not ranked. Usernames match case-insensitively. Send no Authorization header.",
         "security": [],
         "parameters": [
           {
@@ -3979,8 +4279,8 @@
         "tags": [
           "Curation"
         ],
-        "summary": "Courses on members' rankings, for curators choosing photos",
-        "description": "Every course on an active member's ranking with how many members rank it, most-ranked first. Curators and admins only.",
+        "summary": "Courses on members' lists, for curators choosing photos",
+        "description": "Every course on an active member's list, ranked or not, with how many members have it, most first. Curators and admins only.",
         "security": [
           {
             "ClerkSession": []

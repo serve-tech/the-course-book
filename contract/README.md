@@ -22,6 +22,10 @@ Installed app builds cannot be forced to update, so the contract only grows.
 - `operationId`s become method names in the generated clients; never rename one.
 - No schema exposes another member's email address or id.
 
+## Vocabulary: list, ranking, unranked
+
+A member's **list** is every course they have played. Their **ranking** is the ranked courses on it, in order, #1 to #N. A course on the list without a rank is **Played** in the app and **unranked** in the contract (#52). The contract cannot call that state `played`, because `played` already means a round count (`MyCourse.played`, `MemberCourse.played`, `TopListEntry.played`), and a field name can never change its meaning. So state is named for what it is (`unranked`, `onMyList`, `personalRank`) and operations for what the member means to do (`markPlayed`, `addPlayedCourse`, `unrankCourse`). Every older `courses` array, and every `rank`, is about the ranking alone, so a client from before #52 never meets a course without a rank. `TimelineRound.rank` is the one field that predates Played courses and must still describe one: it reports the course one below the ranking, and `personalRank` is its honest, nullable twin. Please don't "fix" these names to match the screens.
+
 `apps/api/src/contract/contract.test.ts` enforces the mechanical rules. Background and the generator findings are in `.planning/research/2026-09-25-api-split-spikes.md`.
 
 ## Clients

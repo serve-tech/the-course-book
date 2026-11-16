@@ -1,17 +1,20 @@
 import { and, eq } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { courses, rounds, userCourses, users } from "../db/schema";
+import { courses, rounds, userCourses, users, wantToPlay } from "../db/schema";
 import { insertPlayed, rankNumbers, resetMemberData, testDatabase } from "../test/db";
 import {
   addCourseByDetails,
+  addPlayedCourse,
   addToList,
   deleteCourse,
   deleteRound,
   logRounds,
+  markPlayed,
   moveCourse,
   personalList,
   roundHistory,
   setCount,
+  unrankCourse,
   wholeList,
 } from "./journal";
 import { ErrorCode } from "./errors";
@@ -337,6 +340,125 @@ describe("Played courses (on the list without a rank)", () => {
     await Promise.all([moveCourse(db, USER, p, 1), moveCourse(db, USER, q, 2), moveCourse(db, USER, b, 1), deleteCourse(db, USER, a)]);
     expect(await rankNumbers(db, USER)).toEqual([1, 2, 3]);
     expect(await unrankedIds()).toEqual([]);
+  });
+});
+
+describe("marking Played, adding Played by details, and unranking", () => {
+  const roundsAt = async (courseId: string) => (await roundsFor(courseId)).filter((row) => row.userId === USER);
+
+  it("marks a catalog course Played with no rank and no round, and takes it off Want to play", async () => {
+    const [a, p] = (await Promise.all(["usa1", "usa4"].map(seeded))) as [string, string];
+    await logRounds(db, USER, { courseId: a }, 1);
+    await db.insert(wantToPlay).values({ userId: USER, courseId: p });
+    const result = await markPlayed(db, USER, p);
+    expect(result.added).toBe(true);
+    expect(result.courses.map((entry) => entry.course.id)).toEqual([a]);
+    expect(result.unranked.map((entry) => [entry.course.id, entry.played])).toEqual([[p, 0]]);
+    expect(await ranks()).toEqual([[a, 1], [p, null]]);
+    expect(await roundsAt(p)).toEqual([]);
+    expect(await db.select().from(wantToPlay).where(eq(wantToPlay.userId, USER))).toEqual([]);
+  });
+
+  it("changes nothing when the course is already on the list, Ranked or Played", async () => {
+    const [a, p] = (await Promise.all(["usa1", "usa4"].map(seeded))) as [string, string];
+    await logRounds(db, USER, { courseId: a }, 1);
+    await markPlayed(db, USER, p);
+    // Played again on purpose ("play it again"): a repeat tap must not take it off.
+    await db.insert(wantToPlay).values({ userId: USER, courseId: p });
+    expect((await markPlayed(db, USER, p)).added).toBe(false);
+    expect((await markPlayed(db, USER, a)).added).toBe(false);
+    expect(await ranks()).toEqual([[a, 1], [p, null]]);
+    expect(await roundsAt(a)).toHaveLength(1);
+    expect(await db.select({ courseId: wantToPlay.courseId }).from(wantToPlay).where(eq(wantToPlay.userId, USER))).toEqual([{ courseId: p }]);
+  });
+
+  it("rejects an unknown course", async () => {
+    await expect(markPlayed(db, USER, "00000000-0000-4000-8000-000000000000")).rejects.toMatchObject({ status: 404, code: ErrorCode.CourseNotFound });
+  });
+
+  it("adds a course described by its details as Played, creating a custom course once", async () => {
+    const details = { ...blob("Played Pines", "Hometown, OH, USA", { city: "Hometown", state: "OH", country: "USA" }), isCustom: true };
+    const first = await addPlayedCourse(db, USER, details);
+    expect(first.added).toBe(true);
+    expect(first.courses).toEqual([]);
+    expect(first.unranked.map((entry) => [entry.course.id, entry.course.name, entry.played])).toEqual([[first.courseId, "Played Pines", 0]]);
+    const [row] = await db.select().from(courses).where(eq(courses.id, first.courseId));
+    expect(row).toMatchObject({ isCustom: true, createdBy: USER });
+    const again = await addPlayedCourse(db, USER, details);
+    expect(again).toMatchObject({ courseId: first.courseId, added: false });
+    expect(await roundsAt(first.courseId)).toEqual([]);
+  });
+
+  it("finds a catalog course by its details rather than creating another", async () => {
+    const a = await seeded("usa1");
+    const [catalogRow] = await db.select().from(courses).where(eq(courses.id, a));
+    if (!catalogRow) throw new Error("missing usa1");
+    const result = await addPlayedCourse(db, USER, {
+      ...blob(catalogRow.name, [catalogRow.city, catalogRow.state, catalogRow.country].filter(Boolean).join(", "), {
+        city: catalogRow.city ?? "",
+        state: catalogRow.state ?? "",
+        country: catalogRow.country,
+      }),
+    });
+    expect(result.courseId).toBe(a);
+  });
+
+  it("takes a course out of the ranking, keeping its rounds, closing the gap and clearing ranked_at", async () => {
+    const [a, b, c] = (await Promise.all(["usa1", "usa2", "usa3"].map(seeded))) as [string, string, string];
+    for (const id of [a, b, c]) await logRounds(db, USER, { courseId: id }, 2);
+    const result = await unrankCourse(db, USER, b);
+    expect(result.courses.map((entry) => [entry.course.id, entry.rank])).toEqual([
+      [a, 1],
+      [c, 2],
+    ]);
+    expect(result.unranked.map((entry) => [entry.course.id, entry.played])).toEqual([[b, 2]]);
+    const [row] = await db.select().from(userCourses).where(and(eq(userCourses.userId, USER), eq(userCourses.courseId, b)));
+    expect(row).toMatchObject({ personalRank: null, rankedAt: null });
+    expect(await roundsAt(b)).toHaveLength(2);
+  });
+
+  it("puts a course it unranks at the top of the Played line", async () => {
+    const [a, p] = (await Promise.all(["usa1", "usa4"].map(seeded))) as [string, string];
+    await logRounds(db, USER, { courseId: a }, 1);
+    await markPlayed(db, USER, p);
+    await db.update(userCourses).set({ updatedAt: new Date("2026-01-01T00:00:00Z") }).where(eq(userCourses.courseId, p));
+    expect((await unrankCourse(db, USER, a)).unranked.map((entry) => entry.course.id)).toEqual([a, p]);
+  });
+
+  it("leaves a Played course alone when unranking it again, and rejects one not on the list", async () => {
+    const p = await seeded("usa4");
+    await markPlayed(db, USER, p);
+    expect((await unrankCourse(db, USER, p)).unranked.map((entry) => entry.course.id)).toEqual([p]);
+    await expect(unrankCourse(db, USER, await seeded("usa1"))).rejects.toMatchObject({ status: 404, code: ErrorCode.NotOnList });
+  });
+
+  it("can rank, unrank and rank a course again, keeping ranks contiguous throughout", async () => {
+    const [a, b, p] = (await Promise.all(["usa1", "usa2", "usa4"].map(seeded))) as [string, string, string];
+    await logRounds(db, USER, { courseId: a }, 1);
+    await logRounds(db, USER, { courseId: b }, 1);
+    await markPlayed(db, USER, p);
+    await moveCourse(db, USER, p, 2);
+    expect(await rankNumbers(db, USER)).toEqual([1, 2, 3]);
+    await unrankCourse(db, USER, a);
+    expect(await ranks()).toEqual([[p, 1], [b, 2], [a, null]]);
+    await moveCourse(db, USER, a, 3);
+    expect(await ranks()).toEqual([[p, 1], [b, 2], [a, 3]]);
+  });
+
+  it("serializes taps and drags that arrive together, leaving contiguous ranks", async () => {
+    const ids = (await Promise.all(["usa1", "usa2", "usa3", "usa4", "usa5"].map(seeded))) as [string, string, string, string, string];
+    await logRounds(db, USER, { courseId: ids[0] }, 1);
+    await logRounds(db, USER, { courseId: ids[1] }, 1);
+    await Promise.all([
+      markPlayed(db, USER, ids[2]),
+      markPlayed(db, USER, ids[3]),
+      unrankCourse(db, USER, ids[0]),
+      moveCourse(db, USER, ids[1], 1),
+      markPlayed(db, USER, ids[4]),
+    ]);
+    await Promise.all([moveCourse(db, USER, ids[2], 1), moveCourse(db, USER, ids[3], 99), unrankCourse(db, USER, ids[1])]);
+    expect(await rankNumbers(db, USER)).toEqual([1, 2]);
+    expect((await wholeList(db, USER)).unranked).toHaveLength(3);
   });
 });
 

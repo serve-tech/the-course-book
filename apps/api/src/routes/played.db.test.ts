@@ -1,9 +1,18 @@
 import { eq } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import {
+  AddedCourseSchema,
+  AddedPlayedCourseSchema,
+  AddedToListSchema,
+  ApiErrorSchema,
   CoursePageSchema,
+  DeletedRoundSchema,
+  FeedSchema,
+  LoggedRoundsSchema,
   MemberListSchema,
+  MovedCourseSchema,
   MyCoursesSchema,
+  PlayCountSchema,
   ProfileSchema,
   PublicRankingSchema,
   TimelineSchema,
@@ -139,5 +148,146 @@ describe("reading a list with Played courses", () => {
     expect(byId.get(shinnecock)).toMatchObject({ played: 1, onMyList: true });
     expect(detail.entries.filter((entry) => entry.onMyList)).toHaveLength(2);
     expect(detail.progress).toMatchObject({ mine: 2, friends: [{ played: 4 }] });
+  });
+});
+
+const errorCode = (body: unknown) => ApiErrorSchema.parse(body).error.code;
+
+describe("PUT /v1/me/played-courses/{courseId} (markPlayed)", () => {
+  it("adds a catalog course unranked with no round, and changes nothing the second time", async () => {
+    const { t, auth, pine, merion } = await scenario();
+    const first = AddedToListSchema.parse((await t.send("PUT", `/v1/me/played-courses/${pine}`, undefined, auth)).body);
+    expect(first.added).toBe(true);
+    expect(first.unranked.map((entry) => [entry.course.id, entry.played])).toEqual([
+      [pine, 0],
+      [merion, 0],
+    ]);
+    expect(first.courses.map((entry) => entry.rank)).toEqual([1]);
+    const again = AddedToListSchema.parse((await t.send("PUT", `/v1/me/played-courses/${pine}`, undefined, auth)).body);
+    expect(again).toMatchObject({ added: false, unranked: first.unranked, courses: first.courses });
+    expect(await db.select().from(rounds).where(eq(rounds.courseId, pine))).toHaveLength(1);
+  });
+
+  it("answers course_not_found for an unknown course and rejects a malformed id", async () => {
+    const { t, auth } = await scenario();
+    const unknown = await t.send("PUT", "/v1/me/played-courses/00000000-0000-4000-8000-000000000000", undefined, auth);
+    expect([unknown.status, errorCode(unknown.body)]).toEqual([404, "course_not_found"]);
+    expect((await t.send("PUT", "/v1/me/played-courses/not-a-uuid", undefined, auth)).status).toBe(400);
+  });
+});
+
+describe("POST /v1/me/played-courses (addPlayedCourse)", () => {
+  it("adds a course typed in by hand as Played, with no round, once", async () => {
+    const { t, auth } = await scenario();
+    const body = { source: "manual", course: { name: "Backyard Nine", city: "Hometown", state: "OH", country: "USA" } };
+    const result = await t.send("POST", "/v1/me/played-courses", body, auth);
+    expect(result.status).toBe(200);
+    const added = AddedPlayedCourseSchema.parse(result.body);
+    expect(added.added).toBe(true);
+    expect(added.unranked[0]).toMatchObject({ played: 0, course: { id: added.courseId, name: "Backyard Nine" } });
+    const [row] = await db.select().from(courses).where(eq(courses.id, added.courseId));
+    expect(row).toMatchObject({ isCustom: true, createdBy: "user_1" });
+    const again = AddedPlayedCourseSchema.parse((await t.send("POST", "/v1/me/played-courses", body, auth)).body);
+    expect(again).toMatchObject({ courseId: added.courseId, added: false });
+    expect(await db.select().from(rounds).where(eq(rounds.courseId, added.courseId))).toEqual([]);
+  });
+
+  it("requires a U.S. state and a name, and accepts null optional fields as Kotlin sends them", async () => {
+    const { t, auth } = await scenario();
+    const stateless = await t.send("POST", "/v1/me/played-courses", { source: "search", course: { name: "Nowhere Nine", location: "USA", country: "USA" } }, auth);
+    expect([stateless.status, errorCode(stateless.body)]).toEqual([400, "us_state_required"]);
+    const nameless = await t.send("POST", "/v1/me/played-courses", { source: "manual", course: { name: "", country: "USA" } }, auth);
+    expect([nameless.status, errorCode(nameless.body)]).toEqual([400, "validation_failed"]);
+    const kotlin = await t.send(
+      "POST",
+      "/v1/me/played-courses",
+      { source: "search", course: { name: "Links Abroad", city: "Dundee", state: null, country: "Scotland", location: null, logoUrl: null, websiteUrl: null } },
+      auth,
+    );
+    expect(kotlin.status).toBe(200);
+  });
+});
+
+describe("DELETE /v1/me/courses/{courseId}/rank (unrankCourse)", () => {
+  it("moves a Ranked course to unranked, keeping its rounds, and is safe to repeat", async () => {
+    const { t, auth, shinnecock, merion } = await scenario();
+    const result = MyCoursesSchema.parse((await t.send("DELETE", `/v1/me/courses/${shinnecock}/rank`, undefined, auth)).body);
+    expect(result.courses).toEqual([]);
+    expect(result.unranked.map((entry) => [entry.course.id, entry.played])).toEqual([
+      [shinnecock, 1],
+      [merion, 0],
+    ]);
+    const again = MyCoursesSchema.parse((await t.send("DELETE", `/v1/me/courses/${shinnecock}/rank`, undefined, auth)).body);
+    expect(again).toEqual(result);
+  });
+
+  it("answers not_on_list for a course that is not on the list", async () => {
+    const { t, auth, pine } = await scenario();
+    const result = await t.send("DELETE", `/v1/me/courses/${pine}/rank`, undefined, auth);
+    expect([result.status, errorCode(result.body)]).toEqual([404, "not_on_list"]);
+  });
+
+  it("is undone by moving the course back into the ranking", async () => {
+    const { t, auth, shinnecock, merion } = await scenario();
+    await t.send("DELETE", `/v1/me/courses/${shinnecock}/rank`, undefined, auth);
+    const placed = MovedCourseSchema.parse((await t.send("PUT", `/v1/me/courses/${merion}/rank`, { rank: 1 }, auth)).body);
+    expect(placed.rank).toBe(1);
+    const back = MovedCourseSchema.parse((await t.send("PUT", `/v1/me/courses/${shinnecock}/rank`, { rank: 1 }, auth)).body);
+    expect(back.courses.map((entry) => [entry.course.id, entry.rank])).toEqual([
+      [shinnecock, 1],
+      [merion, 2],
+    ]);
+    expect(back.unranked).toEqual([]);
+  });
+});
+
+/**
+ * The deploy overlap (design section 1): an installed web bundle, or a
+ * native build, from before Played courses reads `courses` and `rank` and
+ * nothing else. Once a member has Played courses, every operation those
+ * clients call must still answer with integer ranks only (the schemas parse
+ * `rank` as an integer of at least 1) and never put a Played course in
+ * `courses`; the public ranking must never show one.
+ */
+describe("older clients, once a member has Played courses", () => {
+  it("never get a Played course or a missing rank from the operations they call", async () => {
+    const { t, auth, pine, augusta, shinnecock, merion } = await scenario();
+    const oakmont = await seeded("usa8");
+    expect((await t.send("PUT", `/v1/me/played-courses/${oakmont}`, undefined, auth)).status).toBe(200);
+    await db.insert(rounds).values({ userId: "user_2", courseId: merion, playedAt: "2026-07-01" });
+    await db.insert(rounds).values({ userId: "user_1", courseId: merion, playedAt: "2026-07-02" });
+    const played = new Set([merion, oakmont]);
+    const ranked = (rows: readonly { course: { id: string } }[]) => rows.filter((row) => played.has(row.course.id));
+
+    const responses = [
+      MyCoursesSchema.parse((await t.get("/v1/me/courses", auth)).body).courses,
+      AddedToListSchema.parse((await t.send("PUT", `/v1/me/courses/${pine}`, {}, auth)).body).courses,
+      AddedCourseSchema.parse(
+        (await t.send("POST", "/v1/me/courses", { source: "manual", course: { name: "Old Client Links", city: "Austin", state: "TX", country: "USA" } }, auth)).body,
+      ).courses,
+      LoggedRoundsSchema.parse((await t.send("POST", `/v1/me/courses/${augusta}/rounds`, { playedOn: "2026-08-01" }, auth)).body).courses,
+      MovedCourseSchema.parse((await t.send("PUT", `/v1/me/courses/${augusta}/rank`, { rank: 1 }, auth)).body).courses,
+      PlayCountSchema.parse((await t.send("PUT", `/v1/me/courses/${shinnecock}/play-count`, { count: 2 }, auth)).body).courses,
+    ];
+    const [round] = await db.select({ id: rounds.id }).from(rounds).where(eq(rounds.courseId, augusta));
+    responses.push(DeletedRoundSchema.parse((await t.send("DELETE", `/v1/me/rounds/${round?.id ?? ""}`, undefined, auth)).body).courses);
+    responses.push(MyCoursesSchema.parse((await t.send("DELETE", `/v1/me/courses/${pine}`, undefined, auth)).body).courses);
+    for (const courses of responses) {
+      expect(ranked(courses)).toEqual([]);
+      expect(courses.map((entry) => entry.rank)).toEqual(courses.map((_, index) => index + 1));
+    }
+
+    expect(ranked(MemberListSchema.parse((await t.get("/v1/members/golfer_1", auth)).body).courses)).toEqual([]);
+    expect(ranked(ProfileSchema.parse((await t.get("/v1/members/golfer_1/profile", auth)).body).topFour)).toEqual([]);
+    expect(ranked(PublicRankingSchema.parse((await t.get("/v1/members/golfer_1/ranking")).body).courses)).toEqual([]);
+    expect(ranked(PublicRankingSchema.parse((await t.get("/v1/members/Bravo/ranking")).body).courses)).toEqual([]);
+    // Rounds at Played courses still appear, with an integer rank below the ranking.
+    const timeline = TimelineSchema.parse((await t.get("/v1/members/golfer_1/rounds", auth)).body);
+    expect(timeline.rounds.find((entry) => entry.course.id === merion)).toMatchObject({ personalRank: null });
+    const feed = FeedSchema.parse((await t.get("/v1/feed", auth)).body);
+    expect(feed.items.flatMap((item) => item.rounds).find((entry) => entry.course.id === merion)).toMatchObject({ personalRank: null, rank: 3 });
+    expect(MyCoursesSchema.parse((await t.get("/v1/me/courses", auth)).body).unranked.map((entry) => entry.course.id).sort()).toEqual(
+      [merion, oakmont].sort(),
+    );
   });
 });

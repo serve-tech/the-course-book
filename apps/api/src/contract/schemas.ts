@@ -521,6 +521,19 @@ export const AddCourseRequestSchema = z
 
 export const AddToListRequestSchema = z.object({ playedOn }).openapi("AddToListRequest");
 
+export const AddPlayedCourseRequestSchema = z
+  .object({ course: CourseDetailsRequestSchema, source: CourseSourceSchema })
+  .openapi("AddPlayedCourseRequest", { description: "A course to add as played but not ranked, described by its details." });
+
+export const AddedPlayedCourseSchema = z
+  .object({
+    courseId: z.uuid(),
+    added: z.boolean().openapi({ description: "False when the course was already on the list, ranked or not; it is then unchanged." }),
+    courses: listAfterChange,
+    unranked: unrankedCourses,
+  })
+  .openapi("AddedPlayedCourse");
+
 export const LogRoundsRequestSchema = z.object({ quantity, playedOn }).openapi("LogRoundsRequest");
 
 export const MoveCourseRequestSchema = z

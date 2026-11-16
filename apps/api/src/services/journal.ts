@@ -240,6 +240,88 @@ async function removeMembership(tx: Transaction, userId: string, courseId: strin
 }
 
 /**
+ * Put a course on the member's list as Played: no rank, no round. A course
+ * already on the list, Ranked or Played, is left alone. A course that joins
+ * the list comes off Want to play, as it does when a round is logged there.
+ *
+ * Returns:
+ *     Whether the course joined the list.
+ */
+async function addAsPlayed(tx: Transaction, userId: string, courseId: string): Promise<boolean> {
+  const inserted = await tx
+    .insert(userCourses)
+    .values({ userId, courseId, personalRank: null })
+    .onConflictDoNothing({ target: [userCourses.userId, userCourses.courseId] })
+    .returning({ id: userCourses.id });
+  if (!inserted.length) return false;
+  await tx.delete(wantToPlay).where(and(eq(wantToPlay.userId, userId), eq(wantToPlay.courseId, courseId)));
+  return true;
+}
+
+/**
+ * One-tap Played for a catalog course (#52): it joins the member's list
+ * without a rank and without a round. Nothing ranks it later on its own.
+ * Repeating it, or marking a course already on the list, changes nothing.
+ *
+ * Raises:
+ *     AppError: 404 `course_not_found` for an unknown course.
+ */
+export async function markPlayed(db: Database, userId: string, courseId: string): Promise<{ added: boolean } & PersonalList> {
+  return withJournalLock(db, userId, async (tx) => {
+    await requireCourse(tx, courseId);
+    return { added: await addAsPlayed(tx, userId, courseId), ...(await wholeList(tx, userId)) };
+  });
+}
+
+/**
+ * Played for a course described by its details (an outside search hit, or a
+ * course typed in by hand): resolve or create the catalog row exactly as
+ * `addCourseByDetails` does, then add it as Played, with no rank and no
+ * round. A course already on the list is left alone.
+ *
+ * Returns:
+ *     The course id, whether it joined the list, and the whole list.
+ */
+export async function addPlayedCourse(
+  db: Database,
+  userId: string,
+  input: Exclude<CourseInput, { courseId: string }>,
+): Promise<{ courseId: string; added: boolean } & PersonalList> {
+  const result = await withJournalLock(db, userId, async (tx) => {
+    const course = await findOrCreateCourse(tx, input, userId);
+    const added = await addAsPlayed(tx, userId, course.id);
+    return { courseId: course.id, added, created: course.created, list: await wholeList(tx, userId) };
+  });
+  if (result.created) invalidateCatalog();
+  return { courseId: result.courseId, added: result.added, ...result.list };
+}
+
+/**
+ * Take a course out of the ranking (#52). It stays on the list as Played,
+ * with its rounds and Want to play; the ranks below close up and its
+ * `ranked_at` is cleared. A Played course is left alone, so a retry changes
+ * nothing.
+ *
+ * Raises:
+ *     AppError: 404 `not_on_list` when the course is not on the list.
+ */
+export async function unrankCourse(db: Database, userId: string, courseId: string): Promise<PersonalList> {
+  return withJournalLock(db, userId, async (tx) => {
+    const current = await listing(tx, userId, courseId);
+    if (!current) throw new AppError(404, ErrorCode.NotOnList, "That course is not on your list.");
+    if (current.rank !== null) {
+      // updated_at is when it became Played, which orders the Played line (db/schema.ts).
+      await tx
+        .update(userCourses)
+        .set({ personalRank: null, rankedAt: null, updatedAt: sql`now()` })
+        .where(and(eq(userCourses.userId, userId), eq(userCourses.courseId, courseId)));
+      await renumber(tx, userId, await rankingIds(tx, userId));
+    }
+    return wholeList(tx, userId);
+  });
+}
+
+/**
  * Log rounds from the Log Round dialog: resolve or create the course, put it
  * in the ranking at the bottom unless it is already Ranked (`putInRanking`),
  * and insert `quantity` rounds sharing one played date. A Ranked course
