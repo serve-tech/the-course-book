@@ -53,7 +53,7 @@ jobs:
           docker run -d --name photos -p 127.0.0.1:7070:7070 --tmpfs /data \
             -e ROOT_ACCESS_KEY=ci-access -e ROOT_SECRET_KEY=ci-secret-key -e VGW_REGION=auto \
             versity/versitygw:v1.11.0 posix /data
-          curl --retry 15 --retry-delay 1 --retry-connrefused -s -o /dev/null 127.0.0.1:7070
+          curl --retry 15 --retry-delay 1 --retry-all-errors -s -o /dev/null 127.0.0.1:7070
       - run: pnpm test
         env:
           PHOTO_STORAGE_TEST_ENDPOINT: http://127.0.0.1:7070
@@ -107,7 +107,7 @@ jobs:
           docker run -d --name photos -p 127.0.0.1:7070:7070 --tmpfs /data \
             -e ROOT_ACCESS_KEY=ci-access -e ROOT_SECRET_KEY=ci-secret-key -e VGW_REGION=auto \
             versity/versitygw:v1.11.0 posix /data
-          curl --retry 15 --retry-delay 1 --retry-connrefused -s -o /dev/null 127.0.0.1:7070
+          curl --retry 15 --retry-delay 1 --retry-all-errors -s -o /dev/null 127.0.0.1:7070
           pnpm photos:local-bucket
       - run: pnpm --filter @coursebook/e2e exec playwright install --with-deps chromium
       - run: pnpm test:e2e
