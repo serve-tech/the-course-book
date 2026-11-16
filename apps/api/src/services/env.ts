@@ -105,3 +105,81 @@ export function parseApiEnv(source: Record<string, string | undefined>) {
 
 /** API server settings: port, web origins, token key and client configuration. */
 export const apiEnv = memo(() => parseApiEnv(process.env));
+
+/** Whether course photos can be stored in the app's own bucket (#67). */
+export enum PhotoStorageStatus {
+  /** No photo storage variable is set: uploads are off and Commons photos stay on Commons. */
+  Off = "off",
+  /** Some are set but not all, or one is malformed: uploads stay off and the log names the problems. */
+  Incomplete = "incomplete",
+  /** Every required variable is set and valid. */
+  Ready = "ready",
+}
+
+/** Where the API stores course photos: an S3-compatible bucket and the address it is served from. */
+export interface PhotoStorageConfig {
+  /** The S3 API endpoint, e.g. `https://<account id>.r2.cloudflarestorage.com`; the bucket goes in the path. */
+  endpoint: string;
+  bucket: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+  /** The signing region; R2 uses `auto`. */
+  region: string;
+  /** Where the bucket's objects are publicly served, e.g. `https://photos.coursebook.golf`, without a trailing slash. */
+  publicUrl: string;
+}
+
+/** The photo storage settings, or why there are none. `problems` name variables, never their values. */
+export type PhotoStorageEnv =
+  | { status: PhotoStorageStatus.Off }
+  | { status: PhotoStorageStatus.Incomplete; problems: string[] }
+  | { status: PhotoStorageStatus.Ready; config: PhotoStorageConfig };
+
+/** The variables that must all be set for photo storage; `PHOTO_STORAGE_REGION` is optional. */
+export const PHOTO_STORAGE_VARIABLES = [
+  "PHOTO_STORAGE_ENDPOINT",
+  "PHOTO_STORAGE_BUCKET",
+  "PHOTO_STORAGE_ACCESS_KEY_ID",
+  "PHOTO_STORAGE_SECRET_ACCESS_KEY",
+  "PHOTO_PUBLIC_URL",
+] as const;
+
+const isHttpUrl = (value: string) => URL.canParse(value) && /^https?:$/.test(new URL(value).protocol);
+const withoutTrailingSlash = (value: string) => value.replace(/\/+$/, "");
+
+/**
+ * Read the photo storage variables. Unlike the other groups this never
+ * throws: storage is optional, so a missing or malformed value turns
+ * uploads off instead of stopping the API (issue #67).
+ *
+ * Args:
+ *     source: Variables such as `process.env`. Blank values count as unset.
+ *
+ * Returns:
+ *     Off when none of the required variables is set; Incomplete, naming
+ *     each missing or malformed variable, when some are; Ready otherwise.
+ */
+export function parsePhotoStorageEnv(source: Record<string, string | undefined>): PhotoStorageEnv {
+  const value = (name: string) => source[name]?.trim() ?? "";
+  if (PHOTO_STORAGE_VARIABLES.every((name) => value(name) === "")) return { status: PhotoStorageStatus.Off };
+  const problems = PHOTO_STORAGE_VARIABLES.filter((name) => value(name) === "").map((name) => name + " is not set");
+  for (const name of ["PHOTO_STORAGE_ENDPOINT", "PHOTO_PUBLIC_URL"] as const)
+    if (value(name) !== "" && !isHttpUrl(value(name))) problems.push(name + " is not an http(s) URL");
+  if (/[^a-z0-9.-]/.test(value("PHOTO_STORAGE_BUCKET")))
+    problems.push("PHOTO_STORAGE_BUCKET is not a bucket name (lowercase letters, digits, dots and hyphens)");
+  if (problems.length) return { status: PhotoStorageStatus.Incomplete, problems };
+  return {
+    status: PhotoStorageStatus.Ready,
+    config: {
+      endpoint: withoutTrailingSlash(value("PHOTO_STORAGE_ENDPOINT")),
+      bucket: value("PHOTO_STORAGE_BUCKET"),
+      accessKeyId: value("PHOTO_STORAGE_ACCESS_KEY_ID"),
+      secretAccessKey: value("PHOTO_STORAGE_SECRET_ACCESS_KEY"),
+      region: value("PHOTO_STORAGE_REGION") || "auto",
+      publicUrl: withoutTrailingSlash(value("PHOTO_PUBLIC_URL")),
+    },
+  };
+}
+
+/** Photo storage settings, for uploads and stored copies of Commons photos. */
+export const photoStorageEnv = memo(() => parsePhotoStorageEnv(process.env));
