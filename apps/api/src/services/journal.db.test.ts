@@ -1,7 +1,7 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { courses, rounds, userCourses, users } from "../db/schema";
-import { resetMemberData, testDatabase } from "../test/db";
+import { insertPlayed, rankNumbers, resetMemberData, testDatabase } from "../test/db";
 import {
   addCourseByDetails,
   addToList,
@@ -12,6 +12,7 @@ import {
   personalList,
   roundHistory,
   setCount,
+  wholeList,
 } from "./journal";
 import { ErrorCode } from "./errors";
 import { allCourses, invalidateCatalog } from "./catalog";
@@ -209,6 +210,133 @@ describe("counts and deletion", () => {
     await expect(deleteRound(db, USER, round?.id ?? "")).rejects.toMatchObject({ status: 404, code: ErrorCode.RoundNotFound });
     await expect(setCount(db, USER, a, 0)).rejects.toMatchObject({ status: 404, code: ErrorCode.NotOnList });
     expect(await roundHistory(db, "user_other", a)).toHaveLength(1);
+  });
+});
+
+describe("Played courses (on the list without a rank)", () => {
+  /** Mark when a Played row became Played, so the order under test does not hang on clock resolution. */
+  const playedAt = (courseId: string, iso: string) =>
+    db.update(userCourses).set({ updatedAt: new Date(iso) }).where(and(eq(userCourses.userId, USER), eq(userCourses.courseId, courseId)));
+  const unrankedIds = async () => (await wholeList(db, USER)).unranked.map((entry) => entry.course.id);
+
+  it("keeps Played courses out of the ranking and lists them most recently Played first", async () => {
+    const [a, b, older, newer] = (await Promise.all(["usa1", "usa2", "usa3", "usa4"].map(seeded))) as [string, string, string, string];
+    await logRounds(db, USER, { courseId: a }, 1);
+    await logRounds(db, USER, { courseId: b }, 2);
+    await insertPlayed(db, USER, older);
+    await insertPlayed(db, USER, newer);
+    await playedAt(older, "2026-10-01T00:00:00Z");
+    await playedAt(newer, "2026-11-01T00:00:00Z");
+    const list = await wholeList(db, USER);
+    expect(list.courses.map((entry) => [entry.course.id, entry.rank, entry.played])).toEqual([
+      [a, 1, 1],
+      [b, 2, 2],
+    ]);
+    expect(list.unranked.map((entry) => [entry.course.id, entry.played])).toEqual([
+      [newer, 0],
+      [older, 0],
+    ]);
+    expect(await personalList(db, USER)).toEqual(list.courses);
+  });
+
+  it("Played order: renumbering the ranking never writes a Played row, so its place in the Played line holds", async () => {
+    // The Played line is ordered by updated_at (see userCourses in db/schema.ts).
+    // Anything that updates a Played row moves it to the top; renumbering must not.
+    const [a, b, older, newer] = (await Promise.all(["usa1", "usa2", "usa3", "usa4"].map(seeded))) as [string, string, string, string];
+    await logRounds(db, USER, { courseId: a }, 1);
+    await logRounds(db, USER, { courseId: b }, 1);
+    await insertPlayed(db, USER, older);
+    await insertPlayed(db, USER, newer);
+    await playedAt(older, "2026-11-02T00:00:00Z");
+    await playedAt(newer, "2026-11-03T00:00:00Z");
+    await moveCourse(db, USER, b, 1);
+    await deleteCourse(db, USER, a);
+    expect(await unrankedIds()).toEqual([newer, older]);
+    const [row] = await db.select({ updatedAt: userCourses.updatedAt }).from(userCourses).where(eq(userCourses.courseId, older));
+    expect(row?.updatedAt.toISOString()).toBe("2026-11-02T00:00:00.000Z");
+  });
+
+  it.each([
+    [1, ["p", "a", "b", "c"]],
+    [2, ["a", "p", "b", "c"]],
+    [4, ["a", "b", "c", "p"]],
+    [99, ["a", "b", "c", "p"]],
+  ])("ranks a Played course when it is moved to %s, shifting the courses below it", async (rank, expected) => {
+    const ids = { a: await seeded("usa1"), b: await seeded("usa2"), c: await seeded("usa3"), p: await seeded("usa4") };
+    for (const id of [ids.a, ids.b, ids.c]) await logRounds(db, USER, { courseId: id }, 1);
+    await insertPlayed(db, USER, ids.p);
+    const moved = await moveCourse(db, USER, ids.p, rank);
+    const order = expected.map((key) => ids[key as keyof typeof ids]);
+    expect(moved.rank).toBe(order.indexOf(ids.p) + 1);
+    expect(moved.courses.map((entry) => entry.course.id)).toEqual(order);
+    expect(moved.unranked).toEqual([]);
+    expect(await rankNumbers(db, USER)).toEqual([1, 2, 3, 4]);
+  });
+
+  it("moves a Ranked course past a Played one without ranking it", async () => {
+    const [a, b, p] = (await Promise.all(["usa1", "usa2", "usa4"].map(seeded))) as [string, string, string];
+    await logRounds(db, USER, { courseId: a }, 1);
+    await logRounds(db, USER, { courseId: b }, 1);
+    await insertPlayed(db, USER, p);
+    expect(await moveCourse(db, USER, a, 99)).toMatchObject({ rank: 2 });
+    expect(await ranks()).toEqual([[b, 1], [a, 2], [p, null]]);
+  });
+
+  it("is ranked at the bottom by the operations that predate Played courses, which old clients use", async () => {
+    const [a, viaLog, viaAdd] = (await Promise.all(["usa1", "usa2", "usa3"].map(seeded))) as [string, string, string];
+    await logRounds(db, USER, { courseId: a }, 1);
+    await insertPlayed(db, USER, viaLog);
+    await insertPlayed(db, USER, viaAdd);
+    const logged = await logRounds(db, USER, { courseId: viaLog }, 1);
+    expect(logged.courses.map((entry) => [entry.course.id, entry.rank])).toEqual([[a, 1], [viaLog, 2]]);
+    const added = await addToList(db, USER, viaAdd);
+    expect(added.added).toBe(false);
+    expect(added.courses.map((entry) => [entry.course.id, entry.rank, entry.played])).toEqual([
+      [a, 1, 1],
+      [viaLog, 2, 1],
+      [viaAdd, 3, 1],
+    ]);
+    expect(added.unranked).toEqual([]);
+  });
+
+  it("is ranked at the requested rank when added again by details, so the response's rank is real", async () => {
+    await logRounds(db, USER, { courseId: await seeded("usa1") }, 1);
+    const details = { ...blob("Brand New Links", "Hometown, OH, USA", { city: "Hometown", state: "OH", country: "USA" }), isCustom: true };
+    const first = await addCourseByDetails(db, USER, details, { rank: null, quantity: 1 });
+    await db.update(userCourses).set({ personalRank: null }).where(eq(userCourses.courseId, first.courseId));
+    const again = await addCourseByDetails(db, USER, details, { rank: 1, quantity: 1 });
+    expect(again).toMatchObject({ courseId: first.courseId, rank: 1 });
+    expect(again.unranked).toEqual([]);
+    expect(await rankNumbers(db, USER)).toEqual([1, 2]);
+  });
+
+  it("keeps a Played course off the ranking when it is removed, and the ranks contiguous", async () => {
+    const [a, b, p] = (await Promise.all(["usa1", "usa2", "usa4"].map(seeded))) as [string, string, string];
+    await logRounds(db, USER, { courseId: a }, 1);
+    await logRounds(db, USER, { courseId: b }, 1);
+    await insertPlayed(db, USER, p);
+    const after = await deleteCourse(db, USER, p);
+    expect(after.unranked).toEqual([]);
+    expect(await ranks()).toEqual([[a, 1], [b, 2]]);
+    await expect(deleteCourse(db, USER, p)).rejects.toMatchObject({ status: 404, code: ErrorCode.NotOnList });
+  });
+
+  it("allows any number of Played courses per member", async () => {
+    const ids = await Promise.all(["usa1", "usa2", "usa3"].map(seeded));
+    for (const id of ids) await insertPlayed(db, USER, id);
+    expect(await unrankedIds()).toHaveLength(3);
+    expect(await rankNumbers(db, USER)).toEqual([]);
+  });
+
+  it("keeps ranks contiguous when Played courses are ranked and Ranked ones move at the same time", async () => {
+    const [a, b, p, q] = (await Promise.all(["usa1", "usa2", "usa3", "usa4"].map(seeded))) as [string, string, string, string];
+    await logRounds(db, USER, { courseId: a }, 1);
+    await logRounds(db, USER, { courseId: b }, 1);
+    await insertPlayed(db, USER, p);
+    await insertPlayed(db, USER, q);
+    await Promise.all([moveCourse(db, USER, p, 1), moveCourse(db, USER, q, 2), moveCourse(db, USER, b, 1), deleteCourse(db, USER, a)]);
+    expect(await rankNumbers(db, USER)).toEqual([1, 2, 3]);
+    expect(await unrankedIds()).toEqual([]);
   });
 });
 

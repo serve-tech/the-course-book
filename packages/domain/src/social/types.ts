@@ -17,7 +17,7 @@ export enum ProfileRelationship {
 }
 
 export interface ProfileStats {
-  /** Courses on the member's list (every one has been played). */
+  /** Courses on the member's list, Ranked and Played (every one has been played). */
   courses: number;
   rounds: number;
   /** Rounds dated in the current calendar year (UTC). */
@@ -60,8 +60,14 @@ export interface TimelineRound {
   playedOn: string | null;
   /** 1 for the member's first round at this course, 2 for the second, ... Undated rounds count as earliest. */
   visit: number;
-  /** The member's current personal rank for this course. */
+  /**
+   * The contract's required `TimelineRound.rank`: the member's rank for the
+   * course, or for a Played course, one below the ranking (its size + 1),
+   * because the contract cannot make it nullable. Read `personalRank`.
+   */
   rank: number;
+  /** The member's current rank for this course; null when it is Played (not ranked). */
+  personalRank: number | null;
 }
 
 /**
@@ -132,6 +138,8 @@ export interface TopListCourse {
   rank: number;
   /** The viewer's rounds there. */
   played: number;
+  /** Whether the course is on the viewer's list, Ranked or Played; a course on it may have no rounds. */
+  onMyList: boolean;
   wantToPlay: boolean;
   /** Friends who played it, by display name. */
   friendsPlayed: PublicMember[];
@@ -153,10 +161,12 @@ export interface CourseFriendRank {
 
 /** The viewer's own standing with a course. */
 export interface CourseStanding {
-  /** Their rank for it; null when it is not on their ranking. */
+  /** Their rank for it; null when it is not in their ranking (Played, or not on their list). */
   rank: number | null;
-  /** How many courses their ranking holds. */
+  /** How many courses their ranking holds (Ranked courses only). */
   outOf: number;
+  /** Whether the course is on their list, Ranked or Played. */
+  onMyList: boolean;
   wantToPlay: boolean;
 }
 
@@ -166,6 +176,8 @@ export interface CoursePage {
   you: CourseStanding;
   /** Friends with it on their ranking, best rank first. */
   friendsRanked: CourseFriendRank[];
+  /** Friends who have played it but not ranked it, by display name. */
+  friendsUnranked: PublicMember[];
   /** Friends who want to play it, by display name. */
   friendsWantToPlay: PublicMember[];
 }

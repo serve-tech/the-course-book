@@ -7,6 +7,7 @@ import {
   toCourseDetails,
   toFeedItem,
   toMemberList,
+  toMyCourses,
   toProfile,
   toRankingEntry,
   toRound,
@@ -17,6 +18,7 @@ import {
   CourseSchema,
   FeedItemSchema,
   MemberListSchema,
+  MyCoursesSchema,
   ProfileSchema,
   RankingEntrySchema,
   RoundSchema,
@@ -124,14 +126,36 @@ describe("other mappings", () => {
     const list = toMemberList({
       member: { username: "friend", displayName: "Friend" },
       rows: [{ course: course(), rank: 1, onMyList: true, played: 3, lastPlayedOn: "2026-09-27", myRank: 2 }],
+      unranked: [{ course: course({ id: "33333333-3333-4333-8333-333333333333" }), onMyList: true, played: 0, lastPlayedOn: null, myRank: null }],
     });
     expect(list.courses[0]).toMatchObject({ rank: 1, onMyList: true, played: 3, lastPlayedOn: "2026-09-27", myRank: 2 });
+    expect(list.unranked[0]).toEqual({
+      course: toContractCourse(course({ id: "33333333-3333-4333-8333-333333333333" })),
+      onMyList: true,
+      played: 0,
+      lastPlayedOn: null,
+      myRank: null,
+    });
     expect(MemberListSchema.safeParse(list).success).toBe(true);
+  });
+
+  it("maps a whole list to the ranking and the unranked courses", () => {
+    const list = toMyCourses({ courses: [{ course: course(), rank: 1, played: 2 }], unranked: [{ course: course({ id: "33333333-3333-4333-8333-333333333333" }), played: 0 }] });
+    expect(list.courses).toMatchObject([{ rank: 1, played: 2 }]);
+    expect(list.unranked).toMatchObject([{ played: 0, course: { id: "33333333-3333-4333-8333-333333333333" } }]);
+    expect(MyCoursesSchema.safeParse(list).success).toBe(true);
+  });
+
+  it("maps a timeline round at an unranked course with its stand-in rank and a null personalRank", () => {
+    const round = { id: "aaaaaaaa-0000-4000-8000-000000000010", course: course(), playedOn: "2026-10-01", visit: 1, rank: 8, personalRank: null };
+    const mapped = toTimelineRound(round);
+    expect(mapped).toMatchObject({ rank: 8, personalRank: null });
+    expect(TimelineRoundSchema.safeParse(mapped).success).toBe(true);
   });
 
   it("maps profiles, timeline rounds and feed items to valid contract shapes", () => {
     const row = { course: course(), rank: 1, onMyList: false, played: 1, lastPlayedOn: null, myRank: null };
-    const round = { id: "aaaaaaaa-0000-4000-8000-000000000009", course: course(), playedOn: null, visit: 1, rank: 1 };
+    const round = { id: "aaaaaaaa-0000-4000-8000-000000000009", course: course(), playedOn: null, visit: 1, rank: 1, personalRank: 1 };
     const profile = toProfile({
       member: { username: "friend", displayName: "Friend" },
       relationship: ProfileRelationship.Friends,

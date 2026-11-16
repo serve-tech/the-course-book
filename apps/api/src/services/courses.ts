@@ -8,8 +8,9 @@ import { courseViews } from "./timeline";
 
 /**
  * One course for the viewer: its page (decision 2026-11-13). Reads the
- * course and, for the viewer and their friends only, rankings and Want to
- * play; `domain/course-page.ts` assembles them.
+ * course and, for the viewer and their friends only, their lists (Ranked or
+ * Played), ranking sizes and Want to play; `domain/course-page.ts`
+ * assembles them.
  *
  * Args:
  *     db: Database or transaction.
@@ -24,13 +25,14 @@ export async function coursePage(db: Executor, viewerId: string, courseId: strin
   const course = views.get(courseId);
   if (!course) return null;
   const memberIds = [viewerId, ...friends.map((friend) => friend.id)];
-  const [ranks, sizes, wanted] = await Promise.all([
+  const [listings, sizes, wanted] = await Promise.all([
     db
       .select({ userId: userCourses.userId, rank: userCourses.personalRank })
       .from(userCourses)
       .where(and(eq(userCourses.courseId, courseId), inArray(userCourses.userId, memberIds))),
     db
-      .select({ userId: userCourses.userId, size: count() })
+      // count(column) skips nulls, so a ranking's size leaves Played courses out.
+      .select({ userId: userCourses.userId, size: count(userCourses.personalRank) })
       .from(userCourses)
       .where(inArray(userCourses.userId, memberIds))
       .groupBy(userCourses.userId),
@@ -39,5 +41,5 @@ export async function coursePage(db: Executor, viewerId: string, courseId: strin
       .from(wantToPlay)
       .where(and(eq(wantToPlay.courseId, courseId), inArray(wantToPlay.userId, memberIds))),
   ]);
-  return coursePageFrom({ course, viewerId, friends, ranks, sizes, wanted });
+  return coursePageFrom({ course, viewerId, friends, listings, sizes, wanted });
 }

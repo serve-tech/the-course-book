@@ -1,6 +1,6 @@
 import { courseSchema, type Course, type RankedCourse } from "@coursebook/domain/catalog/course";
 import type { SearchResult } from "@coursebook/domain/catalog/search-results";
-import type { MemberList, MemberListRow, PublicRanking } from "@coursebook/domain/friends/types";
+import type { MemberList, MemberListRow, MemberUnrankedRow, PublicRanking } from "@coursebook/domain/friends/types";
 import {
   FeedItemType,
   ProfileRelationship,
@@ -84,10 +84,10 @@ export function fromSearchHit(hit: ApiSchemas["SearchHit"], index: number): Sear
   return { course, display: course, catalogId: hit.courseId };
 }
 
-export function fromMemberCourse(row: ApiSchemas["MemberCourse"]): MemberListRow {
+/** A course on another member's list without a rank (Played), relative to the viewer. */
+export function fromMemberUnrankedCourse(row: ApiSchemas["MemberUnrankedCourse"]): MemberUnrankedRow {
   return {
     course: fromApiCourse(row.course),
-    rank: row.rank,
     onMyList: row.onMyList,
     played: row.played,
     lastPlayedOn: row.lastPlayedOn,
@@ -95,8 +95,12 @@ export function fromMemberCourse(row: ApiSchemas["MemberCourse"]): MemberListRow
   };
 }
 
+export function fromMemberCourse(row: ApiSchemas["MemberCourse"]): MemberListRow {
+  return { ...fromMemberUnrankedCourse(row), rank: row.rank };
+}
+
 export function fromMemberList(list: ApiSchemas["MemberList"]): MemberList {
-  return { member: list.member, rows: list.courses.map(fromMemberCourse) };
+  return { member: list.member, rows: list.courses.map(fromMemberCourse), unranked: list.unranked.map(fromMemberUnrankedCourse) };
 }
 
 export function fromPublicRanking(ranking: ApiSchemas["PublicRanking"]): PublicRanking {
@@ -104,7 +108,14 @@ export function fromPublicRanking(ranking: ApiSchemas["PublicRanking"]): PublicR
 }
 
 export function fromTimelineRound(round: ApiSchemas["TimelineRound"]): TimelineRound {
-  return { id: round.id, course: fromApiCourse(round.course), playedOn: round.playedOn, visit: round.visit, rank: round.rank };
+  return {
+    id: round.id,
+    course: fromApiCourse(round.course),
+    playedOn: round.playedOn,
+    visit: round.visit,
+    rank: round.rank,
+    personalRank: round.personalRank,
+  };
 }
 
 export function fromTimelineMonth(count: ApiSchemas["TimelineMonth"]): TimelineMonthCount {
@@ -185,6 +196,7 @@ export function fromTopListDetail(detail: ApiSchemas["TopListDetail"]): TopListD
       course: fromApiCourse(entry.course),
       rank: entry.rank,
       played: entry.played,
+      onMyList: entry.onMyList,
       wantToPlay: entry.wantToPlay,
       friendsPlayed: entry.friendsPlayed,
     })),
@@ -197,6 +209,7 @@ export function fromCoursePage(page: ApiSchemas["CoursePage"]): CoursePage {
     course: fromApiCourse(page.course),
     you: page.you,
     friendsRanked: page.friendsRanked,
+    friendsUnranked: page.friendsUnranked,
     friendsWantToPlay: page.friendsWantToPlay,
   };
 }

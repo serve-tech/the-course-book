@@ -172,7 +172,7 @@ describe("moving, counting and deleting", () => {
     expect(DeletedRoundSchema.parse(await deleted.json())).toMatchObject({ courseId: b, removedCourse: true, courses: [{ course: { id: a }, rank: 1 }] });
 
     const removed = await t.app.request(`/v1/me/courses/${a}`, { method: "DELETE", headers: auth });
-    expect(MyCoursesSchema.parse(await removed.json())).toEqual({ courses: [] });
+    expect(MyCoursesSchema.parse(await removed.json())).toEqual({ courses: [], unranked: [] });
     const again = await t.app.request(`/v1/me/courses/${a}`, { method: "DELETE", headers: auth });
     expect(again.status).toBe(404);
     expect(errorOf(await again.json()).code).toBe("not_on_list");
@@ -184,7 +184,7 @@ describe("moving, counting and deleting", () => {
     const a = await seeded("usa1");
     await logRounds(db, "user_1", { courseId: a }, 1);
     const result = PlayCountSchema.parse((await t.send("PUT", `/v1/me/courses/${a}/play-count`, { count: 0 }, auth)).body);
-    expect(result).toEqual({ count: 0, removed: true, courses: [] });
+    expect(result).toEqual({ count: 0, removed: true, courses: [], unranked: [] });
   });
 
   it("rejects a rank below one", async () => {

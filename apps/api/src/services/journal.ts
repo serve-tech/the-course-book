@@ -1,9 +1,10 @@
-import { and, count, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import type { Database, Executor, Transaction } from "../db/client";
 import { courses, rounds, userCourses, wantToPlay } from "../db/schema";
 import { courseView } from "../domain/course-view";
-import { insertAt, reorder } from "@coursebook/domain/journal/reorder";
-import type { ListEntry, RoundEntry } from "@coursebook/domain/journal/types";
+import { splitList } from "../domain/personal-list";
+import { placeInRanking } from "@coursebook/domain/journal/reorder";
+import type { ListEntry, PersonalList, RoundEntry } from "@coursebook/domain/journal/types";
 import {
   findOrCreateCourse,
   invalidateCatalog,
@@ -15,16 +16,22 @@ import { AppError, ErrorCode } from "./errors";
 import { lockMembers } from "./member-lock";
 
 /**
- * Journal transactions: memberships (a member's personal list) and rounds.
+ * Journal transactions: a member's list (memberships) and rounds.
  *
- * Every mutation runs inside `withJournalLock`, one transaction holding a
- * per-user advisory lock, so concurrent moves and logs serialize. Ranks are
- * contiguous 1..N per user; `renumber` keeps that invariant after any
- * insertion, move or removal. Play counts are always counted from rounds.
+ * A course on the list is Ranked (it has a personal rank) or Played (it has
+ * none; #52). Every mutation runs inside `withJournalLock`, one transaction
+ * holding a per-user advisory lock, so concurrent moves and logs serialize.
+ * Ranks are contiguous 1..N over the Ranked courses only; `renumber` keeps
+ * that after any insertion, move or removal and never touches a Played
+ * course. Play counts are always counted from rounds.
  */
 
-/** The member's personal list in rank order with play counts. */
-export async function personalList(db: Executor, userId: string): Promise<ListEntry[]> {
+/**
+ * The member's whole list: the ranking in rank order and the Played
+ * courses, most recently Played first, each with its play count. Both come
+ * from one read, so they never disagree.
+ */
+export async function wholeList(db: Executor, userId: string): Promise<PersonalList> {
   const playedRows = db
     .select({ courseId: rounds.courseId, played: count().as("played") })
     .from(rounds)
@@ -35,20 +42,26 @@ export async function personalList(db: Executor, userId: string): Promise<ListEn
     .select({
       course: courses,
       rank: userCourses.personalRank,
+      updatedAt: userCourses.updatedAt,
       // bigint comes back as a string from pg.
       played: sql<string>`coalesce(${playedRows.played}, 0)`,
     })
     .from(userCourses)
     .innerJoin(courses, eq(courses.id, userCourses.courseId))
     .leftJoin(playedRows, eq(playedRows.courseId, userCourses.courseId))
-    .where(eq(userCourses.userId, userId))
-    .orderBy(userCourses.personalRank);
+    .where(eq(userCourses.userId, userId));
   const views = await rankedViews(db, rows.map((row) => row.course));
-  return rows.map((row) => ({
-    course: views.get(row.course.id) ?? courseView(row.course),
-    rank: row.rank,
-    played: Number(row.played),
-  }));
+  const view = (row: (typeof rows)[number]) => views.get(row.course.id) ?? courseView(row.course);
+  const { ranked, unranked } = splitList(rows);
+  return {
+    courses: ranked.map((row) => ({ course: view(row), rank: row.rank, played: Number(row.played) })),
+    unranked: unranked.map((row) => ({ course: view(row), played: Number(row.played) })),
+  };
+}
+
+/** The member's ranking in rank order with play counts: Ranked courses only. */
+export async function personalList(db: Executor, userId: string): Promise<ListEntry[]> {
+  return (await wholeList(db, userId)).courses;
 }
 
 /** Rounds for one course, newest first. */
@@ -87,11 +100,12 @@ export function withJournalLock<T>(
   });
 }
 
-async function orderedCourseIds(tx: Transaction, userId: string): Promise<string[]> {
+/** The member's ranking as course ids in rank order, locked for update. Played courses are not in it. */
+async function rankingIds(tx: Transaction, userId: string): Promise<string[]> {
   const rows = await tx
     .select({ courseId: userCourses.courseId })
     .from(userCourses)
-    .where(eq(userCourses.userId, userId))
+    .where(and(eq(userCourses.userId, userId), isNotNull(userCourses.personalRank)))
     .orderBy(userCourses.personalRank, userCourses.id)
     .for("update");
   return rows.map((row) => row.courseId);
@@ -101,7 +115,11 @@ async function orderedCourseIds(tx: Transaction, userId: string): Promise<string
 const sqlArray = (values: readonly (string | number)[], type: string) =>
   sql`array[${sql.join(values.map((value) => sql`${value}`), sql`, `)}]::${sql.raw(type)}[]`;
 
-/** Write ranks 1..N for `order` in one statement; the unique check is deferred to commit. */
+/**
+ * Write ranks 1..N for `order` in one statement; the unique check is
+ * deferred to commit. `order` must be the whole ranking: rows not in it are
+ * left alone, which is what keeps Played courses unranked.
+ */
 async function renumber(tx: Transaction, userId: string, order: readonly string[]): Promise<void> {
   if (!order.length) return;
   const ranks = order.map((_, index) => index + 1);
@@ -152,50 +170,59 @@ export async function roundCount(
   return row?.n ?? 0;
 }
 
-async function membershipRank(
-  tx: Transaction,
-  userId: string,
-  courseId: string,
-): Promise<number | undefined> {
+/** A course on the member's list: its rank, null when it is Played. */
+interface Listing {
+  rank: number | null;
+}
+
+/** The course's place on the member's list, or null when it is not on it. */
+async function listing(tx: Transaction, userId: string, courseId: string): Promise<Listing | null> {
   const [row] = await tx
     .select({ rank: userCourses.personalRank })
     .from(userCourses)
     .where(and(eq(userCourses.userId, userId), eq(userCourses.courseId, courseId)));
-  return row?.rank;
+  return row ?? null;
 }
 
 /**
- * Ensure a membership exists, appending it at the bottom of the list when
- * missing. Never changes an existing membership's rank.
+ * Put a course into the ranking at `rank` (the bottom when null) unless it
+ * is already Ranked, adding it to the list first when it is not on it. A
+ * Played course is ranked too. This is how the operations that predate
+ * Played courses add a course (`addToList`, `addCourse`, `logRounds`): their
+ * clients only know the ranking, so a course they add always lands in it.
+ *
+ * Returns:
+ *     Whether the course was added to the list, and its rank afterwards.
  */
-export async function ensureMembership(
+async function putInRanking(
   tx: Transaction,
   userId: string,
   courseId: string,
+  rank: number | null,
 ): Promise<{ created: boolean; rank: number }> {
-  const existing = await membershipRank(tx, userId, courseId);
-  if (existing !== undefined) return { created: false, rank: existing };
-  const [bottom] = await tx
-    .select({ max: sql<number>`coalesce(max(${userCourses.personalRank}), 0)` })
-    .from(userCourses)
-    .where(eq(userCourses.userId, userId));
-  const rank = (bottom?.max ?? 0) + 1;
-  await tx.insert(userCourses).values({ userId, courseId, personalRank: rank });
-  return { created: true, rank };
+  const current = await listing(tx, userId, courseId);
+  if (current?.rank != null) return { created: false, rank: current.rank };
+  if (!current) await tx.insert(userCourses).values({ userId, courseId, personalRank: null });
+  const ranking = await rankingIds(tx, userId);
+  const order = placeInRanking(ranking, courseId, rank ?? ranking.length + 1);
+  await renumber(tx, userId, order);
+  return { created: !current, rank: order.indexOf(courseId) + 1 };
 }
 
-/** Delete a membership (rounds cascade) and close the gap in the ranks. */
+/** Delete a membership (rounds cascade) and, if it was Ranked, close the gap in the ranks. */
 async function removeMembership(tx: Transaction, userId: string, courseId: string): Promise<void> {
-  await tx
+  const [removed] = await tx
     .delete(userCourses)
-    .where(and(eq(userCourses.userId, userId), eq(userCourses.courseId, courseId)));
-  await renumber(tx, userId, await orderedCourseIds(tx, userId));
+    .where(and(eq(userCourses.userId, userId), eq(userCourses.courseId, courseId)))
+    .returning({ rank: userCourses.personalRank });
+  if (removed?.rank != null) await renumber(tx, userId, await rankingIds(tx, userId));
 }
 
 /**
- * Log rounds from the Log Round dialog: resolve or create the course, add
- * the membership at the bottom if missing, insert `quantity` rounds sharing
- * one played date. An existing membership keeps its rank.
+ * Log rounds from the Log Round dialog: resolve or create the course, put it
+ * in the ranking at the bottom unless it is already Ranked (`putInRanking`),
+ * and insert `quantity` rounds sharing one played date. A Ranked course
+ * keeps its rank.
  */
 export async function logRounds(
   db: Database,
@@ -203,25 +230,25 @@ export async function logRounds(
   input: CourseInput,
   quantity: number,
   playedAt?: string,
-): Promise<{ courseId: string; count: number; roundIds: string[]; courses: ListEntry[] }> {
+): Promise<{ courseId: string; count: number; roundIds: string[] } & PersonalList> {
   const count = Math.max(1, quantity);
   if (!("courseId" in input)) {
-    const added = await addCourseByDetails(db, userId, input, { rank: null, quantity: count, playedOn: playedAt });
-    return { courseId: added.courseId, count, roundIds: added.roundIds, courses: added.courses };
+    const { courseId, roundIds, courses, unranked } = await addCourseByDetails(db, userId, input, { rank: null, quantity: count, playedOn: playedAt });
+    return { courseId, count, roundIds, courses, unranked };
   }
   return withJournalLock(db, userId, async (tx) => {
     const courseId = await requireCourse(tx, input.courseId);
-    await ensureMembership(tx, userId, courseId);
+    await putInRanking(tx, userId, courseId, null);
     const roundIds = await insertRounds(tx, userId, courseId, count, playedAt);
-    return { courseId, count: roundIds.length, roundIds, courses: await personalList(tx, userId) };
+    return { courseId, count: roundIds.length, roundIds, ...(await wholeList(tx, userId)) };
   });
 }
 
 /**
  * Add a course described by its details: resolve or create the catalog row,
- * put it on the list at `rank` if it is not there yet (clamped to [1, N+1],
- * bottom when null; an existing membership keeps its rank), and log
- * `quantity` rounds on `playedOn`.
+ * put it in the ranking at `rank` unless it is already Ranked (clamped to
+ * [1, N+1], bottom when null; a Ranked course keeps its rank, a Played one
+ * is ranked), and log `quantity` rounds on `playedOn`.
  *
  * This is both "log a searched course" (`isCustom` false, bottom) and "add a
  * hand-entered course" (`isCustom` true, requested rank).
@@ -230,70 +257,70 @@ export async function logRounds(
  *     db: Database handle.
  *     userId: The acting member.
  *     input: Course details; `isCustom` marks hand-entered courses.
- *     options: `rank` for a new membership, `quantity` (at least 1) and an
- *         optional ISO `playedOn` date (database date when absent).
+ *     options: `rank` for a course not yet Ranked, `quantity` (at least 1)
+ *         and an optional ISO `playedOn` date (database date when absent).
  *
  * Returns:
- *     The course id, its rank on the list, the ids of the rounds logged
- *     (for undo) and the whole updated list.
+ *     The course id, its rank, the ids of the rounds logged (for undo) and
+ *     the whole updated list.
  */
 export async function addCourseByDetails(
   db: Database,
   userId: string,
   input: Exclude<CourseInput, { courseId: string }>,
   options: { rank: number | null; quantity: number; playedOn?: string | undefined },
-): Promise<{ courseId: string; rank: number; roundIds: string[]; courses: ListEntry[] }> {
+): Promise<{ courseId: string; rank: number; roundIds: string[] } & PersonalList> {
   const result = await withJournalLock(db, userId, async (tx) => {
     const course = await findOrCreateCourse(tx, input, userId);
-    let rank = await membershipRank(tx, userId, course.id);
-    if (rank === undefined) {
-      await ensureMembership(tx, userId, course.id);
-      const order = insertAt(await orderedCourseIds(tx, userId), course.id, options.rank);
-      await renumber(tx, userId, order);
-      rank = order.indexOf(course.id) + 1;
-    }
+    const { rank } = await putInRanking(tx, userId, course.id, options.rank);
     const roundIds = await insertRounds(tx, userId, course.id, Math.max(1, options.quantity), options.playedOn);
-    return { courseId: course.id, rank, roundIds, created: course.created, courses: await personalList(tx, userId) };
+    return { courseId: course.id, rank, roundIds, created: course.created, list: await wholeList(tx, userId) };
   });
   if (result.created) invalidateCatalog();
-  return { courseId: result.courseId, rank: result.rank, roundIds: result.roundIds, courses: result.courses };
+  return { courseId: result.courseId, rank: result.rank, roundIds: result.roundIds, ...result.list };
 }
 
 /**
- * "Add to my list" for a catalog course, from any client: add the
- * membership at the bottom if missing and log one round when the course has
- * none. Adding twice is harmless.
+ * "Add to my list" for a catalog course, from any client: put it in the
+ * ranking at the bottom unless it is already Ranked, and log one round when
+ * the course has none. Adding twice is harmless.
  *
  * Returns:
- *     Whether a membership was created, and the updated list.
+ *     Whether the course was added to the list, and the updated list.
  */
 export async function addToList(
   db: Database,
   userId: string,
   courseId: string,
   playedOn?: string,
-): Promise<{ added: boolean; courses: ListEntry[] }> {
+): Promise<{ added: boolean } & PersonalList> {
   return withJournalLock(db, userId, async (tx) => {
     await requireCourse(tx, courseId);
-    const { created } = await ensureMembership(tx, userId, courseId);
+    const { created } = await putInRanking(tx, userId, courseId, null);
     if ((await roundCount(tx, userId, courseId)) === 0) await insertRounds(tx, userId, courseId, 1, playedOn);
-    return { added: created, courses: await personalList(tx, userId) };
+    return { added: created, ...(await wholeList(tx, userId)) };
   });
 }
 
-/** Move a course to a rank; the whole list is renumbered from its full order. */
+/**
+ * Put a course at a rank: a Ranked course moves there, a Played course is
+ * placed into the ranking there (`placeInRanking`). The whole ranking is
+ * renumbered from its full order, so courses a view hides keep their places.
+ *
+ * Raises:
+ *     AppError: 404 `not_on_list` when the course is not on the list.
+ */
 export async function moveCourse(
   db: Database,
   userId: string,
   courseId: string,
   rank: number,
-): Promise<{ rank: number; courses: ListEntry[] }> {
+): Promise<{ rank: number } & PersonalList> {
   return withJournalLock(db, userId, async (tx) => {
-    const ids = await orderedCourseIds(tx, userId);
-    if (!ids.includes(courseId)) throw new AppError(404, ErrorCode.NotOnList, "That course is not on your list.");
-    const order = reorder(ids, courseId, rank);
+    if (!(await listing(tx, userId, courseId))) throw new AppError(404, ErrorCode.NotOnList, "That course is not on your list.");
+    const order = placeInRanking(await rankingIds(tx, userId), courseId, rank);
     await renumber(tx, userId, order);
-    return { rank: order.indexOf(courseId) + 1, courses: await personalList(tx, userId) };
+    return { rank: order.indexOf(courseId) + 1, ...(await wholeList(tx, userId)) };
   });
 }
 
@@ -307,14 +334,13 @@ export async function setCount(
   userId: string,
   courseId: string,
   requested: number,
-): Promise<{ count: number; removed: boolean; courses: ListEntry[] }> {
+): Promise<{ count: number; removed: boolean } & PersonalList> {
   return withJournalLock(db, userId, async (tx) => {
-    if ((await membershipRank(tx, userId, courseId)) === undefined)
-      throw new AppError(404, ErrorCode.NotOnList, "That course is not on your list.");
+    if (!(await listing(tx, userId, courseId))) throw new AppError(404, ErrorCode.NotOnList, "That course is not on your list.");
     const target = Math.max(0, Math.floor(requested));
     if (target === 0) {
       await removeMembership(tx, userId, courseId);
-      return { count: 0, removed: true, courses: await personalList(tx, userId) };
+      return { count: 0, removed: true, ...(await wholeList(tx, userId)) };
     }
     const existing = await tx
       .select({ id: rounds.id })
@@ -329,7 +355,7 @@ export async function setCount(
     } else if (existing.length < target) {
       await insertRounds(tx, userId, courseId, target - existing.length);
     }
-    return { count: target, removed: false, courses: await personalList(tx, userId) };
+    return { count: target, removed: false, ...(await wholeList(tx, userId)) };
   });
 }
 
@@ -338,7 +364,7 @@ export async function deleteRound(
   db: Database,
   userId: string,
   roundId: string,
-): Promise<{ removedCourse: boolean; courseId: string; courses: ListEntry[] }> {
+): Promise<{ removedCourse: boolean; courseId: string } & PersonalList> {
   return withJournalLock(db, userId, async (tx) => {
     const [round] = await tx
       .select({ courseId: rounds.courseId })
@@ -348,20 +374,15 @@ export async function deleteRound(
     await tx.delete(rounds).where(and(eq(rounds.userId, userId), eq(rounds.id, roundId)));
     const remaining = await roundCount(tx, userId, round.courseId);
     if (remaining === 0) await removeMembership(tx, userId, round.courseId);
-    return { removedCourse: remaining === 0, courseId: round.courseId, courses: await personalList(tx, userId) };
+    return { removedCourse: remaining === 0, courseId: round.courseId, ...(await wholeList(tx, userId)) };
   });
 }
 
-/** Remove a course from the list along with all its rounds. */
-export async function deleteCourse(
-  db: Database,
-  userId: string,
-  courseId: string,
-): Promise<{ courses: ListEntry[] }> {
+/** Remove a course from the list, Ranked or Played, along with all its rounds. */
+export async function deleteCourse(db: Database, userId: string, courseId: string): Promise<PersonalList> {
   return withJournalLock(db, userId, async (tx) => {
-    if ((await membershipRank(tx, userId, courseId)) === undefined)
-      throw new AppError(404, ErrorCode.NotOnList, "That course is not on your list.");
+    if (!(await listing(tx, userId, courseId))) throw new AppError(404, ErrorCode.NotOnList, "That course is not on your list.");
     await removeMembership(tx, userId, courseId);
-    return { courses: await personalList(tx, userId) };
+    return wholeList(tx, userId);
   });
 }

@@ -64,7 +64,7 @@ describe("getCourse", () => {
     const { t, auth, pine } = await scenario();
     const page = CoursePageSchema.parse((await t.get(`/v1/courses/${pine}`, auth)).body);
     expect(page.course).toMatchObject({ id: pine, name: "Pine Valley Golf Club", ranks: { usa: 1 } });
-    expect(page.you).toEqual({ rank: 1, outOf: 1, wantToPlay: false });
+    expect(page.you).toEqual({ rank: 1, outOf: 1, onMyList: true, wantToPlay: false });
     expect(page.friendsRanked).toEqual([{ member: { username: "priya", displayName: "Priya" }, rank: 2, outOf: 2 }]);
     expect(page.friendsWantToPlay).toEqual([]);
   });
@@ -73,7 +73,7 @@ describe("getCourse", () => {
     const { t, auth, augusta } = await scenario();
     expect((await t.send("PUT", `/v1/me/want-to-play/${augusta}`, undefined, auth)).status).toBe(200);
     const page = CoursePageSchema.parse((await t.get(`/v1/courses/${augusta}`, auth)).body);
-    expect(page.you).toEqual({ rank: null, outOf: 1, wantToPlay: true });
+    expect(page.you).toEqual({ rank: null, outOf: 1, onMyList: false, wantToPlay: true });
     expect(page.friendsRanked).toEqual([{ member: { username: "priya", displayName: "Priya" }, rank: 1, outOf: 2 }]);
     expect(page.friendsWantToPlay).toEqual([{ username: "priya", displayName: "Priya" }]);
   });

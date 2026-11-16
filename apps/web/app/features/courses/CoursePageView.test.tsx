@@ -48,7 +48,7 @@ function show(page: CoursePage, canCurate = false) {
   return render(<RouterProvider router={router} />);
 }
 
-const standing = { you: { rank: 5, outOf: 23, wantToPlay: false }, friendsRanked: [], friendsWantToPlay: [] };
+const standing = { you: { rank: 5, outOf: 23, onMyList: true, wantToPlay: false }, friendsRanked: [], friendsUnranked: [], friendsWantToPlay: [] };
 
 afterEach(() => {
   cleanup();
@@ -60,8 +60,9 @@ describe("CoursePageView", () => {
   it("shows a ranked course with its photo, published ranks, friends and the photo's credit", () => {
     show({
       course: course(true),
-      you: { rank: 5, outOf: 23, wantToPlay: false },
+      you: { rank: 5, outOf: 23, onMyList: true, wantToPlay: false },
       friendsRanked: [{ member: ben, rank: 1, outOf: 21 }],
+      friendsUnranked: [],
       friendsWantToPlay: [priya],
     });
     expect(screen.getByRole("heading", { level: 1, name: "Arcadia Bluffs" })).toBeInTheDocument();
@@ -76,7 +77,7 @@ describe("CoursePageView", () => {
   });
 
   it("offers Played it and Want to play for a course not on the ranking", () => {
-    show({ course: course(false), you: { rank: null, outOf: 23, wantToPlay: true }, friendsRanked: [], friendsWantToPlay: [] });
+    show({ course: course(false), you: { rank: null, outOf: 23, onMyList: false, wantToPlay: true }, friendsRanked: [], friendsUnranked: [], friendsWantToPlay: [] });
     expect(screen.getByText("Not on your ranking")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Played it" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Saved" })).toHaveAttribute("aria-pressed", "true");

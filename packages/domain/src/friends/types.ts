@@ -40,24 +40,30 @@ export interface FriendRequests {
   outgoing: PublicMember[];
 }
 
-/** One course on another member's list, relative to the viewer. */
-export interface MemberListRow {
+/** One Played course (on the list, not ranked) of another member, relative to the viewer. */
+export interface MemberUnrankedRow {
   course: Course;
-  rank: number;
-  /** Whether the viewer already has this course (by id or equivalent identity). */
+  /** Whether the course is on the viewer's list, Ranked or Played (by id or equivalent identity). */
   onMyList: boolean;
   /** The member's rounds at this course. */
   played: number;
   /** ISO date of the member's latest dated round here; null when none is dated. */
   lastPlayedOn: string | null;
-  /** The viewer's own rank for this course (by id or equivalent identity); null when not on their list. */
+  /** The viewer's own rank for this course (by id or equivalent identity); null when it is not in their ranking. */
   myRank: number | null;
 }
 
-/** Another member's list as the viewer sees it. */
+/** One course of another member's ranking, relative to the viewer. */
+export interface MemberListRow extends MemberUnrankedRow {
+  rank: number;
+}
+
+/** Another member's list as the viewer sees it: their ranking and their Played courses. */
 export interface MemberList {
   member: PublicMember;
   rows: MemberListRow[];
+  /** Courses they have played but not ranked, most recently Played first. */
+  unranked: MemberUnrankedRow[];
 }
 
 /** One course on a member's public ranking: the course and its rank, nothing about rounds. */

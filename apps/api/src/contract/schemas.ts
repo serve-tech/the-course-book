@@ -15,6 +15,11 @@ import { ErrorCode } from "../services/errors";
  * - values that may gain new members (error codes, ranking list types) are
  *   documented strings, not enums.
  * Changes are additive only: never rename, retype or remove a field.
+ *
+ * Vocabulary (contract/README.md): a member's *list* holds every course they
+ * have played; their *ranking* is the Ranked ones in order. A course on the
+ * list without a rank is Played in the app and `unranked` here, because
+ * `played` already means a round count.
  */
 
 const rank = z.number().int().min(1);
@@ -105,8 +110,20 @@ export const MyCourseSchema = z
   .object({ course: CourseSchema, rank, played: z.number().int().min(0) })
   .openapi("MyCourse");
 
+export const MyUnrankedCourseSchema = z
+  .object({ course: CourseSchema, played: z.number().int().min(0).openapi({ description: "The member's rounds at this course; often none." }) })
+  .openapi("MyUnrankedCourse", { description: "A course on the member's list without a rank: Played in the app. A valid state, not a to-do." });
+
+/** The member's Played courses, beside every `courses` that carries their ranking. */
+const unrankedCourses = z
+  .array(MyUnrankedCourseSchema)
+  .openapi({ description: "Courses on the member's list that are not ranked (Played in the app), most recently Played first." });
+
 export const MyCoursesSchema = z
-  .object({ courses: z.array(MyCourseSchema).openapi({ description: "The member's list in personal rank order." }) })
+  .object({
+    courses: z.array(MyCourseSchema).openapi({ description: "The member's ranking in personal rank order: Ranked courses only." }),
+    unranked: unrankedCourses,
+  })
   .openapi("MyCourses");
 
 export const RoundSchema = z
@@ -183,16 +200,20 @@ export const FriendRequestsSchema = z
   })
   .openapi("FriendRequests");
 
+const onMyList = z.boolean().openapi({ description: "Whether the course is on the viewer's list, ranked or not." });
+const myRank = optionalRank.openapi({
+  description: "The viewer's own rank for this course; null when it is not in the viewer's ranking (not on their list, or unranked).",
+});
+const memberPlayed = z.number().int().min(0).openapi({ description: "The member's rounds at this course." });
+const lastPlayedOn = z.iso.date().nullable().openapi({ description: "The member's latest dated round here; null when none is dated." });
+
 export const MemberCourseSchema = z
-  .object({
-    course: CourseSchema,
-    rank,
-    onMyList: z.boolean(),
-    played: z.number().int().min(0).openapi({ description: "The member's rounds at this course." }),
-    lastPlayedOn: z.iso.date().nullable().openapi({ description: "The member's latest dated round here; null when none is dated." }),
-    myRank: optionalRank.openapi({ description: "The viewer's own rank for this course; null when it is not on the viewer's list." }),
-  })
+  .object({ course: CourseSchema, rank, onMyList, played: memberPlayed, lastPlayedOn, myRank })
   .openapi("MemberCourse");
+
+export const MemberUnrankedCourseSchema = z
+  .object({ course: CourseSchema, onMyList, played: memberPlayed, lastPlayedOn, myRank })
+  .openapi("MemberUnrankedCourse", { description: "A course on another member's list without a rank (Played in the app), relative to the viewer." });
 
 export const PublicRankingCourseSchema = z
   .object({ course: CourseSchema, rank })
@@ -206,7 +227,13 @@ export const PublicRankingSchema = z
   .openapi("PublicRanking");
 
 export const MemberListSchema = z
-  .object({ member: MemberSchema, courses: z.array(MemberCourseSchema) })
+  .object({
+    member: MemberSchema,
+    courses: z.array(MemberCourseSchema).openapi({ description: "The member's ranking in rank order: Ranked courses only." }),
+    unranked: z
+      .array(MemberUnrankedCourseSchema)
+      .openapi({ description: "Courses on the member's list that are not ranked (Played in the app), most recently Played first." }),
+  })
   .openapi("MemberList");
 
 const nextCursor = z.string().nullable().openapi({ description: "Pass as `cursor` for the next page; null on the last page." });
@@ -217,7 +244,12 @@ export const TimelineRoundSchema = z
     course: CourseSchema,
     playedOn: z.iso.date().nullable().openapi({ description: "Date played; null when the member did not record one." }),
     visit: z.number().int().min(1).openapi({ description: "1 for the member's first round at this course, 2 for the second; undated rounds count as earliest." }),
-    rank: rank.openapi({ description: "The member's current personal rank for this course." }),
+    rank: rank.openapi({
+      description:
+        "The member's current personal rank for this course. For a course they have not ranked (Played in the app) it is one below " +
+        "their ranking (its size plus one), because this field cannot be null; read `personalRank` instead.",
+    }),
+    personalRank: optionalRank.openapi({ description: "The member's current personal rank for this course; null when they have not ranked it." }),
   })
   .openapi("TimelineRound");
 
@@ -246,7 +278,7 @@ export const TimelineSchema = z
 
 export const ProfileStatsSchema = z
   .object({
-    courses: z.number().int().min(0),
+    courses: z.number().int().min(0).openapi({ description: "Courses on the member's list, ranked or not." }),
     rounds: z.number().int().min(0),
     roundsThisYear: z.number().int().min(0).openapi({ description: "Rounds dated in the current calendar year (UTC)." }),
     friends: z.number().int().min(0),
@@ -322,9 +354,10 @@ export const TopListEntrySchema = z
   .object({
     course: CourseSchema,
     rank,
-    played: z.number().int().min(0).openapi({ description: "The member's rounds at this course." }),
+    played: z.number().int().min(0).openapi({ description: "The member's rounds at this course. A course on their list may have none; tick with `onMyList`." }),
+    onMyList: z.boolean().openapi({ description: "Whether the course is on the member's list, ranked or not." }),
     wantToPlay: z.boolean(),
-    friendsPlayed: z.array(MemberSchema).openapi({ description: "Friends who have played it, by display name." }),
+    friendsPlayed: z.array(MemberSchema).openapi({ description: "Friends who have played it (it is on their list), by display name." }),
   })
   .openapi("TopListEntry");
 
@@ -338,8 +371,9 @@ export const CourseFriendRankSchema = z
 
 export const CourseStandingSchema = z
   .object({
-    rank: optionalRank.openapi({ description: "The member's rank for the course; null when it is not on their ranking." }),
-    outOf: z.number().int().min(0).openapi({ description: "How many courses the member's ranking holds." }),
+    rank: optionalRank.openapi({ description: "The member's rank for the course; null when it is not in their ranking (not on their list, or unranked)." }),
+    outOf: z.number().int().min(0).openapi({ description: "How many courses the member's ranking holds (ranked courses only)." }),
+    onMyList: z.boolean().openapi({ description: "Whether the course is on the member's list, ranked or not." }),
     wantToPlay: z.boolean(),
   })
   .openapi("CourseStanding");
@@ -348,7 +382,10 @@ export const CoursePageSchema = z
   .object({
     course: CourseSchema,
     you: CourseStandingSchema,
-    friendsRanked: z.array(CourseFriendRankSchema).openapi({ description: "Friends with the course on their ranking, best rank first." }),
+    friendsRanked: z.array(CourseFriendRankSchema).openapi({ description: "Friends with the course in their ranking, best rank first." }),
+    friendsUnranked: z
+      .array(MemberSchema)
+      .openapi({ description: "Friends with the course on their list but not ranked (Played in the app), by display name." }),
     friendsWantToPlay: z.array(MemberSchema).openapi({ description: "Friends who want to play it, by display name." }),
   })
   .openapi("CoursePage");
@@ -394,10 +431,14 @@ export const HealthSchema = z.object({ ok: z.boolean() }).openapi("Health");
 
 const listAfterChange = z
   .array(MyCourseSchema)
-  .openapi({ description: "The member's whole list after the change, read in the same transaction." });
+  .openapi({ description: "The member's whole ranking after the change, read in the same transaction; `unranked` holds the rest of their list." });
 
 export const AddedToListSchema = z
-  .object({ added: z.boolean().openapi({ description: "False when the course was already on the list." }), courses: listAfterChange })
+  .object({
+    added: z.boolean().openapi({ description: "False when the course was already on the list." }),
+    courses: listAfterChange,
+    unranked: unrankedCourses,
+  })
   .openapi("AddedToList");
 
 const loggedRoundIds = z
@@ -405,15 +446,20 @@ const loggedRoundIds = z
   .openapi({ description: "Ids of the rounds just logged, so a client can offer Undo (`deleteRound` each one)." });
 
 export const AddedCourseSchema = z
-  .object({ courseId: z.uuid(), rank, roundIds: loggedRoundIds, courses: listAfterChange })
+  .object({ courseId: z.uuid(), rank, roundIds: loggedRoundIds, courses: listAfterChange, unranked: unrankedCourses })
   .openapi("AddedCourse");
 
 export const LoggedRoundsSchema = z
-  .object({ added: z.number().int().min(1).openapi({ description: "Rounds logged." }), roundIds: loggedRoundIds, courses: listAfterChange })
+  .object({
+    added: z.number().int().min(1).openapi({ description: "Rounds logged." }),
+    roundIds: loggedRoundIds,
+    courses: listAfterChange,
+    unranked: unrankedCourses,
+  })
   .openapi("LoggedRounds");
 
 export const MovedCourseSchema = z
-  .object({ rank, courses: listAfterChange })
+  .object({ rank, courses: listAfterChange, unranked: unrankedCourses })
   .openapi("MovedCourse");
 
 export const PlayCountSchema = z
@@ -421,6 +467,7 @@ export const PlayCountSchema = z
     count: z.number().int().min(0),
     removed: z.boolean().openapi({ description: "True when a count of zero removed the course from the list." }),
     courses: listAfterChange,
+    unranked: unrankedCourses,
   })
   .openapi("PlayCount");
 
@@ -429,6 +476,7 @@ export const DeletedRoundSchema = z
     courseId: z.uuid(),
     removedCourse: z.boolean().openapi({ description: "True when it was the course's last round, which removes the course." }),
     courses: listAfterChange,
+    unranked: unrankedCourses,
   })
   .openapi("DeletedRound");
 
@@ -540,12 +588,12 @@ export type AddCourseRequest = z.infer<typeof AddCourseRequestSchema>;
 export const CurationCourseSchema = z
   .object({
     course: CourseSchema,
-    members: z.number().int().min(1).openapi({ description: "Members with the course on their ranking." }),
+    members: z.number().int().min(1).openapi({ description: "Members with the course on their list, ranked or not." }),
   })
   .openapi("CurationCourse");
 
 export const CurationCoursesSchema = z
-  .object({ courses: z.array(CurationCourseSchema).openapi({ description: "Every course on a member's ranking, most-ranked first." }) })
+  .object({ courses: z.array(CurationCourseSchema).openapi({ description: "Every course on a member's list, most-listed first." }) })
   .openapi("CurationCourses");
 
 export const CommonsCandidateSchema = z

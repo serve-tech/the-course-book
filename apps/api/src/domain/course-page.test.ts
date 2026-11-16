@@ -13,7 +13,7 @@ const rows = (overrides: Partial<CoursePageRows>): CoursePageRows => ({
   course,
   viewerId: "me",
   friends,
-  ranks: [],
+  listings: [],
   sizes: [],
   wanted: [],
   ...overrides,
@@ -23,15 +23,20 @@ describe("coursePageFrom", () => {
   it.each([
     {
       name: "on the viewer's ranking",
-      input: rows({ ranks: [{ userId: "me", rank: 3 }], sizes: [{ userId: "me", size: 42 }], wanted: [] }),
-      you: { rank: 3, outOf: 42, wantToPlay: false },
+      input: rows({ listings: [{ userId: "me", rank: 3 }], sizes: [{ userId: "me", size: 42 }], wanted: [] }),
+      you: { rank: 3, outOf: 42, onMyList: true, wantToPlay: false },
+    },
+    {
+      name: "Played: on the list but not ranked",
+      input: rows({ listings: [{ userId: "me", rank: null }], sizes: [{ userId: "me", size: 42 }] }),
+      you: { rank: null, outOf: 42, onMyList: true, wantToPlay: false },
     },
     {
       name: "not on it, but wanted",
       input: rows({ sizes: [{ userId: "me", size: 42 }], wanted: [{ userId: "me" }] }),
-      you: { rank: null, outOf: 42, wantToPlay: true },
+      you: { rank: null, outOf: 42, onMyList: false, wantToPlay: true },
     },
-    { name: "an empty ranking", input: rows({}), you: { rank: null, outOf: 0, wantToPlay: false } },
+    { name: "an empty ranking", input: rows({}), you: { rank: null, outOf: 0, onMyList: false, wantToPlay: false } },
   ])("gives the viewer's standing: $name", ({ input, you }) => {
     expect(coursePageFrom(input).you).toEqual(you);
   });
@@ -39,7 +44,7 @@ describe("coursePageFrom", () => {
   it("orders friends by their rank, then by name, with their ranking size", () => {
     const page = coursePageFrom(
       rows({
-        ranks: [
+        listings: [
           { userId: "u_priya", rank: 5 },
           { userId: "u_ben", rank: 1 },
           { userId: "u_ana", rank: 5 },
@@ -58,14 +63,32 @@ describe("coursePageFrom", () => {
     ]);
   });
 
+  it("lists friends who have it Played, not ranked, by name and apart from those who rank it", () => {
+    const page = coursePageFrom(
+      rows({
+        listings: [
+          { userId: "u_priya", rank: null },
+          { userId: "u_ben", rank: 2 },
+          { userId: "u_ana", rank: null },
+          { userId: "me", rank: null },
+        ],
+      }),
+    );
+    expect(page.friendsUnranked).toEqual([member("ana", "Ana"), member("priya", "Priya")]);
+    expect(page.friendsRanked.map((friend) => friend.member.username)).toEqual(["ben"]);
+  });
+
   it("lists friends who want to play it by name", () => {
     const page = coursePageFrom(rows({ wanted: [{ userId: "u_priya" }, { userId: "u_ana" }, { userId: "me" }] }));
     expect(page.friendsWantToPlay).toEqual([member("ana", "Ana"), member("priya", "Priya")]);
   });
 
   it("never shows a member who is not the viewer's friend", () => {
-    const page = coursePageFrom(rows({ ranks: [{ userId: "stranger", rank: 1 }], wanted: [{ userId: "stranger" }] }));
+    const page = coursePageFrom(
+      rows({ listings: [{ userId: "stranger", rank: 1 }, { userId: "stranger_2", rank: null }], wanted: [{ userId: "stranger" }] }),
+    );
     expect(page.friendsRanked).toEqual([]);
+    expect(page.friendsUnranked).toEqual([]);
     expect(page.friendsWantToPlay).toEqual([]);
   });
 });
