@@ -4,6 +4,8 @@ Use the Node version from `.nvmrc` and install the committed dependencies with `
 
 Database-backed tests need the local Postgres: `docker compose up -d db` once, then `pnpm test`. The API's `db` project migrates the test database (`DATABASE_URL_TEST`) before running. `pnpm test:unit` runs only the projects that need no database.
 
+The API's `s3` project (`*.s3.test.ts`) sends real signed requests to an S3-compatible emulator, VersityGW, which checks signatures as R2 does. It skips unless `PHOTO_STORAGE_TEST_ENDPOINT`, `PHOTO_STORAGE_TEST_ACCESS_KEY_ID` and `PHOTO_STORAGE_TEST_SECRET_ACCESS_KEY` are set; CI sets them and `PHOTO_STORAGE_TEST_REQUIRED=1`, which turns the skip into a failure. Locally: `docker compose --profile photos up -d photos`, then `PHOTO_STORAGE_TEST_ENDPOINT=http://127.0.0.1:9000 PHOTO_STORAGE_TEST_ACCESS_KEY_ID=coursebook PHOTO_STORAGE_TEST_SECRET_ACCESS_KEY=coursebook-local-secret pnpm --filter @coursebook/api test:s3`. No test reaches Cloudflare R2.
+
 ## Standard checks
 
 Run before considering a change complete:
@@ -35,12 +37,12 @@ For documentation-only changes, check referenced paths, links, commands and clai
 | --- | --- |
 | `lint` | Typed ESLint across every workspace package, React hooks rules for the web app, and import boundaries: the domain package stays framework-, database- and Node-free; the API has no UI imports; the web app never imports server code or database libraries |
 | `typecheck` | `tsc` in every workspace package (`pnpm -r typecheck`), with generated route types for the web app; the domain package checks without DOM or Node types |
-| `pnpm test` | Vitest across the packages' projects: `domain`; `@coursebook/api (node)` and `(db)`; `@coursebook/web (node)` and `(jsdom)`. API `*.db.test.ts` suites run the real app or services against the migrated test database, serially |
+| `pnpm test` | Vitest across the packages' projects: `domain`; `@coursebook/api (node)`, `(db)` and `(s3)`; `@coursebook/web (node)` and `(jsdom)`. API `*.db.test.ts` suites run the real app or services against the migrated test database, serially. Photo uploads are tested with an in-memory bucket and real image processing; a committed phone-like JPEG with an EXIF GPS location proves stored photos carry no metadata |
 | `pnpm db:check` and `pnpm db:generate` | Migration drift gate: the snapshot chain is consistent and `apps/api/src/db/schema.ts` produces no new migration. CI fails if `apps/api/src/db/migrations` changes |
 | `pnpm contract:check` | The committed contract and web API types match the route definitions. `contract.test.ts` adds the rules native clients depend on: served and committed documents match, operations uniquely named, no polymorphic schemas, no email properties, response fields required, every secured operation 401s without a token |
 | `build` | The API bundle (`apps/api/dist`) and the static web app (`apps/web/build/client`) |
-| `test:e2e` | Playwright user flows against the built API and static web app, the migrated test database, the local OpenGolfAPI stub ([tests/e2e/opengolf-stub.ts](../tests/e2e/opengolf-stub.ts)) and a Clerk development instance; desktop Chromium and Chromium emulating an iPhone viewport, one test at a time because every scenario shares the two test users |
-| CI `docker` job | The API image builds, starts with no `node_modules`, migrates on start, serves `/healthz`, every ranking stored in the database (compared with the database, not a fixed number) and a 401 without a token |
+| `test:e2e` | Playwright user flows against the built API and static web app, the migrated test database, the local OpenGolfAPI stub ([tests/e2e/opengolf-stub.ts](../tests/e2e/opengolf-stub.ts)) and a Clerk development instance; desktop Chromium and Chromium emulating an iPhone viewport, one test at a time because every scenario shares the two test users. The photo upload scenario runs when `PHOTO_STORAGE_*` and `PHOTO_PUBLIC_URL` are set (Playwright passes them to the API); CI points them at a VersityGW emulator |
+| CI `docker` job | The API image builds, starts with no `node_modules` but sharp's (`dist/node_modules`), migrates on start, serves `/healthz`, every ranking stored in the database (compared with the database, not a fixed number) and a 401 without a token, and logs photo storage as off. A second container with photo storage configured loads sharp through the bundle, and sharp converts a JPEG to WebP in the image (musl) |
 
 A green suite does not verify Clerk's production instance, Render's environment, its rewrite to the API or DNS, or the cards messaging apps draw. Describe those limits accurately.
 

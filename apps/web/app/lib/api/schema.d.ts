@@ -503,7 +503,7 @@ export interface paths {
         get?: never;
         /**
          * Make a Wikimedia Commons file a course's photo
-         * @description Replaces any photo the course had. The credit and license come from Commons. Curators and admins only.
+         * @description Replaces any photo the course had. The credit and license come from Commons. When the API has photo storage, it keeps its own copy and serves the photo from there. Curators and admins only.
          */
         put: operations["setCoursePhoto"];
         post?: never;
@@ -512,6 +512,46 @@ export interface paths {
          * @description Succeeds when the course has no photo. Curators and admins only.
          */
         delete: operations["removeCoursePhoto"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/curation/photo-uploads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Whether curators can upload photos, and the limits
+         * @description Uploads need the API's photo storage; until it is configured `enabled` is false. Curators and admins only.
+         */
+        get: operations["getPhotoUploadSettings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/courses/{courseId}/photo/upload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload a course's photo
+         * @description Replaces any photo the course had. The API stores it upright as WebP at 1280 and 330 px and removes its metadata, location included. Credit and license (or permission) are required. Curators and admins only.
+         */
+        post: operations["uploadCoursePhoto"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -609,7 +649,7 @@ export interface components {
         };
         ApiErrorBody: {
             /**
-             * @description Stable machine-readable code. Current values: bad_request, validation_failed, us_state_required, unauthenticated, account_deleted, username_invalid, username_taken, not_found, course_not_found, not_on_list, round_not_found, member_not_found, friendship_not_found, top_list_not_found, payload_too_large, unsupported_media_type, account_deletion_incomplete, search_unavailable, curator_required, admin_required, photo_not_usable, commons_unavailable, role_protected, internal. New codes may appear; treat unknown codes by HTTP status.
+             * @description Stable machine-readable code. Current values: bad_request, validation_failed, us_state_required, unauthenticated, account_deleted, username_invalid, username_taken, not_found, course_not_found, not_on_list, round_not_found, member_not_found, friendship_not_found, top_list_not_found, payload_too_large, unsupported_media_type, account_deletion_incomplete, search_unavailable, curator_required, admin_required, photo_not_usable, commons_unavailable, photo_uploads_off, photo_storage_unavailable, photo_too_large, photo_unsupported, photo_too_narrow, role_protected, internal. New codes may appear; treat unknown codes by HTTP status.
              * @example not_on_list
              */
             code: string;
@@ -682,7 +722,7 @@ export interface components {
             licenseUrl: string | null;
             /**
              * Format: uri
-             * @description The photo's source page, e.g. its Wikimedia Commons file page.
+             * @description The photo's source page, e.g. its Wikimedia Commons file page. An uploaded photo with no source page gives its own address (`url`).
              */
             sourceUrl: string;
         } | null;
@@ -1056,6 +1096,39 @@ export interface components {
         SetCoursePhotoRequest: {
             /** @description A Commons file page title from `searchCommonsPhotos`. Its credit and license are read from Commons. */
             commonsFile: string;
+        };
+        PhotoUploadSettings: {
+            /** @description Whether `uploadCoursePhoto` works. False until the API's photo storage is configured; offer Commons only. */
+            enabled: boolean;
+            /** @description The largest photo file accepted, in bytes. */
+            maxBytes: number;
+            /** @description The most pixels (width × height) a photo may have. */
+            maxPixels: number;
+            /** @description The narrowest photo accepted, in pixels, once upright. */
+            minWidth: number;
+            /** @description Content types accepted, JPEG first. Use them in this order for a file picker's `accept`: iOS Safari converts a HEIC photo to the first. */
+            contentTypes: string[];
+        };
+        UploadCoursePhotoRequest: {
+            /**
+             * Format: binary
+             * @description The photo: JPEG, PNG or WebP within `PhotoUploadSettings`' limits.
+             */
+            photo: string;
+            /** @description The photographer or owner, shown with the photo. */
+            credit: string;
+            /** @description A license's short name (`CC BY 4.0`) or the permission given (`Used with permission`). */
+            license: string;
+            /**
+             * Format: uri
+             * @description The license's text, when it has one; http or https.
+             */
+            licenseUrl?: string | null;
+            /**
+             * Format: uri
+             * @description Where the photo came from. Without one, the photo's own address is its `sourceUrl`.
+             */
+            sourceUrl?: string | null;
         };
         RoledMembers: {
             /** @description Every active member, admins and curators first. */
@@ -2938,7 +3011,7 @@ export interface operations {
                     "application/json": components["schemas"]["ApiError"];
                 };
             };
-            /** @description Wikimedia Commons did not answer: `commons_unavailable`. Try again shortly. */
+            /** @description Wikimedia Commons (`commons_unavailable`) or photo storage (`photo_storage_unavailable`) did not answer. Try again shortly. */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -3007,6 +3080,151 @@ export interface operations {
             };
             /** @description Another member holds the Clerk account's username: `username_taken`. Choose a different username. */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    getPhotoUploadSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Upload availability and limits. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhotoUploadSettings"];
+                };
+            };
+            /** @description No valid session: `unauthenticated`, or `account_deleted` after the account was deleted. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description The Clerk account cannot use the app (`username_invalid`), or the member is not a curator or admin (`curator_required`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Another member holds the Clerk account's username: `username_taken`. Choose a different username. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    uploadCoursePhoto: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                courseId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["UploadCoursePhotoRequest"];
+            };
+        };
+        responses: {
+            /** @description The course with its new photo. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Course"];
+                };
+            };
+            /** @description Invalid form (`validation_failed`, `bad_request`), a file that isn't a JPEG, PNG or WebP photo (`photo_unsupported`, HEIC included), or a photo narrower than `minWidth` (`photo_too_narrow`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description No valid session: `unauthenticated`, or `account_deleted` after the account was deleted. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description The Clerk account cannot use the app (`username_invalid`), or the member is not a curator or admin (`curator_required`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description No such catalog course: `course_not_found`. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Another member holds the Clerk account's username: `username_taken`. Choose a different username. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description More bytes or pixels than `PhotoUploadSettings` allows: `photo_too_large`. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Not sent as multipart/form-data: `unsupported_media_type`. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Uploads aren't switched on (`photo_uploads_off`), or photo storage didn't answer (`photo_storage_unavailable`). Try again shortly. */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

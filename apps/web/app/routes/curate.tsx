@@ -6,7 +6,8 @@ import type { Route } from "./+types/curate";
 import { BACK_TO_COURSE, commonsQuery, curationList, CurationTab, membersNote, type CurationEntry } from "../features/curation/curation";
 import { listEntries } from "../features/top-lists/lists";
 import { CurationPage, type CurationReply } from "../features/curation/CurationPage";
-import { api, ApiError, unwrap } from "../lib/api";
+import { UPLOADS_OFF, type UploadSettings } from "../features/curation/photo-upload";
+import { api, ApiError, unwrap, uploadCoursePhoto } from "../lib/api";
 import { fromApiCourse, fromCoursePage, fromRankingEntry } from "../lib/api/mappers";
 import { apiFailureMessage } from "../shared/lib/errors";
 import { RouteError } from "../shared/ui/RouteError";
@@ -14,10 +15,10 @@ import { useShell } from "../shared/ui/shell";
 
 /**
  * The curator screen (`/curate`): courses on members' rankings, or on a
- * national published list (`?from=world`), and their photos; a Wikimedia
- * Commons search for one course (`?course=<id>`, with `q` to search for
- * something other than its name, and `back=course` to return to the course's
- * page); and, for admins, who curates
+ * national published list (`?from=world`), and their photos; for one course
+ * (`?course=<id>`), an upload when the API has photo storage (#67) and a
+ * Wikimedia Commons search (`q` searches for something other than its name;
+ * `back=course` returns to the course's page); and, for admins, who curates
  * (`?tab=curators`). Decision 2026-11-13.
  */
 export async function clientLoader({ request }: Route.ClientLoaderArgs) {
@@ -49,6 +50,7 @@ export async function clientLoader({ request }: Route.ClientLoaderArgs) {
     listed.find((entry) => entry.course.id === courseId)?.course ??
     fromCoursePage(unwrap(await api.GET("/v1/courses/{courseId}", { params: { path: { courseId } } }))).course;
   const query = (url.searchParams.get("q") ?? commonsQuery(course.name)).trim();
+  const uploads = uploadSettings();
   let candidates: CommonsCandidate[] = [];
   let searchError: string | null = null;
   if (query.length >= 2) {
@@ -61,7 +63,28 @@ export async function clientLoader({ request }: Route.ClientLoaderArgs) {
     }
   }
   const backToCourse = url.searchParams.get("back") === BACK_TO_COURSE;
-  return { role, tab: CurationTab.Photos, source, courses: listed, picking: { course, query, candidates, searchError, backToCourse } } as const;
+  return {
+    role,
+    tab: CurationTab.Photos,
+    source,
+    courses: listed,
+    picking: { course, query, candidates, searchError, backToCourse, uploads: await uploads },
+  } as const;
+}
+
+/**
+ * Whether the API takes photo uploads (#67). The static site can deploy
+ * before the API, and uploads are optional, so an API that can't say (an
+ * older release answers 404) means no uploads rather than a broken page.
+ */
+async function uploadSettings(): Promise<UploadSettings> {
+  try {
+    return unwrap(await api.GET("/v1/curation/photo-uploads"));
+  } catch (error) {
+    if (!(error instanceof ApiError)) throw error;
+    console.warn("Photo upload settings unavailable; uploads are hidden", error);
+    return UPLOADS_OFF;
+  }
 }
 
 const intentSchema = z.discriminatedUnion("intent", [
@@ -109,7 +132,7 @@ export function meta() {
 export default function Curate({ loaderData }: Route.ComponentProps) {
   const shell = useShell();
   if (!loaderData) return null;
-  return <CurationPage view={loaderData} notify={shell.notify} />;
+  return <CurationPage view={loaderData} notify={shell.notify} upload={uploadCoursePhoto} />;
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {

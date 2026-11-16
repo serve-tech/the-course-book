@@ -20,19 +20,63 @@ const METADATA = "Artist|LicenseShortName|LicenseUrl|ImageDescription";
 
 export const COMMONS_UNAVAILABLE = "Wikimedia Commons isn't answering right now. Try again in a minute.";
 
+/** Commons serves its images from this host only; nothing else is downloaded. */
+const IMAGE_HOST = "upload.wikimedia.org";
+/** A 1280 px Commons thumbnail is a few hundred KB; a narrower original is rarely more than a few MB. */
+const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
+const IMAGE_TIMEOUT_MS = 20_000;
+
 export interface CommonsClient {
   /** Usable photos whose Commons pages match `query`, best match first. */
   search(query: string): Promise<CommonsCandidate[]>;
   /** One file by its page title ("File:…"); null when it is missing or unusable. */
   file(title: string): Promise<CommonsPhoto | null>;
+  /**
+   * Download an image Commons serves (a `CommonsPhoto.url`), to keep a copy
+   * of it in the app's own storage (#67).
+   *
+   * Raises:
+   *     AppError: 503 `commons_unavailable` when Commons fails, the URL
+   *         isn't on upload.wikimedia.org, or the image is over 25 MB.
+   */
+  image(url: string): Promise<Uint8Array>;
 }
 
 export interface CommonsDependencies {
   fetcher?: typeof fetch;
 }
 
+/**
+ * A response body, read until `maxBytes`; null when it is longer. The
+ * download stops there, so an unexpected file is never held whole.
+ */
+export async function readAtMost(response: Response, maxBytes: number): Promise<Uint8Array | null> {
+  const reader: ReadableStreamDefaultReader<Uint8Array> | undefined = response.body?.getReader();
+  if (!reader) return new Uint8Array();
+  const chunks: Uint8Array[] = [];
+  let length = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    length += value.byteLength;
+    if (length > maxBytes) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(length);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return bytes;
+}
+
 export function createCommonsClient(deps: CommonsDependencies = {}): CommonsClient {
   const fetcher = deps.fetcher ?? ((input, init) => globalThis.fetch(input, init));
+  const unavailable = (cause: unknown) => new AppError(503, ErrorCode.CommonsUnavailable, COMMONS_UNAVAILABLE, { cause });
 
   async function query(params: Record<string, string>) {
     const url = API_URL + "?" + new URLSearchParams({ action: "query", format: "json", formatversion: "2", ...params }).toString();
@@ -69,6 +113,25 @@ export function createCommonsClient(deps: CommonsDependencies = {}): CommonsClie
     async file(title) {
       const [page] = await query({ titles: title, ...imageinfo });
       return page ? commonsPhoto(page) : null;
+    },
+    async image(url) {
+      if (!URL.canParse(url) || new URL(url).protocol !== "https:" || new URL(url).hostname !== IMAGE_HOST)
+        throw unavailable(new Error("Not a Commons image address"));
+      let response: Response;
+      try {
+        response = await fetcher(url, { headers: { "User-Agent": USER_AGENT }, signal: AbortSignal.timeout(IMAGE_TIMEOUT_MS) });
+      } catch (cause) {
+        throw unavailable(cause);
+      }
+      if (!response.ok) throw unavailable(new Error("Commons answered " + String(response.status) + " for an image"));
+      let bytes: Uint8Array | null;
+      try {
+        bytes = await readAtMost(response, MAX_IMAGE_BYTES);
+      } catch (cause) {
+        throw unavailable(cause);
+      }
+      if (!bytes) throw unavailable(new Error("The Commons image is larger than " + String(MAX_IMAGE_BYTES) + " bytes"));
+      return bytes;
     },
   };
 }

@@ -30,6 +30,9 @@ import { registerWantToPlayRoutes } from "./routes/want-to-play";
 import { checkDatabase } from "./services/health";
 import type { Provisioner } from "./services/provisioning";
 import type { CommonsClient } from "./services/commons";
+import type { PhotoStorage } from "./services/curation";
+import { tooManyBytesError } from "./services/photo-images";
+import { UPLOAD_LIMITS } from "./domain/stored-photo";
 import type { CourseSearch } from "./services/search";
 import type { WebShell } from "./services/web-shell";
 
@@ -69,6 +72,12 @@ export interface AppDependencies {
   search: CourseSearch;
   /** Wikimedia Commons, for curators picking course photos. */
   commons: CommonsClient;
+  /**
+   * The app's own photo storage and image processing (#67). Absent or null
+   * when photo storage isn't configured: uploads are off and Commons photos
+   * are served from Commons.
+   */
+  photos?: PhotoStorage | null;
   /** Exact origins of the web app, used for CORS and the token `azp` check. */
   webOrigins: readonly string[];
   clientConfig: ClientConfig;
@@ -127,6 +136,11 @@ const securityHeaders = secureHeaders({
   crossOriginResourcePolicy: "cross-origin",
 });
 
+/** The one operation whose body is a file (#67); every other `/v1` body is small JSON. */
+const PHOTO_UPLOAD_PATH = "/v1/courses/:courseId/photo/upload";
+/** Room in an upload's body for the multipart boundaries and the credit and license fields. */
+const UPLOAD_FORM_ALLOWANCE = 64 * 1024;
+
 /** Personal responses must never be stored by a shared cache. */
 const noStore: MiddlewareHandler<AppEnv> = async (c, next) => {
   await next();
@@ -137,9 +151,10 @@ const noStore: MiddlewareHandler<AppEnv> = async (c, next) => {
  * Build the API application.
  *
  * Middleware order matters: request id, logging and security headers wrap
- * everything; CORS answers preflights before authentication; the body limit
- * and session checks apply to `/v1` only. `/healthz` stays outside `/v1`,
- * unlogged, for Render's frequent probes.
+ * everything; CORS answers preflights before authentication; the body limits
+ * (32 KB, or the upload limit for `uploadCoursePhoto`) and session checks
+ * apply to `/v1` only. `/healthz` stays outside `/v1`, unlogged, for
+ * Render's frequent probes.
  */
 export function createApp(deps: AppDependencies): OpenAPIHono<AppEnv> {
   const logger = deps.logger ?? consoleLogger;
@@ -173,10 +188,25 @@ export function createApp(deps: AppDependencies): OpenAPIHono<AppEnv> {
   app.use("*", compress());
   app.use(
     "/v1/*",
+    except(
+      PHOTO_UPLOAD_PATH,
+      bodyLimit({
+        maxSize: 32 * 1024,
+        onError: () => {
+          throw new HTTPException(413);
+        },
+      }),
+    ),
+  );
+  // An upload is read into memory to be decoded, so its size is capped
+  // before it is read: by Content-Length when sent, else while it streams.
+  const uploadLimits = deps.photos?.limits ?? UPLOAD_LIMITS;
+  app.use(
+    PHOTO_UPLOAD_PATH,
     bodyLimit({
-      maxSize: 32 * 1024,
+      maxSize: uploadLimits.maxBytes + UPLOAD_FORM_ALLOWANCE,
       onError: () => {
-        throw new HTTPException(413);
+        throw tooManyBytesError(uploadLimits);
       },
     }),
   );
@@ -206,7 +236,7 @@ export function createApp(deps: AppDependencies): OpenAPIHono<AppEnv> {
   registerWantToPlayRoutes(app, deps);
   registerTopListRoutes(app, deps);
   registerCourseRoutes(app, deps);
-  registerCurationRoutes(app, deps);
+  registerCurationRoutes(app, deps, logger);
   registerFeedRoutes(app, deps);
   registerClientRoutes(app, deps);
   registerSharePageRoutes(app, deps, logger);

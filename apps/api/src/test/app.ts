@@ -4,6 +4,8 @@ import { createApp, type AppDependencies, type Logger, type RequestLog } from ".
 import { createClerkSessionVerifier } from "../auth/session";
 import type { Database } from "../db/client";
 import type { LoggedError } from "../http/loggable-error";
+import { COMMONS_UNAVAILABLE } from "../services/commons";
+import { AppError, ErrorCode } from "../services/errors";
 import { createProvisioner, provisionUser } from "../services/provisioning";
 import { createTestTokens, TEST_PUBLISHABLE_KEY, TEST_SECRET_KEY } from "./tokens";
 
@@ -20,8 +22,9 @@ export const TEST_CLIENT_CONFIG = {
  * The real API over the test database. Tokens are signed locally and checked
  * by the real Clerk verifier; only the external services are replaced:
  * course discovery (`setSearchResults`), Wikimedia Commons
- * (`setCommonsPhotos`) and Clerk account deletion (`deletedAccounts`,
- * `failAccountDeletion`).
+ * (`setCommonsPhotos`, `commonsImages`) and Clerk account deletion
+ * (`deletedAccounts`, `failAccountDeletion`). Photo storage is off unless
+ * `overrides.photos` passes one (an in-memory store from `photo-store.ts`).
  */
 export function createTestApp(db: Database, overrides: Partial<AppDependencies> = {}) {
   const tokens = createTestTokens();
@@ -31,6 +34,7 @@ export function createTestApp(db: Database, overrides: Partial<AppDependencies> 
   let searchResults: SearchResult[] | Error = [];
   let commonsPhotos: CommonsPhoto[] | Error = [];
   const commonsFailure = () => (commonsPhotos instanceof Error ? commonsPhotos : null);
+  const commonsImages = new Map<string, Uint8Array>();
   const deletedAccounts: string[] = [];
   let accountDeletionFailure: Error | null = null;
   const logger: Logger = {
@@ -79,6 +83,12 @@ export function createTestApp(db: Database, overrides: Partial<AppDependencies> 
         if (failure) return Promise.reject(failure);
         return Promise.resolve((commonsPhotos as CommonsPhoto[]).find((photo) => photo.file === title) ?? null);
       },
+      image: (url) => {
+        const failure = commonsFailure();
+        if (failure) return Promise.reject(failure);
+        const bytes = commonsImages.get(url);
+        return bytes ? Promise.resolve(bytes) : Promise.reject(new AppError(503, ErrorCode.CommonsUnavailable, COMMONS_UNAVAILABLE));
+      },
     },
     webOrigins: [WEB_ORIGIN],
     clientConfig: TEST_CLIENT_CONFIG,
@@ -108,6 +118,8 @@ export function createTestApp(db: Database, overrides: Partial<AppDependencies> 
     setCommonsPhotos: (value: CommonsPhoto[] | Error) => {
       commonsPhotos = value;
     },
+    /** The image bytes the fake Commons serves at an address (a `CommonsPhoto.url`). */
+    commonsImages,
     deletedAccounts,
     failAccountDeletion: (error: Error | null) => {
       accountDeletionFailure = error;

@@ -260,7 +260,8 @@ export const photoSource = pgEnum("photo_source", PhotoSource);
  * At most one photo per course, chosen by a curator (decision 2026-11-13).
  * Every row carries the credit and license its source requires; the API
  * shows them wherever the photo appears. `url` is where the image is served
- * from: upload.wikimedia.org for Commons photos until R2 (#67).
+ * from: upload.wikimedia.org for a Commons photo with no stored copy, or the
+ * app's own storage (#67), in which case `storage_key` names the copy.
  */
 export const coursePhotos = pgTable("course_photos", {
   courseId: uuid("course_id")
@@ -276,6 +277,14 @@ export const coursePhotos = pgTable("course_photos", {
   sourceUrl: text("source_url").notNull(),
   /** The Commons file's page title, e.g. "File:ArcadiaBluffs1011.jpg"; null for other sources. */
   commonsFile: text("commons_file"),
+  /**
+   * The prefix of the photo's files in the app's own storage
+   * (`courses/<course>/<photo>`, holding `hero.webp` and `card.webp`);
+   * null while it is served from Commons. A row only names files that were
+   * stored before it was written, and files are deleted only after no row
+   * names them (services/course-photos.ts).
+   */
+  storageKey: text("storage_key"),
   /** The curator who set it; null once their account is deleted. */
   setBy: text("set_by").references(() => users.id, { onDelete: "set null" }),
   ...timestamps,

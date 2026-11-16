@@ -1,6 +1,12 @@
 /** Hosts the development seed may write to: this machine only. */
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
 
+/** Whether a URL (a database's, or a storage emulator's) points at this machine. */
+export function isLocalUrl(url: string): boolean {
+  if (!URL.canParse(url)) return false;
+  return LOCAL_HOSTS.has(new URL(url).hostname);
+}
+
 /**
  * Whether a Postgres URL points at this machine.
  *
@@ -8,6 +14,5 @@ const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
  * shared database) is refused, whatever `.env` or the shell says.
  */
 export function isLocalDatabaseUrl(url: string): boolean {
-  if (!URL.canParse(url)) return false;
-  return LOCAL_HOSTS.has(new URL(url).hostname);
+  return isLocalUrl(url);
 }

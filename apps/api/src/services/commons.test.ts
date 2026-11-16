@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createCommonsClient } from "./commons";
+import { createCommonsClient, readAtMost } from "./commons";
 import { AppError, ErrorCode } from "./errors";
 
 const info = (name: string, overrides: { width?: number; license?: string } = {}) => ({
@@ -74,5 +74,54 @@ describe("createCommonsClient", () => {
       .catch((caught: unknown) => caught);
     expect(error).toBeInstanceOf(AppError);
     expect(error).toMatchObject({ status: 503, code: ErrorCode.CommonsUnavailable });
+  });
+});
+
+describe("Commons images", () => {
+  const url = "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/First.jpg/1280px-First.jpg";
+
+  it("downloads an image, identifying the app", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response(new Uint8Array([255, 216, 255, 1]), { status: 200 }));
+    await expect(createCommonsClient({ fetcher }).image(url)).resolves.toEqual(new Uint8Array([255, 216, 255, 1]));
+    expect(requested(fetcher).href).toBe(url);
+    expect(new Headers(fetcher.mock.calls[0]?.[1]?.headers).get("User-Agent")).toBe("TheCourseBook/1.0 (https://coursebook.golf)");
+  });
+
+  it.each([
+    "http://upload.wikimedia.org/wikipedia/commons/a/ab/First.jpg",
+    "https://example.com/First.jpg",
+    "https://upload.wikimedia.org.example.com/First.jpg",
+    "not a url",
+  ])("refuses to download %s", async (address) => {
+    const fetcher = vi.fn<typeof fetch>();
+    await expect(createCommonsClient({ fetcher }).image(address)).rejects.toMatchObject({ status: 503, code: ErrorCode.CommonsUnavailable });
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { name: "a missing file", fetcher: () => Promise.resolve(new Response("", { status: 404 })) },
+    { name: "a network failure", fetcher: () => Promise.reject(new TypeError("fetch failed")) },
+  ])("reports Commons as unavailable on $name", async ({ fetcher }) => {
+    await expect(createCommonsClient({ fetcher: vi.fn<typeof fetch>(fetcher) }).image(url)).rejects.toMatchObject({ status: 503, code: ErrorCode.CommonsUnavailable });
+  });
+});
+
+describe("readAtMost", () => {
+  const streamed = (...chunks: number[]) =>
+    new Response(
+      new ReadableStream<Uint8Array>({
+        start(controller) {
+          for (const size of chunks) controller.enqueue(new Uint8Array(size).fill(7));
+          controller.close();
+        },
+      }),
+    );
+
+  it("reads a body up to the limit", async () => {
+    expect(await readAtMost(streamed(3, 4), 7)).toEqual(new Uint8Array(7).fill(7));
+  });
+
+  it("stops reading a body past the limit", async () => {
+    expect(await readAtMost(streamed(3, 4, 100), 7)).toBeNull();
   });
 });

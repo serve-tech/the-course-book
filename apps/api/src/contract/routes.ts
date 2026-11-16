@@ -48,6 +48,7 @@ import {
   UsernameParamsSchema,
   WantToPlaySchema,
 } from "./schemas";
+import { PhotoUploadSettingsSchema, UploadCoursePhotoRequestSchema } from "./schemas";
 
 /**
  * Operation definitions of API v1: paths, parameters, responses and
@@ -601,7 +602,9 @@ export const setCoursePhoto = createRoute({
   operationId: "setCoursePhoto",
   tags: ["Curation"],
   summary: "Make a Wikimedia Commons file a course's photo",
-  description: "Replaces any photo the course had. The credit and license come from Commons. Curators and admins only.",
+  description:
+    "Replaces any photo the course had. The credit and license come from Commons. When the API has photo storage, it keeps its own copy " +
+    "and serves the photo from there. Curators and admins only.",
   security: MEMBER,
   request: { params: CourseIdParamsSchema, ...jsonBody(SetCoursePhotoRequestSchema) },
   responses: {
@@ -611,7 +614,7 @@ export const setCoursePhoto = createRoute({
     403: notCurator,
     404: failure("No such catalog course: `course_not_found`."),
     409: usernameTaken,
-    503: commonsUnavailable,
+    503: failure("Wikimedia Commons (`commons_unavailable`) or photo storage (`photo_storage_unavailable`) did not answer. Try again shortly."),
   },
 });
 
@@ -660,5 +663,46 @@ export const setMemberRole = createRoute({
     403: notAdmin,
     404: failure("No active member with that username: `member_not_found`."),
     409: failure("The member is an admin (`role_protected`), or another member holds the Clerk account's username (`username_taken`)."),
+  },
+});
+
+export const getPhotoUploadSettings = createRoute({
+  method: "get",
+  path: "/v1/curation/photo-uploads",
+  operationId: "getPhotoUploadSettings",
+  tags: ["Curation"],
+  summary: "Whether curators can upload photos, and the limits",
+  description: "Uploads need the API's photo storage; until it is configured `enabled` is false. Curators and admins only.",
+  security: MEMBER,
+  responses: { 200: json(PhotoUploadSettingsSchema, "Upload availability and limits."), 401: unauthenticated, 403: notCurator, 409: usernameTaken },
+});
+
+export const uploadCoursePhoto = createRoute({
+  method: "post",
+  path: "/v1/courses/{courseId}/photo/upload",
+  operationId: "uploadCoursePhoto",
+  tags: ["Curation"],
+  summary: "Upload a course's photo",
+  description:
+    "Replaces any photo the course had. The API stores it upright as WebP at 1280 and 330 px and removes its metadata, location included. " +
+    "Credit and license (or permission) are required. Curators and admins only.",
+  security: MEMBER,
+  request: {
+    params: CourseIdParamsSchema,
+    body: { required: true, content: { "multipart/form-data": { schema: UploadCoursePhotoRequestSchema } } },
+  },
+  responses: {
+    200: json(CourseSchema, "The course with its new photo."),
+    400: failure(
+      "Invalid form (`validation_failed`, `bad_request`), a file that isn't a JPEG, PNG or WebP photo (`photo_unsupported`, HEIC included), " +
+        "or a photo narrower than `minWidth` (`photo_too_narrow`).",
+    ),
+    401: unauthenticated,
+    403: notCurator,
+    404: failure("No such catalog course: `course_not_found`."),
+    409: usernameTaken,
+    413: failure("More bytes or pixels than `PhotoUploadSettings` allows: `photo_too_large`."),
+    415: failure("Not sent as multipart/form-data: `unsupported_media_type`."),
+    503: failure("Uploads aren't switched on (`photo_uploads_off`), or photo storage didn't answer (`photo_storage_unavailable`). Try again shortly."),
   },
 });

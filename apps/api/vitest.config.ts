@@ -15,6 +15,9 @@ const TEST_DATABASE_URL =
  * - db: `*.db.test.ts` suites against the migrated local test database, run
  *   serially and in their own sequence group because other packages' db
  *   projects share the database.
+ * - s3: `*.s3.test.ts` integration suites against a local S3-compatible
+ *   emulator (`PHOTO_STORAGE_TEST_*`); they skip when it isn't configured.
+ *   Run them alone with `pnpm --filter @coursebook/api test:s3`.
  */
 export default defineConfig({
   test: {
@@ -26,7 +29,7 @@ export default defineConfig({
           restoreMocks: true,
           environment: "node",
           include: ["src/**/*.test.ts", "scripts/**/*.test.ts"],
-          exclude: ["**/*.db.test.ts", "**/node_modules/**"],
+          exclude: ["**/*.db.test.ts", "**/*.s3.test.ts", "**/node_modules/**"],
         },
       },
       {
@@ -40,6 +43,15 @@ export default defineConfig({
           fileParallelism: false,
           sequence: { groupOrder: 1 },
           env: { DATABASE_URL: TEST_DATABASE_URL, DATABASE_URL_TEST: TEST_DATABASE_URL },
+        },
+      },
+      {
+        test: {
+          name: "s3",
+          root: fileURLToPath(new URL(".", import.meta.url)),
+          restoreMocks: true,
+          environment: "node",
+          include: ["src/**/*.s3.test.ts"],
         },
       },
     ],

@@ -1,8 +1,12 @@
 # coursebook.golf API image. Build context: the repository root
 #   docker build -f apps/api/Dockerfile .
-# The runtime stage holds only the esbuild bundle and its migrations; no
-# node_modules. Recipe validated in the P0 spike
-# (.planning/research/2026-09-25-api-split-spikes.md).
+# The runtime stage holds the esbuild bundle, its migrations and, in
+# dist/node_modules, only sharp with its prebuilt libvips for musl (photo
+# uploads, #67), which build.ts copies there because a native module can't be
+# bundled. The build stage is Alpine for that reason: pnpm installs the
+# binaries for the platform it runs on. Recipe validated in the P0 spike
+# (.planning/research/2026-09-25-api-split-spikes.md); sharp in
+# .planning/decisions/2026-11-15-process-course-photos-with-sharp-in-the-api-image.md.
 FROM node:24-alpine AS base
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 RUN corepack enable && corepack prepare pnpm@12.5.1 --activate

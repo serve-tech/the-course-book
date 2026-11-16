@@ -22,16 +22,21 @@
     "import:supabase": "tsx scripts/import-supabase.ts",
     "seed:dev": "tsx scripts/seed-dev.ts",
     "role:set": "tsx scripts/set-role.ts",
-    "contract:emit": "tsx scripts/emit-openapi.ts"
+    "contract:emit": "tsx scripts/emit-openapi.ts",
+    "test:s3": "vitest run --project s3",
+    "photos:local-bucket": "tsx scripts/prepare-photo-bucket.ts",
+    "photos:copy-commons": "tsx scripts/copy-commons-photos.ts"
   },
   "dependencies": {
     "@clerk/backend": "^3.18.1",
     "@coursebook/domain": "workspace:*",
     "@hono/node-server": "2.1.1",
     "@hono/zod-openapi": "1.6.3",
+    "aws4fetch": "1.0.20",
     "drizzle-orm": "0.45.3",
     "hono": "4.13.9",
     "pg": "8.23.0",
+    "sharp": "0.35.5",
     "zod": "4.6.5"
   },
   "devDependencies": {
