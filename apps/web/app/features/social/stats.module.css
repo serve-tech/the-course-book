@@ -1,0 +1,81 @@
+/*
+ * The Stats tab: one full-width band per section.
+ * No two sections that grow differently sit side by side: a member has four
+ * Top 100s but may have fifty states, so each band's height is its own.
+ * Inside a band, rows run two across from 860 px and one across below.
+ */
+
+.page { display: grid; gap: 38px; min-width: 0; }
+.grid { display: grid; gap: 6px 48px; margin: 0; padding: 0; list-style: none; }
+/* The two comparisons with the lists: both short, so they can share a band. */
+.pair { display: grid; gap: 38px 48px; }
+@media (min-width: 860px) {
+  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pair { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+}
+/* Leaves room under the sticky header when "Show fewer" returns to the heading. */
+.anchor { scroll-margin-top: calc(86px + env(safe-area-inset-top, 0px)); }
+.more { margin-top: 14px; }
+
+/*
+ * A row: the name on the left and its number on the right, the bar under
+ * both, then the member's top-ranked course. The name's link covers the row
+ * (as CourseRow's does), so the row opens its list; links inside sit above it.
+ */
+.rows { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.row { position: relative; display: grid; gap: 7px; margin: 0 -10px; padding: 9px 10px; border-radius: 10px; }
+.row:hover:has(.rowLink) { background: rgba(255, 255, 255, 0.04); }
+.rowHead { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.rowTitle { font: 600 16px / 1.25 "Playfair Display", Georgia, serif; color: var(--cream); text-decoration: none; overflow-wrap: anywhere; }
+.rowLink::after { content: ""; position: absolute; inset: 0; z-index: 1; border-radius: 10px; }
+.row:hover .rowLink { color: var(--gold); }
+.rowLink:focus-visible { outline: none; }
+.rowLink:focus-visible::after { outline: 2px solid var(--gold); outline-offset: -2px; }
+.rowCount {
+  margin-left: auto;
+  font: 600 18px / 1 "Playfair Display", Georgia, serif;
+  color: var(--cream);
+  white-space: nowrap;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+.rowCount small { font: 600 11px "DM Sans", Arial, sans-serif; color: var(--muted); }
+
+/* How many of a state's courses are on its "Best in" list, in words, over that list's bar. */
+.onList { margin: 0; color: var(--muted); font-size: 12.5px; line-height: 1.4; }
+
+.topRanked { margin: 0; color: var(--muted); font-size: 12.5px; line-height: 1.4; }
+.topRanked b { color: var(--gold); font-weight: 700; font-variant-numeric: tabular-nums; }
+.courseLink { position: relative; z-index: 2; color: var(--cream); text-decoration: none; }
+.courseLink:hover { color: var(--gold); text-decoration: underline; }
+.courseLink:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; border-radius: 3px; }
+
+/* How the ranking compares with the lists: a label, the course, one sentence. */
+.notes { display: grid; gap: 18px; }
+.note { display: grid; gap: 4px; }
+.noteLabel { font-size: 10px; font-weight: 700; letter-spacing: 1.4px; text-transform: uppercase; color: var(--gold); }
+.noteCourse { justify-self: start; font: 600 18px / 1.25 "Playfair Display", Georgia, serif; }
+.noteText { margin: 0; color: var(--muted); font-size: 13.5px; line-height: 1.5; }
+.noteText a, .bestList a { color: var(--cream); text-decoration: underline; text-decoration-color: rgba(255, 255, 255, 0.25); text-underline-offset: 3px; }
+.noteText a:hover, .bestList a:hover { color: var(--gold); }
+
+/* The best course played on each national list: its rank there, the course, the list. */
+.best { display: grid; grid-template-columns: 3.25rem minmax(0, 1fr); gap: 12px; align-items: baseline; padding: 7px 0; }
+.bestRank { font: 600 22px / 1 "Playfair Display", Georgia, serif; color: var(--gold); text-align: right; font-variant-numeric: lining-nums tabular-nums; }
+.best .courseLink { font: 600 16px / 1.25 "Playfair Display", Georgia, serif; }
+.bestList { display: block; margin-top: 2px; color: var(--muted); font-size: 12.5px; }
+
+/* A native progress bar draws the share without an inline width; WebKit and Firefox each need their own parts. */
+.bar {
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  width: 100%;
+  height: 6px;
+  border: 0;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+.bar::-webkit-progress-bar { background: rgba(255, 255, 255, 0.08); border-radius: 99px; }
+.bar::-webkit-progress-value { background: var(--gold); border-radius: 99px; }
+.bar::-moz-progress-bar { background: var(--gold); border-radius: 99px; }

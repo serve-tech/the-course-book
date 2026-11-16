@@ -7,6 +7,7 @@ import { sharePath } from "@coursebook/domain/sharing/view";
 import { displayName } from "../features/social/paths";
 import { ProfileHeader } from "../features/social/ProfileHeader";
 import profileStyles from "../features/social/profile.module.css";
+import { placeCounts } from "../features/social/stats";
 import styles from "../features/social/social.module.css";
 import { api, ApiError, unwrap } from "../lib/api";
 import { fromMemberList, fromProfile } from "../lib/api/mappers";
@@ -73,7 +74,7 @@ export default function ProfileRoute({ loaderData, params }: Route.ComponentProp
     );
   return (
     <div className={profileStyles.page}>
-      <ProfileHeader profile={loaderData.profile} notify={shell.notify} onLog={shell.openLog} />
+      <ProfileHeader profile={loaderData.profile} places={placeCounts(loaderData.list.rows)} notify={shell.notify} onLog={shell.openLog} />
       <Outlet context={shell} />
     </div>
   );

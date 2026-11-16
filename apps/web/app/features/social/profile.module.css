@@ -45,14 +45,17 @@
 .handle b { color: #cfd3cb; font-weight: 600; }
 .heroActions { display: flex; align-items: center; gap: 8px; }
 
+/* However many numbers a header has (three on a public ranking, six on a profile), in one row. */
 .stats {
   display: grid;
-  grid-template-columns: repeat(4, minmax(64px, auto));
-  gap: 6px 26px;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(56px, auto);
+  gap: 6px 22px;
   margin: 0;
 }
 .stat { display: grid; justify-items: center; gap: 3px; }
 .statValue {
+  margin: 0;
   font: 600 28px / 1 "Playfair Display", Georgia, serif;
   color: var(--cream);
   font-variant-numeric: lining-nums tabular-nums;
@@ -202,21 +205,6 @@
 .entryDelete:disabled { opacity: 0.5; cursor: default; }
 .more { display: flex; justify-content: center; margin-top: 18px; }
 
-/* The most-played course row on the Stats tab. */
-.rankRow {
-  display: grid;
-  grid-template-columns: 34px 26px minmax(0, 1fr) auto;
-  gap: 12px;
-  align-items: center;
-  padding: 10px 0;
-  border-top: 1px solid var(--line);
-}
-.rankRow:first-of-type { border-top: 0; }
-.rankPlace { color: var(--muted); font-size: 12.5px; margin-top: 2px; }
-.you { text-align: right; font-size: 12px; color: var(--muted); white-space: nowrap; }
-.you b { color: var(--cream); font-variant-numeric: tabular-nums; }
-.editHint { margin: 0 0 14px; color: var(--muted); font-size: 14px; }
-
 /* Comparison. */
 .compare { display: grid; gap: 12px; padding: 16px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); }
 .compareTop { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
@@ -247,7 +235,8 @@ a.progressRow:focus-visible { outline: 2px solid var(--gold); outline-offset: 2p
   .hero { margin-top: -20px; padding: 28px 0 20px; }
   .heroInner { gap: 14px 16px; }
   .identity { flex-basis: 180px; }
-  .stats { width: 100%; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; padding-top: 14px; border-top: 1px solid var(--line); }
+  /* Three across on a phone: a profile's six numbers make two rows, a public ranking's three make one. */
+  .stats { width: 100%; grid-auto-flow: row; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 6px; padding-top: 14px; border-top: 1px solid var(--line); }
   .statValue { font-size: 22px; }
   .statLabel { font-size: 9px; letter-spacing: 1px; }
   .entry { grid-template-columns: 30px 32px minmax(0, 1fr) auto; gap: 10px; }
