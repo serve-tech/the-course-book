@@ -87,6 +87,13 @@ jobs:
       CLERK_SECRET_KEY: ${{ secrets.E2E_CLERK_SECRET_KEY }}
       E2E_OWNER_EMAIL: ${{ secrets.E2E_OWNER_EMAIL }}
       E2E_FRIEND_EMAIL: ${{ secrets.E2E_FRIEND_EMAIL }}
+      # Photo storage for the upload scenario: the API under test gets these
+      # from Playwright and stores photos in the emulator started below.
+      PHOTO_STORAGE_ENDPOINT: http://127.0.0.1:7070
+      PHOTO_STORAGE_BUCKET: coursebook-photos-e2e
+      PHOTO_STORAGE_ACCESS_KEY_ID: ci-access
+      PHOTO_STORAGE_SECRET_ACCESS_KEY: ci-secret-key
+      PHOTO_PUBLIC_URL: http://127.0.0.1:7070/coursebook-photos-e2e
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -95,6 +102,13 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Start the S3-compatible storage emulator
+        run: |
+          docker run -d --name photos -p 127.0.0.1:7070:7070 --tmpfs /data \
+            -e ROOT_ACCESS_KEY=ci-access -e ROOT_SECRET_KEY=ci-secret-key -e VGW_REGION=auto \
+            versity/versitygw:v1.11.0 posix /data
+          curl --retry 15 --retry-delay 1 --retry-connrefused -s -o /dev/null 127.0.0.1:7070
+          pnpm photos:local-bucket
       - run: pnpm --filter @coursebook/e2e exec playwright install --with-deps chromium
       - run: pnpm test:e2e
       - uses: actions/upload-artifact@v4

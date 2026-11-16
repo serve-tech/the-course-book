@@ -1,8 +1,10 @@
 import { randomBytes } from "node:crypto";
 import { readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 import { createClerkClient } from "@clerk/backend";
-import { userCourses, users } from "@coursebook/api/db/schema";
+import { coursePhotos, userCourses, users } from "@coursebook/api/db/schema";
 import { FriendshipStatus } from "@coursebook/api/domain/friendship";
+import { MemberRole } from "@coursebook/domain/curation/types";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { and, eq } from "drizzle-orm";
 import { clerk } from "@clerk/testing/playwright";
@@ -778,6 +780,45 @@ test.describe("public ranking", () => {
     await db.update(userCourses).set({ personalRank: 9 }).where(and(eq(userCourses.userId, owner.id), eq(userCourses.courseId, fixtureCourses.beta.id)));
     await page.goto(`/r/${owner.username}`);
     await expect.poll(() => rankingOrder(page)).toEqual(["Test Alpha Links", "Test Beta Links"]);
+  });
+});
+
+test.describe("course photo uploads", () => {
+  test.skip(!authAvailable, "Clerk development instance keys or test users are not configured");
+  // The API gets photo storage from these (Playwright passes the environment to it); CI points them at an emulator.
+  test.skip(!process.env["PHOTO_STORAGE_ENDPOINT"] || !process.env["PHOTO_PUBLIC_URL"], "PHOTO_STORAGE_* is not set, so the API has no photo storage");
+
+  test("a curator uploads a photo from the course page and sees it there, without its location", async ({ page }) => {
+    const { owner, friend } = members();
+    const alpha = fixtureCourses.alpha;
+    await resetScenario(db, owner, friend);
+    await db.delete(coursePhotos).where(eq(coursePhotos.courseId, alpha.id));
+    await db.update(users).set({ role: MemberRole.Curator }).where(eq(users.id, owner.id));
+    try {
+      await page.goto("/");
+      await signInAs(page, owner);
+      await page.goto(`/courses/${alpha.id}`);
+      await page.getByRole("link", { name: /Add a photo/ }).click();
+      await expect(page.getByRole("heading", { name: "Upload a photo" })).toBeVisible();
+      // A phone-like JPEG with an EXIF GPS location (apps/api/src/services/photo-images.test.ts).
+      await page.getByLabel("Photo file").setInputFiles(fileURLToPath(new URL("../../apps/api/src/test/fixtures/phone-photo-with-gps.jpg", import.meta.url)));
+      await expect(page.getByRole("img", { name: `Chosen photo for ${alpha.name}` })).toBeVisible();
+      await page.getByRole("textbox", { name: "Credit" }).fill("E2E Curator");
+      await page.getByRole("combobox", { name: "License or permission" }).fill("Used with permission");
+      await page.getByRole("button", { name: "Upload photo" }).click();
+
+      await expect(page).toHaveURL(new RegExp(`/courses/${alpha.id}$`));
+      const hero = page.getByRole("img", { name: `Photo of ${alpha.name}` });
+      await expect(hero).toHaveAttribute("src", /\/hero\.webp$/);
+      await expect(page.getByRole("link", { name: "E2E Curator" }).first()).toBeVisible();
+      const served = await page.request.get((await hero.getAttribute("src")) ?? "");
+      expect(served.headers()["content-type"]).toBe("image/webp");
+      const bytes = await served.body();
+      for (const chunk of ["EXIF", "XMP ", "ICCP"]) expect(bytes.includes(chunk)).toBe(false);
+    } finally {
+      await db.delete(coursePhotos).where(eq(coursePhotos.courseId, alpha.id));
+      await db.update(users).set({ role: MemberRole.Member }).where(eq(users.id, owner.id));
+    }
   });
 });
 
