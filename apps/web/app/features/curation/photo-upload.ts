@@ -21,9 +21,11 @@ export const UPLOADS_OFF: UploadSettings = { enabled: false, maxBytes: 0, maxPix
 /** Suggestions for the license field; any text is accepted. */
 export const LICENSE_SUGGESTIONS: readonly string[] = ["Used with permission", "CC BY 4.0", "CC BY-SA 4.0", "CC0 1.0", "Public domain"];
 
-/** "12.4 MB": a file size as members read it. */
+/** "12.4 MB", "25 MB" or "9 KB": a file size as members read it. */
 export function fileSize(bytes: number): string {
-  return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+  const megabytes = bytes / (1024 * 1024);
+  if (megabytes < 1) return String(Math.max(1, Math.round(bytes / 1024))) + " KB";
+  return (Number.isInteger(megabytes) ? String(megabytes) : megabytes.toFixed(1)) + " MB";
 }
 
 const HEIC = /\.(heic|heif)$/i;

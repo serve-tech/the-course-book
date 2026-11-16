@@ -22,7 +22,7 @@ describe("fileProblem", () => {
     {
       name: "a file over the limit",
       file: { name: "big.jpg", type: "image/jpeg", size: 31 * MB },
-      problem: "That photo is 31.0 MB; the most is 25.0 MB. Choose a smaller copy.",
+      problem: "That photo is 31 MB; the most is 25 MB. Choose a smaller copy.",
     },
   ])("judges $name", ({ file, problem }) => {
     expect(fileProblem(file, settings)).toEqual(problem);
@@ -31,8 +31,8 @@ describe("fileProblem", () => {
 
 describe("upload progress", () => {
   it.each([
-    { sent: 0, total: 8 * MB, stage: UploadStage.Sending, text: "Uploading 0% of 8.0 MB" },
-    { sent: 3 * MB, total: 8 * MB, stage: UploadStage.Sending, text: "Uploading 37% of 8.0 MB" },
+    { sent: 0, total: 8 * MB, stage: UploadStage.Sending, text: "Uploading 0% of 8 MB" },
+    { sent: 3 * MB, total: 8 * MB, stage: UploadStage.Sending, text: "Uploading 37% of 8 MB" },
     { sent: 8 * MB, total: 8 * MB, stage: UploadStage.Saving, text: "Resizing and saving…" },
     { sent: 0, total: 0, stage: UploadStage.Sending, text: "Uploading…" },
   ])("reads $sent of $total bytes as “$text”", ({ sent, total, stage, text }) => {
@@ -40,7 +40,12 @@ describe("upload progress", () => {
     expect(progressText(stage, sent, total)).toBe(text);
   });
 
-  it("shows sizes in megabytes", () => {
-    expect(fileSize(12.44 * MB)).toBe("12.4 MB");
+  it.each([
+    [12.44 * MB, "12.4 MB"],
+    [25 * MB, "25 MB"],
+    [9663, "9 KB"],
+    [100, "1 KB"],
+  ])("shows %d bytes as %s", (bytes, text) => {
+    expect(fileSize(bytes)).toBe(text);
   });
 });

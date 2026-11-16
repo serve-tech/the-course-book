@@ -114,7 +114,12 @@
 
 /* Uploading a photo (#67). One column; the photo picker is the large target. */
 .upload { display: grid; gap: 12px; padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: rgba(255, 255, 255, 0.025); }
-.uploadForm { display: grid; gap: 12px; max-width: 560px; }
+.uploadForm { display: grid; gap: 12px; }
+.uploadColumn { display: grid; gap: 12px; align-content: start; min-width: 0; }
+/* Wider screens: the photo beside its details, lined up with the current photo above. */
+@media (min-width: 761px) {
+  .uploadForm { grid-template-columns: minmax(0, 420px) minmax(0, 1fr); gap: 20px; }
+}
 .filePick {
   position: relative;
   display: grid;
@@ -147,4 +152,16 @@
 }
 .field input:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
 .uploadProgress { display: grid; gap: 6px; color: var(--muted); font-size: 13px; }
-.uploadProgress progress { width: 100%; height: 8px; accent-color: var(--gold); }
+.uploadProgress progress {
+  appearance: none;
+  width: 100%;
+  height: 8px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--gold);
+  overflow: hidden;
+}
+.uploadProgress progress::-webkit-progress-bar { background: rgba(255, 255, 255, 0.1); }
+.uploadProgress progress::-webkit-progress-value { background: var(--gold); border-radius: 999px; transition: width 0.2s ease; }
+.uploadProgress progress::-moz-progress-bar { background: var(--gold); border-radius: 999px; }

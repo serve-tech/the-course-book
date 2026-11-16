@@ -116,74 +116,78 @@ export function PhotoUpload({
         Your own photo, or one you have permission to use. JPEG, PNG or WebP up to {fileSize(settings.maxBytes)}. Location and camera details are removed.
       </p>
       <form className={styles.uploadForm} onSubmit={(event) => void submit(event)}>
-        <label className={cx(styles.filePick, preview && styles.filePicked)}>
-          {preview ? <img src={preview} alt={"Chosen photo for " + course.name} /> : <span className={styles.filePrompt}>Choose a photo</span>}
-          <input
-            type="file"
-            accept={settings.contentTypes.join(",")}
-            disabled={busy}
-            aria-label="Photo file"
-            onChange={(event) => {
-              choose(event.target.files?.[0] ?? null);
-            }}
-          />
-        </label>
-        {file && (
-          <p className={styles.fileMeta}>
-            {file.name} · {fileSize(file.size)}
-          </p>
-        )}
-        <label className={styles.field}>
-          <span>Credit</span>
-          <input {...field("credit")} required maxLength={200} autoComplete="off" placeholder="Who took it, e.g. Jane Smith" />
-        </label>
-        <label className={styles.field}>
-          <span>License or permission</span>
-          <input {...field("license")} required maxLength={100} autoComplete="off" list={ids + "licenses"} placeholder="e.g. Used with permission" />
-          <datalist id={ids + "licenses"}>
-            {LICENSE_SUGGESTIONS.map((license) => (
-              <option key={license} value={license} />
-            ))}
-          </datalist>
-        </label>
-        <label className={styles.field}>
-          <span>
-            License link <em>optional</em>
-          </span>
-          <input {...field("licenseUrl")} type="url" maxLength={500} placeholder="https://creativecommons.org/licenses/by/4.0/" />
-        </label>
-        <label className={styles.field}>
-          <span>
-            Where it came from <em>optional</em>
-          </span>
-          <input {...field("sourceUrl")} type="url" maxLength={500} placeholder="A link to the photo or the photographer" />
-        </label>
-        {busy && (
-          <div className={styles.uploadProgress} role="status">
-            <progress max={progress.total || 1} value={stage === UploadStage.Saving ? undefined : progress.sent} aria-label="Upload progress" />
-            <span>{progressText(stage, progress.sent, progress.total)}</span>
-          </div>
-        )}
-        {error && (
-          <p className={styles.error} role="alert">
-            {error}
-          </p>
-        )}
-        <div className={styles.currentActions}>
-          <button type="submit" className={styles.button} disabled={!file || busy}>
-            {busy ? "Uploading…" : "Upload photo"}
-          </button>
-          {busy && (
-            <button
-              type="button"
-              className={cx(styles.button, styles.buttonGhost)}
-              onClick={() => {
-                inFlight.current?.abort();
+        <div className={styles.uploadColumn}>
+          <label className={cx(styles.filePick, preview && styles.filePicked)}>
+            {preview ? <img src={preview} alt={"Chosen photo for " + course.name} /> : <span className={styles.filePrompt}>Choose a photo</span>}
+            <input
+              type="file"
+              accept={settings.contentTypes.join(",")}
+              disabled={busy}
+              aria-label="Photo file"
+              onChange={(event) => {
+                choose(event.target.files?.[0] ?? null);
               }}
-            >
-              Cancel
-            </button>
+            />
+          </label>
+          {file && (
+            <p className={styles.fileMeta}>
+              {file.name} · {fileSize(file.size)}
+            </p>
           )}
+        </div>
+        <div className={styles.uploadColumn}>
+          <label className={styles.field}>
+            <span>Credit</span>
+            <input {...field("credit")} required maxLength={200} autoComplete="off" placeholder="Who took it, e.g. Jane Smith" />
+          </label>
+          <label className={styles.field}>
+            <span>License or permission</span>
+            <input {...field("license")} required maxLength={100} autoComplete="off" list={ids + "licenses"} placeholder="e.g. Used with permission" />
+            <datalist id={ids + "licenses"}>
+              {LICENSE_SUGGESTIONS.map((license) => (
+                <option key={license} value={license} />
+              ))}
+            </datalist>
+          </label>
+          <label className={styles.field}>
+            <span>
+              License link <em>optional</em>
+            </span>
+            <input {...field("licenseUrl")} type="url" maxLength={500} placeholder="https://creativecommons.org/licenses/by/4.0/" />
+          </label>
+          <label className={styles.field}>
+            <span>
+              Where it came from <em>optional</em>
+            </span>
+            <input {...field("sourceUrl")} type="url" maxLength={500} placeholder="A link to the photo or the photographer" />
+          </label>
+          {busy && (
+            <div className={styles.uploadProgress} role="status">
+              <progress max={progress.total || 1} value={stage === UploadStage.Saving ? undefined : progress.sent} aria-label="Upload progress" />
+              <span>{progressText(stage, progress.sent, progress.total)}</span>
+            </div>
+          )}
+          {error && (
+            <p className={styles.error} role="alert">
+              {error}
+            </p>
+          )}
+          <div className={styles.currentActions}>
+            <button type="submit" className={styles.button} disabled={!file || busy}>
+              {busy ? "Uploading…" : "Upload photo"}
+            </button>
+            {busy && (
+              <button
+                type="button"
+                className={cx(styles.button, styles.buttonGhost)}
+                onClick={() => {
+                  inFlight.current?.abort();
+                }}
+              >
+                Cancel
+              </button>
+            )}
+          </div>
         </div>
       </form>
     </section>

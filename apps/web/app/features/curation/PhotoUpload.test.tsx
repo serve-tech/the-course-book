@@ -88,7 +88,7 @@ describe("uploading a photo on the curator screen", () => {
     expect(screen.getByRole("button", { name: "Upload photo" })).toBeDisabled();
     choose(jpeg());
     expect(screen.getByRole("img", { name: "Chosen photo for Pacific Dunes" })).toHaveAttribute("src", "blob:preview");
-    expect(screen.getByText("IMG_0001.jpg · 4.0 MB")).toBeInTheDocument();
+    expect(screen.getByText("IMG_0001.jpg · 4 MB")).toBeInTheDocument();
     fill();
     fireEvent.click(screen.getByRole("button", { name: "Upload photo" }));
 
@@ -100,7 +100,7 @@ describe("uploading a photo on the curator screen", () => {
     act(() => {
       input.onProgress?.({ sent: 1024 * 1024, total: 4 * 1024 * 1024 });
     });
-    expect(screen.getByRole("status")).toHaveTextContent("Uploading 25% of 4.0 MB");
+    expect(screen.getByRole("status")).toHaveTextContent("Uploading 25% of 4 MB");
     act(() => {
       input.onProgress?.({ sent: 4 * 1024 * 1024, total: 4 * 1024 * 1024 });
     });
@@ -128,7 +128,7 @@ describe("uploading a photo on the curator screen", () => {
   it("refuses a file over the limit before sending it", () => {
     show({ ...on, maxBytes: 1024 * 1024 });
     choose(jpeg(2 * 1024 * 1024));
-    expect(screen.getByRole("alert")).toHaveTextContent("That photo is 2.0 MB; the most is 1.0 MB.");
+    expect(screen.getByRole("alert")).toHaveTextContent("That photo is 2 MB; the most is 1 MB.");
   });
 
   it("shows the API's reason when an upload fails, and lets the curator try again", async () => {
