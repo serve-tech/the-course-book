@@ -7,6 +7,7 @@ import { Avatar } from "../social/Avatar";
 import { displayName } from "../social/paths";
 import profileStyles from "../social/profile.module.css";
 import { AvatarSize } from "../social/sizes";
+import { Stat } from "../social/Stat";
 import socialStyles from "../social/social.module.css";
 import { placeCounts } from "../social/stats";
 import { coursePath } from "../courses/paths";
@@ -79,9 +80,9 @@ export function PublicRanking({
             </p>
           </hgroup>
           <dl className={profileStyles.stats} aria-label="Stats">
-            <Stat value={ranking.rows.length} label="Courses" />
-            <Stat value={places.states} label="States" />
-            <Stat value={places.countries} label="Countries" />
+            <Stat value={ranking.rows.length} label="Course" plural="Courses" />
+            <Stat value={places.states} label="State" plural="States" />
+            <Stat value={places.countries} label="Country" plural="Countries" />
           </dl>
         </div>
       </div>
@@ -144,16 +145,5 @@ export function PublicRanking({
         </div>
       )}
     </section>
-  );
-}
-
-function Stat({ value, label }: { value: number; label: string }) {
-  return (
-    <div className={profileStyles.stat}>
-      <dd className={profileStyles.statValue} style={{ margin: 0 }}>
-        {value}
-      </dd>
-      <dt className={profileStyles.statLabel}>{label}</dt>
-    </div>
   );
 }

@@ -16,6 +16,20 @@ function dateParts(iso: string): { year: number; month: number; day: number } {
   return { year, month, day };
 }
 
+/**
+ * The label that agrees with a count: the singular for exactly one, the
+ * plural for everything else, zero included.
+ *
+ * Example:
+ *     >>> countLabel(1, "Country", "Countries")
+ *     "Country"
+ *     >>> countLabel(0, "Country", "Countries")
+ *     "Countries"
+ */
+export function countLabel(count: number, one: string, many: string): string {
+  return count === 1 ? one : many;
+}
+
 /** "1st", "2nd", "3rd", "4th", "11th", "12th", "13th", "21st", ... */
 export function ordinal(n: number): string {
   const tens = n % 100;
