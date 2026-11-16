@@ -61,7 +61,7 @@ Read the detailed rules in [docs/architecture.md](docs/architecture.md#data-rule
 - The retired Supabase project holds the original data until it has been imported and verified. Treat it as read-only: never delete, rewrite or migrate anything there. Exports for import are run by the maintainer and kept outside the repository.
 - Before any destructive action, production database change, data deletion, deploy that changes infrastructure, force push or irreversible operation, obtain explicit user confirmation for that action.
 - Both Render services deploy from `main` once its CI checks pass, so a merge to `main` is a production deploy. The retired app stays on GitHub Pages (its last deployment, no workflow) until Pages is disabled at cutover.
-- `main` is protected, administrators included: changes land only through pull requests whose `verify`, `browser` and `docker` checks pass on a branch that is up to date with `main`; force pushes and deletion are blocked. Never try to bypass or relax the protection without the maintainer's explicit request.
+- `main` is protected, administrators included: changes land only through pull requests whose `verify`, `browser` and `docker` checks pass on a branch that is up to date with `main`; force pushes and deletion are blocked. CI starts only the jobs a change needs, and a skipped job counts as passed. The browser suite is skipped on pull requests and runs on `main` after the merge, where it holds the deploy, so run it locally before pushing an application change ([testing](docs/testing.md#ci-and-handoff)). Never try to bypass or relax the protection without the maintainer's explicit request.
 
 ## Workflow and completion
 

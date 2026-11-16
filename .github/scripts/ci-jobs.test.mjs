@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
-import { EVERYTHING, jobsFor } from "./ci-jobs.mjs";
+import { EVERYTHING, forEvent, jobsFor } from "./ci-jobs.mjs";
 
 const NOTHING = { verify: false, browser: false, docker: false };
 const VERIFY_ONLY = { verify: true, browser: false, docker: false };
@@ -76,6 +76,21 @@ describe("jobsFor", () => {
   });
 });
 
+describe("forEvent", () => {
+  it("leaves the browser suite out of a pull request, whatever changed", () => {
+    assert.deepEqual(forEvent(EVERYTHING, "pull_request"), { verify: true, browser: false, docker: true });
+    assert.deepEqual(forEvent(NO_IMAGE, "pull_request"), VERIFY_ONLY);
+    assert.deepEqual(forEvent(NOTHING, "pull_request"), NOTHING);
+  });
+
+  for (const event of ["push", "workflow_dispatch", undefined]) {
+    it("changes nothing for " + String(event), () => {
+      assert.deepEqual(forEvent(EVERYTHING, event), EVERYTHING);
+      assert.deepEqual(forEvent(NO_IMAGE, event), NO_IMAGE);
+    });
+  }
+});
+
 describe("the command", () => {
   const script = fileURLToPath(new URL("./ci-jobs.mjs", import.meta.url));
 
@@ -127,10 +142,19 @@ describe("the command", () => {
     }
   });
 
-  it("reads a pull request against its base", () => {
+  it("reads a pull request against its base, and leaves the browser suite to main", () => {
+    const { dir, before } = repository(["apps/web/app/routes/home.tsx", "apps/api/src/app.ts"]);
+    try {
+      assert.deepEqual(outputs(dir, { EVENT: "pull_request", BASE_SHA: before }), ["browser=false", "docker=true", "verify=true"]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("runs the browser suite for the same change once it is on main", () => {
     const { dir, before } = repository(["apps/web/app/routes/home.tsx"]);
     try {
-      assert.deepEqual(outputs(dir, { EVENT: "pull_request", BASE_SHA: before }), ["browser=true", "docker=false", "verify=true"]);
+      assert.deepEqual(outputs(dir, { EVENT: "push", BEFORE_SHA: before }), ["browser=true", "docker=false", "verify=true"]);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -140,8 +164,7 @@ describe("the command", () => {
   const untrusted = [
     ["a new branch, whose previous commit is all zeros", { EVENT: "push", BEFORE_SHA: "0".repeat(40) }],
     ["a previous commit that is not in the clone", { EVENT: "push", BEFORE_SHA: "1234567890123456789012345678901234567890" }],
-    ["a pull request with no base", { EVENT: "pull_request" }],
-    ["any other event", { EVENT: "workflow_dispatch" }],
+    ["a run started by hand", { EVENT: "workflow_dispatch" }],
     ["no event at all", {}],
   ];
   for (const [name, env] of untrusted) {
@@ -154,6 +177,15 @@ describe("the command", () => {
       }
     });
   }
+
+  it("runs everything but the browser suite for a pull request with no base", () => {
+    const { dir } = repository(["docs/architecture.md"]);
+    try {
+      assert.deepEqual(outputs(dir, { EVENT: "pull_request" }), ["browser=false", "docker=true", "verify=true"]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 
   it("runs everything when the push changed no files", () => {
     const { dir, before } = repository([]);

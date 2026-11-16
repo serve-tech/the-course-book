@@ -8,6 +8,9 @@ on:
   pull_request:
   push:
     branches: [main]
+  # "Run workflow" on a branch runs every job, the browser suite included,
+  # for a change worth checking in a browser before it merges.
+  workflow_dispatch:
 concurrency:
   group: ci-${{ github.event.pull_request.number || github.ref }}
   # A newer push to a pull request replaces the run before it. Never cancel on
@@ -30,6 +33,11 @@ jobs:
   # (.github/scripts/ci-jobs.mjs) and the rest of its steps, and the other two
   # jobs, run only when needed. A skipped job counts as passed, for GitHub's
   # required checks and for Render's deploy gate.
+  #
+  # `browser` is about five of a run's nine minutes, so a pull request never
+  # runs it. It runs on main after the merge, before Render deploys, and from
+  # "Run workflow". A broken flow is then caught after merging, not before:
+  # the deploy is held and main needs a fix.
   verify:
     runs-on: ubuntu-latest
     outputs:

@@ -9,6 +9,12 @@
  * this file is the command the workflow runs: it lists the changed files with
  * git and writes the answer to the step's outputs.
  *
+ * The Playwright suite is the heaviest job, about five of a run's nine
+ * minutes, so a pull request never runs it (`forEvent`): it runs on main
+ * after the merge, where Render waits for it before deploying, and on request
+ * ("Run workflow"). Application changes are run through it locally before
+ * they are pushed (docs/testing.md).
+ *
  * Two constraints, as in serve-tech/serve-meters#490:
  *
  * 1. Fail open. When the changed files cannot be worked out (no base commit,
@@ -104,6 +110,18 @@ export function jobsFor(files) {
 }
 
 /**
+ * The jobs for the event that started the run. A pull request leaves the
+ * Playwright suite to main and to runs started by hand, whatever its files.
+ *
+ * @param {Jobs} jobs - What the changed files need.
+ * @param {string | undefined} event - `github.event_name`.
+ * @returns {Jobs}
+ */
+export function forEvent(jobs, event) {
+  return event === "pull_request" ? { ...jobs, browser: false } : jobs;
+}
+
+/**
  * @param {string[]} args
  * @returns {string}
  */
@@ -152,7 +170,8 @@ function main(env) {
   } catch (error) {
     console.log("Running every job: could not list the changed files (" + (error instanceof Error ? error.message.split("\n")[0] : String(error)) + ").");
   }
-  const lines = Object.entries(jobs).map(([job, run]) => job + "=" + String(run));
+  if (jobs.browser && !forEvent(jobs, env.EVENT).browser) console.log("The browser suite waits for main: a pull request does not run it.");
+  const lines = Object.entries(forEvent(jobs, env.EVENT)).map(([job, run]) => job + "=" + String(run));
   console.log("Jobs: " + lines.join(", "));
   if (env.GITHUB_OUTPUT) appendFileSync(env.GITHUB_OUTPUT, lines.join("\n") + "\n");
 }
