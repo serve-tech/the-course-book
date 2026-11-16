@@ -110,7 +110,7 @@ export function PublicRanking({
         />
       </RankingFilters>
 
-      <ViewHeader username={username} memberName={name} view={shown} rows={rows} notify={notify} render={renderImage}>
+      <ViewHeader username={username} memberName={name} own={false} view={shown} rows={rows} notify={notify} render={renderImage}>
         <span id="publicRankingCount">{coursesLabel(rows.length)}</span>
         {places.topState && <> · Most courses in {places.topState}</>}
       </ViewHeader>

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import socialStyles from "../social/social.module.css";
 import { errorMessage } from "../../shared/lib/errors";
-import { copyLink, deliverImage } from "./deliver";
+import { chooseDelivery, deliverShare, ImageStatus, shareNotice, shareSupport } from "./deliver";
 import type { RankingImageContent } from "./ranking-image";
 import { renderRankingImage } from "./render-ranking-image";
 import styles from "./share.module.css";
@@ -17,19 +17,31 @@ interface PreparedImage {
 /**
  * How long a view must stay on screen before its image is drawn. Measured in
  * Chromium (2026-11-04): after several draws in quick succession, `toBlob` can
- * take about 6.7 s instead of about 30 ms, which left Save image disabled while
+ * take about 6.7 s instead of about 30 ms, which left the image unready while
  * a member clicked between views.
  */
 const DRAW_AFTER_MS = 150;
 
+/** Where the image for the view on screen stands. */
+function imageStatus(hasRows: boolean, current: PreparedImage | null): ImageStatus {
+  if (!hasRows) return ImageStatus.None;
+  if (!current) return ImageStatus.Drawing;
+  return current.blob ? ImageStatus.Ready : ImageStatus.Failed;
+}
+
 /**
- * Copy link and Save image for a view of a ranking.
+ * One Share button for a view of a ranking, which sends its image and its
+ * link together: the share sheet on a phone, a saved image and a copied link
+ * on a computer (`chooseDelivery`). Without an image (still drawing, failed,
+ * or an empty view) it sends the link alone and says why.
  *
  * The image is drawn before the button is pressed, not after: a phone's share
  * sheet opens only directly from a tap, and iOS Safari can refuse it once the
- * tap has waited on drawing the image.
+ * tap has waited on drawing the image. The button's `data-image` says where
+ * the image stands.
  *
  * @param path - The app path of this view, for the link.
+ * @param message - The words a phone's share sheet sends with the link.
  * @param image - What the image says, without the link. Memoize it: a new
  *   object draws the image again.
  * @param fileName - The name to save the image under.
@@ -38,12 +50,14 @@ const DRAW_AFTER_MS = 150;
  */
 export function ShareActions({
   path,
+  message,
   image,
   fileName,
   notify,
   render = renderRankingImage,
 }: {
   path: string;
+  message: string;
   image: Omit<RankingImageContent, "link">;
   fileName: string;
   notify: (message: string) => void;
@@ -74,43 +88,28 @@ export function ShareActions({
 
   // A reorder keeps the same link but changes the image, so the link alone cannot say this one is current.
   const current = prepared?.image === image && prepared.path === path ? prepared : null;
+  const status = imageStatus(hasRows, current);
 
-  const onCopy = () => {
+  const onShare = () => {
     const url = window.location.origin + path;
-    copyLink(url).then(
-      () => {
-        notify("Link copied");
+    const file = current?.blob ? new File([current.blob], fileName, { type: "image/png" }) : null;
+    const delivery = chooseDelivery(status, shareSupport(file, url));
+    deliverShare(delivery, file, url, message).then(
+      (outcome) => {
+        const message = shareNotice(delivery, outcome, status, current?.error ?? null, url);
+        if (message) notify(message);
       },
       (error: unknown) => {
-        console.warn("Could not copy the link", error);
-        notify("Couldn't copy it. The link is " + url);
+        console.warn("Could not share the ranking", error);
+        notify("Couldn't share it. Please try again.");
       },
     );
   };
 
-  const onSave = () => {
-    if (!current?.blob) {
-      if (current?.error) notify(current.error);
-      return;
-    }
-    deliverImage(current.blob, fileName).catch((error: unknown) => {
-      console.warn("Could not share the ranking image", error);
-      notify("Couldn't share the image. Please try again.");
-    });
-  };
-
   return (
     <div className={styles.actions}>
-      <button type="button" className={[socialStyles.button, socialStyles.buttonSolid].join(" ")} onClick={onCopy}>
-        Copy link
-      </button>
-      <button
-        type="button"
-        className={socialStyles.button}
-        disabled={!hasRows || !current}
-        onClick={onSave}
-      >
-        Save image
+      <button type="button" className={[socialStyles.button, socialStyles.buttonSolid].join(" ")} data-image={status} onClick={onShare}>
+        Share
       </button>
     </div>
   );

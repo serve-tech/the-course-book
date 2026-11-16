@@ -72,8 +72,7 @@ describe("HomeRanking", () => {
     expect(screen.getByRole("heading", { level: 2, name: "Top 10" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Top 10" })).toHaveAttribute("aria-pressed", "true");
     expect(listedCount()).toBe(10);
-    expect(screen.getByRole("button", { name: "Copy link" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Save image" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Share" })).toBeInTheDocument();
     expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
   });
 
@@ -107,6 +106,6 @@ describe("HomeRanking", () => {
   it("opens an empty ranking on real next steps, with nothing to share", () => {
     show([]);
     expect(screen.getByText(/Your ranking is empty/)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Copy link" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Share" })).not.toBeInTheDocument();
   });
 });

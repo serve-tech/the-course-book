@@ -88,6 +88,16 @@ const textCenter = (locator: Locator) =>
     return box.top + box.height / 2;
   });
 
+/**
+ * The Share button once the image for the view on screen is drawn, so a click
+ * sends the image with the link rather than the link alone.
+ */
+async function readyToShare(page: Page): Promise<Locator> {
+  const share = page.getByRole("button", { name: "Share", exact: true });
+  await expect(share).toHaveAttribute("data-image", "ready");
+  return share;
+}
+
 /** The member's own Ranking tab on their profile. */
 async function openRanking(page: Page, member: TestMember): Promise<void> {
   await page.goto(`/u/${member.username}/ranking`);
@@ -255,14 +265,13 @@ test.describe("signed in", () => {
     await expect(welcome(page)).toBeVisible();
   });
 
-  test("Home is the member's ranking, with its share buttons, and everyone gets it", async ({ page }, testInfo) => {
+  test("Home is the member's ranking, with its Share button, and everyone gets it", async ({ page }, testInfo) => {
     const { owner, friend } = members();
     await signInAs(page, owner);
     await expect(homeRanking(page)).toBeVisible();
     await expect(page.getByRole("link", { name: "Home", exact: true })).toHaveAttribute("aria-current", "page");
     await expect.poll(() => rankingOrder(page)).toEqual(["Test Beta Links", "Test Alpha Links"]);
-    await expect(page.getByRole("button", { name: "Copy link" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Save image" })).toBeEnabled();
+    await readyToShare(page);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await page.screenshot({ path: testInfo.outputPath("home.png"), fullPage: true, scale: "css" });
 
@@ -274,8 +283,10 @@ test.describe("signed in", () => {
     await page.getByRole("tab", { name: "Best in Michigan" }).click();
     await page.getByRole("button", { name: "Top 5" }).click();
     await expect(page.getByRole("heading", { level: 2, name: "Top 5 in Michigan" })).toBeVisible();
-    const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Save image" }).click()]);
+    const share = await readyToShare(page);
+    const [download] = await Promise.all([page.waitForEvent("download"), share.click()]);
     expect(download.suggestedFilename()).toMatch(/-top-5-in-michigan\.png$/);
+    await expect(page.locator("#toast")).toContainText("Image saved");
 
     // Re-ranking on Home persists, and shows wherever the ranking does.
     await page.getByRole("tab", { name: "All", exact: true }).click();
@@ -748,9 +759,10 @@ test.describe("public ranking", () => {
     await expect(page.getByRole("heading", { level: 2, name: "Top 5 in Michigan" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Top 5" })).toHaveAttribute("aria-pressed", "true");
 
-    const save = page.getByRole("button", { name: "Save image" });
-    await expect(save).toBeEnabled();
-    const [download] = await Promise.all([page.waitForEvent("download"), save.click()]);
+    // A computer has no share sheet for files: one click saves the image and copies the link.
+    const share = await readyToShare(page);
+    const [download] = await Promise.all([page.waitForEvent("download"), share.click()]);
+    await expect(page.locator("#toast")).toContainText("Image saved");
     expect(download.suggestedFilename()).toBe(`${owner.username.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-top-5-in-michigan.png`);
     const saved = testInfo.outputPath("ranking.png");
     await download.saveAs(saved);
@@ -766,7 +778,7 @@ test.describe("public ranking", () => {
     await expect(page.getByRole("alert")).toContainText("This ranking isn't available");
   });
 
-  test("a member copies the link and saves the image from their own ranking", async ({ page, context, browserName }, testInfo) => {
+  test("one Share click saves the image and copies the link from a member's own ranking", async ({ page, context, browserName }, testInfo) => {
     test.skip(browserName !== "chromium", "Clipboard permissions are Chromium-only in Playwright");
     const { owner } = members();
     await context.grantPermissions(["clipboard-read", "clipboard-write"]);
@@ -778,16 +790,13 @@ test.describe("public ranking", () => {
     await page.getByRole("button", { name: "Top 5" }).click();
     await expect(page.getByRole("heading", { level: 2, name: "Top 5 in the USA" })).toBeVisible();
 
-    const save = page.getByRole("button", { name: "Save image" });
-    await expect(save).toBeEnabled();
-    const [download] = await Promise.all([page.waitForEvent("download"), save.click()]);
+    const share = await readyToShare(page);
+    const [download] = await Promise.all([page.waitForEvent("download"), share.click()]);
+    await expect(page.locator("#toast")).toContainText("Image saved and link copied");
     expect(download.suggestedFilename()).toMatch(/-top-5-in-the-usa\.png$/);
     const saved = testInfo.outputPath("own-ranking.png");
     await download.saveAs(saved);
     expect((await pngSize(saved)).width).toBe(1080);
-
-    await page.getByRole("button", { name: "Copy link" }).click();
-    await expect(page.getByText("Link copied")).toBeVisible();
     const link = await page.evaluate(() => navigator.clipboard.readText());
     expect(link).toMatch(new RegExp(`/r/${owner.username}\\?view=usa&top=5$`));
 

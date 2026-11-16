@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { courseSchema, RegionFilter, type Course } from "../catalog/course";
-import { imageFileName, parseShareView, sharePath, shareViewQuery, shareViewTitle, viewRows, WHOLE_RANKING, type ShareView } from "./view";
+import { imageFileName, parseShareView, shareMessage, sharePath, shareViewQuery, shareViewTitle, viewRows, WHOLE_RANKING, type ShareView } from "./view";
 
 /** Query parameters by name; this package has no DOM or Node types, so no URLSearchParams. */
 const parse = (query: string) =>
@@ -82,6 +82,20 @@ describe("shareViewTitle", () => {
     [{ region: RegionFilter.State, state: "MI", top: 5 }, "Top 5 in Michigan"],
   ])("names %j", (view, title) => {
     expect(shareViewTitle(view)).toBe(title);
+  });
+});
+
+describe("shareMessage", () => {
+  it.each<[ShareView, string | null, string]>([
+    [WHOLE_RANKING, null, "Check out my golf course ranking on The Course Book"],
+    [{ ...WHOLE_RANKING, top: 10 }, null, "Check out my Top 10 golf courses on The Course Book"],
+    [{ region: RegionFilter.USA, state: "", top: 10 }, null, "Check out my Top 10 golf courses in the USA on The Course Book"],
+    [{ region: RegionFilter.State, state: "MI", top: null }, null, "Check out my best golf courses in Michigan on The Course Book"],
+    [{ region: RegionFilter.World, state: "", top: 5 }, null, "Check out my Top 5 golf courses outside the USA on The Course Book"],
+    [WHOLE_RANKING, "Josh Linneburg", "Check out Josh Linneburg's golf course ranking on The Course Book"],
+    [{ region: RegionFilter.State, state: "MI", top: 5 }, "Josh Linneburg", "Check out Josh Linneburg's Top 5 golf courses in Michigan on The Course Book"],
+  ])("words %j from %s", (view, owner, message) => {
+    expect(shareMessage(view, owner)).toBe(message);
   });
 });
 
