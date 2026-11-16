@@ -68,6 +68,7 @@ a.place:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 
 /* A native progress bar draws the share without an inline width; WebKit and Firefox each need their own parts. */
 .bar {
+  -webkit-appearance: none;
   appearance: none;
   display: block;
   width: 100%;
