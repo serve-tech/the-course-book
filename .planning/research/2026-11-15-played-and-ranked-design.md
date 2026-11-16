@@ -1,14 +1,14 @@
 # Played and Ranked: design for #52
 
 **Date:** 2026-11-15
-**Status:** Proposed. Waiting on the maintainer's answers in section 7 before any code is written.
+**Status:** Approved 2026-11-15. The maintainer's answers are in section 7. PR A (the API) is built on `feat/played-and-ranked`; PR B (the web) waits for PR A to be live. Changes made after review are marked "Changed 2026-11-15" below.
 **Issue:** #52, step 2 of the [ranking-first decision](../decisions/2026-11-03-ranking-first-product-one-master-ranking-with-derived-top-n-views.md); tracking issue #62.
 
 ## Summary
 
 A course on a member's list is either **Ranked** (it has a place in their ranking) or **Played** (it doesn't). Both mean "I've played it", and neither needs a round. One tap marks a course Played. Nothing ever drops a new course into the ranking for the member: they place it when they want to, and until then it sits in a collapsed Played line above the ranking on Home.
 
-In the database this is one change: `user_courses.personal_rank` may be empty, and an empty rank means Played. The API keeps every existing operation working exactly as old clients expect (their lists only ever contain Ranked courses) and adds three operations, a few fields and one request option. The work ships as two pull requests: the API first, the web once the API is live, so neither half ever talks to a version of the other that doesn't understand Played.
+In the database this is one change: `user_courses.personal_rank` may be empty, and an empty rank means Played (plus a `ranked_at` column for #54). The API keeps every existing operation working exactly as old clients expect (their lists only ever contain Ranked courses) and adds three operations and a few fields. The work ships as two pull requests: the API first, the web once the API is live, so neither half ever talks to a version of the other that doesn't understand Played.
 
 ## Words used here
 
@@ -23,11 +23,14 @@ In the database this is one change: `user_courses.personal_rank` may be empty, a
 
 ### The change
 
-Migration `0007` is one statement, which is exactly what drizzle-kit generates when `personalRank` loses `.notNull()` in `schema.ts` (checked by generating it and throwing it away):
+Migration `0007_played_and_ranked` is two statements, exactly what drizzle-kit generates from `schema.ts`:
 
 ```sql
 ALTER TABLE "user_courses" ALTER COLUMN "personal_rank" DROP NOT NULL;
+ALTER TABLE "user_courses" ADD COLUMN "ranked_at" timestamp with time zone;
 ```
+
+The second is `ranked_at`, added after review (below).
 
 Postgres documents a table scan only for adding NOT NULL, not for dropping it ([ALTER TABLE](https://www.postgresql.org/docs/17/sql-altertable.html)); the statement takes a brief exclusive lock on `user_courses`, so the old release's requests wait a moment behind it. The table holds a few hundred rows, so it finishes at once either way. Every existing row keeps its rank, so after the migration nothing is Played until a member makes something Played. The migration goes in its own commit. If the photo-storage branch merges a `0007` first, this one is regenerated as `0008`; nothing else changes.
 
@@ -50,9 +53,16 @@ Making the column nullable also changes Drizzle's row type to `number | null`, s
 
 The composite foreign key `rounds_membership_fk` stays: a round still needs its course on the list, Ranked or Played, and removing a course still deletes its rounds. What goes away is the reverse rule, which only ever lived in the service: a course no longer needs a round to stay on the list. Deleting a course's last round, or setting its count to zero, leaves the course where it was.
 
-### `ranked_at` waits for #54
+### `ranked_at` ships now
 
-Adding the column later is a one-line nullable `ADD COLUMN`, as cheap as adding it now, so it isn't clearly cheaper to do it here. Keeping `0007` to the single change that the deploy overlap has to survive keeps the risky part small and easy to review. The cost: Activity (#54) can only show placements made after #54 ships, not the burst of ranking that will follow this release. If the maintainer wants that history, the column and its two write sites (placing and moving a course) can join PR A in about 30 lines. #54's acceptance criteria already define when it's set.
+Changed 2026-11-15, on review. The first draft left `ranked_at` to #54, because a second migration costs about as little as adding the column now. The reviewer pointed out what that loses: the burst of ranking that follows this release is exactly what Activity (#54) wants to show, and it can't be backfilled. So `0007` adds `ranked_at` (nullable, no default) and PR A writes it, following #54's criteria:
+
+- **Set** when the member places a course into the ranking or moves it: `moveCourse`, and the older operations when they put a course into the ranking (`rankCourse` in `services/journal.ts` is the one place this happens).
+- **Not set** on the courses a change merely shifts down or up. They keep their time.
+- **Cleared** by `unrankCourse`.
+- Null for rows placed before the column existed. It is not in the contract; #54 adds it there.
+
+Tests pin each of these down (`journal.db.test.ts`, "when a course was ranked").
 
 ### The deploy overlap
 
@@ -89,7 +99,7 @@ The old web draws whatever rows it gets and numbers them by position (`MyRanking
 | `listMyCourseRounds` | Unchanged; works for Played courses. |
 | `addToList` | Unchanged behavior for old clients: a course that isn't ranked (new to the list, or Played) goes to the bottom of the ranking, with one round if it has none. The web stopped calling it in #16. |
 | `addCourse` | Same: a course that isn't ranked goes to `rank` (bottom when omitted). Its response must carry an integer `rank`, which is why Played adds by details need a new operation. |
-| `logRounds` | Without the new `addUnranked` option, unchanged: a course that isn't ranked goes to the bottom. With `addUnranked: true`, a course new to the list joins as Played, a Played course stays Played, and a Ranked course keeps its rank. New response field `courseAdded`. |
+| `logRounds` | Unchanged: a course that isn't ranked (new to the list, or Played) goes to the bottom of the ranking. (Changed 2026-11-15: the `addUnranked` option and `courseAdded` field are not added; see below.) |
 | `moveCourse` | Ranked course: unchanged. Played course: it is placed into the ranking at `rank` (clamped to 1..N+1); the courses from there down move down one. This is how a member ranks a Played course; no new operation is needed. |
 | `setPlayCount` | Lowering deletes the oldest rounds, raising logs rounds dated today, as now. Zero deletes every round and **keeps the course** (PR B). `removed` stays in the response and is always false. |
 | `removeCourse` | Unchanged: takes a Ranked or Played course off the list with its rounds; ranks below close up. |
@@ -116,7 +126,7 @@ All three need a session, take the member lock and return the whole list.
 | `operationId` | Request | Response | Behavior |
 | --- | --- | --- | --- |
 | `markPlayed` | `PUT /v1/me/played-courses/{courseId}`, no body | `AddedToList` (`added`, `courses`, `unranked`) | One-tap Played for a catalog course. A course not on the list joins as Played with no rank and no round, and comes off Want to play (as logging a round does). A course already on the list, Ranked or Played, is left alone and `added` is false, so retrying is safe. 404 `course_not_found`. |
-| `addPlayedCourse` | `POST /v1/me/played-courses`, body `AddPlayedCourseRequest` | `AddedPlayedCourse` | Played for a course described by its details: an outside search hit, or a course typed in by hand. Resolves or creates the course through `identity.ts` exactly as `addCourse` does, then adds it as Played. With `quantity`, it also logs that many rounds on `playedOn`; without, no rounds. Idempotent without `quantity`. 400 `us_state_required` and `validation_failed` as `addCourse`. |
+| `addPlayedCourse` | `POST /v1/me/played-courses`, body `AddPlayedCourseRequest` | `AddedPlayedCourse` | Played for a course described by its details: an outside search hit, or a course typed in by hand. Resolves or creates the course through `identity.ts` exactly as `addCourse` does, then adds it as Played, with no round and no rank, and takes it off Want to play. A course already on the list is unchanged, so retrying is safe. 400 `us_state_required` and `validation_failed` as `addCourse`. |
 | `unrankCourse` | `DELETE /v1/me/courses/{courseId}/rank` | `MyCourses` | Takes a course out of the ranking. It stays on the list as Played with its rounds; the ranks below close up. A Played course is left alone, so retrying is safe. 404 `not_on_list`. |
 
 `/v1/me/played-courses` mirrors `/v1/me/courses`: PUT by catalog id, POST by details. It has no GET or DELETE: Played courses are read through `listMyCourses.unranked` and removed with `removeCourse`.
@@ -127,12 +137,10 @@ All three need a session, take the member lock and return the whole list.
 | --- | --- | --- |
 | `MyUnrankedCourse` | `{ course: Course, played: int ≥ 0 }` | `played` is the round count, as in `MyCourse`. |
 | `MemberUnrankedCourse` | `{ course, onMyList, played, lastPlayedOn, myRank }` | `MemberCourse` without `rank`. |
-| `AddPlayedCourseRequest` | `{ course: CourseDetailsRequest, source: CourseSource, quantity?, playedOn? }` | `quantity` is 1..100 and means "rounds to log; none when omitted". The opposite default from `addCourse` is deliberate and documented on the field. |
-| `AddedPlayedCourse` | `{ courseId, added, roundIds, courses, unranked }` | `added` as in `AddedToList`. |
+| `AddPlayedCourseRequest` | `{ course: CourseDetailsRequest, source: CourseSource }` | No rounds. |
+| `AddedPlayedCourse` | `{ courseId, added, courses, unranked }` | `added` as in `AddedToList`. |
 | `MyCourses.unranked` and the six list-change responses | `MyUnrankedCourse[]` | Most recently Played first. |
 | `MemberList.unranked` | `MemberUnrankedCourse[]` | Same order. |
-| `LogRoundsRequest.addUnranked` | `boolean`, optional | "True: a course not on the list joins it as Played instead of at the bottom of the ranking." |
-| `LoggedRounds.courseAdded` | `boolean` | True when this call put the course on the list. Undo then removes the course (`removeCourse`), because deleting its rounds no longer does. |
 | `TopListEntry.onMyList` | `boolean` | As on `MemberCourse`. |
 | `CourseStanding.onMyList` | `boolean` | Same name and meaning everywhere in the contract. |
 | `CoursePage.friendsUnranked` | `Member[]` | Friends with the course Played, by name. |
@@ -142,13 +150,15 @@ All three need a session, take the member lock and return the whole list.
 
 No new error codes.
 
+**Left out on purpose** (changed 2026-11-15, after the maintainer said "Log a Round is going away, don't care about it"): `LogRoundsRequest.addUnranked`, `LoggedRounds.courseAdded`, and `quantity`, `playedOn` and `roundIds` on the Played-by-details operation. Each would only serve logging rounds from the new screens. Contract names are permanent and can always be added later, so if any round logging survives in PR B, PR B adds exactly what it needs.
+
 ## 3. Data rules
 
 These replace "a round cannot exist without a membership... deleting the last round deletes the membership", "zero removes the course" and "ranks are contiguous 1..N per user" in `AGENTS.md` and `docs/architecture.md`.
 
 - **Two states.** A course on a member's list is Ranked (personal rank 1..N) or Played (no rank). Both mean the member has played it. Neither needs a round. Played is not unfinished, and nothing prompts a member to rank a Played course.
 - **Ranks** run 1..N with no gaps over Ranked courses only. Any change that adds to, removes from or reorders the ranking renumbers the whole ranking from its full order, so courses a view hides keep their places. Played courses are never touched by a renumber.
-- **Getting on the list.** `markPlayed` and `addPlayedCourse` add a course as Played, optionally with rounds. `logRounds` with `addUnranked` adds a new course as Played. The old operations (`addToList`, `addCourse`, `logRounds` without the option) put a course that isn't ranked at the bottom of the ranking, or at `rank`, as they always have; they exist for old clients. The new web only uses the first three.
+- **Getting on the list.** `markPlayed` and `addPlayedCourse` add a course as Played, with no rank and no round. The old operations (`addToList`, `addCourse`, `logRounds`) put a course that isn't ranked (new, or Played) at the bottom of the ranking, or at `rank`, as they always have; they exist for old clients and stale browser tabs. The new web only uses the first two.
 - **Leaving the list.** Only `removeCourse`, which deletes the course's rounds. Deleting rounds and lowering the count, even to zero, never remove a course.
 - **Rank** (placing a Played course): `moveCourse` inserts it at the requested position, clamped to 1..N+1. Courses at and below that position move down one.
 - **Move** a Ranked course: unchanged (`reorder`).
@@ -162,6 +172,8 @@ These replace "a round cannot exist without a membership... deleting the last ro
 The pure parts move into `packages/domain/src/journal/reorder.ts`: `placeInRanking(ranked, id, rank)` (move a Ranked course or insert a Played one, with the clamping above), and `reorder` and `insertAt` as now. The services do I/O and call these.
 
 ## 4. The web, screen by screen
+
+> **Note, 2026-11-15.** The maintainer answered: placing a Played course is "tap the course it's better than" (question 1, option a); the public page stays Ranked only (question 2); list rows show Played and Want to play only, with no Log a round button; and "Log a Round is going away, don't care about it." So Log a round leaves the screens in PR B; how far that goes is being confirmed. The text below predates these answers and is redesigned as PR B's first job, not here. Where it mentions logging rounds or round-logging API fields, those are not built.
 
 New intents on the `/journal` action: `played` (`markPlayed` by id), `played-details` (`addPlayedCourse`), `unrank`, and `move` reused for placing. `undo-log` learns to remove a course the log added. No new state library or store; the route loaders read `unranked` from the same calls they already make.
 
@@ -229,11 +241,10 @@ New intents on the `/journal` action: `played` (`markPlayed` by id), `played-det
 **Service tests against the database** (`journal.db.test.ts` and its neighbours). A shared `expectContiguousRanks(db, userId)` runs after every write:
 
 - `markPlayed`: adds as Played with no round and no rank; takes the course off Want to play; repeating it, or calling it on a Ranked course, changes nothing.
-- `addPlayedCourse`: resolves an existing course, creates a custom one, requires a U.S. state, logs `quantity` rounds or none.
+- `addPlayedCourse`: resolves an existing course, creates a custom one, requires a U.S. state, logs no round.
 - `unrankCourse`: the gap closes, rounds are kept, a Played course is unchanged.
 - `moveCourse` places a Played course at 1, in the middle, at N+1 and past the end; Ranked moves are unchanged.
 - Old operations without the option put a Played course at the bottom (`addCourse` at `rank`), and their `courses` never contain a null rank.
-- `logRounds` with `addUnranked`: new course becomes Played, a Played course stays Played, a Ranked course keeps its rank; `courseAdded` true only for the new course.
 - PR B: deleting the last round, and a zero count, keep the course in its state.
 - `removeCourse` on a Played course; account deletion removes Played rows.
 - Concurrent `markPlayed`, `moveCourse` and `unrankCourse` for one member (`Promise.all`) leave contiguous ranks.
@@ -253,6 +264,8 @@ New intents on the `/journal` action: `played` (`markPlayed` by id), `played-det
 
 ## 7. Open questions for the maintainer
 
+> **Answered 2026-11-15.** Question 1: (a), tap the course it's better than. Question 2: (a), the public page stays Ranked only. Also from the maintainer: list rows show Played and Want to play only, with no Log a round button, and "Log a Round is going away, don't care about it", so Log a round leaves the screens in PR B (extent being confirmed). `ranked_at` ships in PR A after all (section 1). The rest of the "decided here" list stands.
+
 1. **How does a member put a Played course into their ranking before "better or worse?" (#58) exists?** It can't land at the top or bottom by itself.
    - **(a) Tap the course it's better than.** Rank shows the whole ranking, the member taps the course it beats, and it lands just above. No typing, no long drag on a phone, and #58 ends the same way, so the screen survives #58. Moderate build.
    - **(b) Type a position**, like today's Move to… in the course details. Cheapest, but the member has to know that Pine Valley is #7.
@@ -271,18 +284,20 @@ Two pull requests. Sizes count tests: S under 100 lines, M 100 to 400, L over 40
 
 **PR A: the API (`feat/played-and-ranked`, this branch).** It deploys the API and a web build that behaves exactly as today. Merge it, check production (migration applied, `listMyCourses` carries `unranked: []`), then open PR B.
 
+As built (changed 2026-11-15): the commits are sliced by feature rather than by layer, so that each one typechecks across the workspace (shared domain types change together with the contract and the web mappers that build them).
+
 1. `docs(planning)`: this document.
 2. `feat(domain)`: `placeInRanking` with data-driven tests. S
-3. `feat(api)`: migration `0007`, `personal_rank` nullable, schema comments. S, its own commit.
-4. `refactor(api)`: Ranked-only reads and renumbering over Ranked courses; the unranked list readers; course page, timeline, profile, top-list and curation counts as in section 5; `expectContiguousRanks`. M to L
-5. `feat(api)`: `markPlayed`, `addPlayedCourse`, `unrankCourse`; `moveCourse` places Played courses; `logRounds` `addUnranked` and `courseAdded`; old operations rank a Played course at the bottom. Services and tests. M
-6. `feat(api)`: contract: the new operations, schemas and fields, routes, API operation tests, `pnpm contract:emit`, and the web's generated types and mappers (no screen changes). M
-7. `docs`: architecture, `AGENTS.md`, api.md and testing.md for the new state and the rollback rule. S
+3. `feat(api)`: migration `0007`: `personal_rank` nullable and `ranked_at`; schema comments, including the Played-order dependency on `updated_at`. S, its own commit.
+4. `feat(api)`: Played-aware reads and ranking: Ranked-only `courses` and renumbering; `unranked`, `onMyList`, `friendsUnranked`, `personalRank` in services, contract and web mappers; older operations rank a Played course; `moveCourse` places one; service and API tests. L
+5. `feat(api)`: `ranked_at` writes and tests. S
+6. `feat(api)`: `markPlayed`, `addPlayedCourse`, `unrankCourse`; the overlap regression test; the contract vocabulary note. M
+7. `docs`: architecture, `AGENTS.md`, api.md, testing.md, the rollback rule, and this document. S
 
 **PR B: the web, and the two rules old screens would trip over (`feat/played-and-ranked-web`, from `main` after PR A is live).**
 
 1. `feat(api)`: deleting the last round or a zero count keeps the course. Held back from PR A because old screens' Undo would otherwise leave a course stuck at the bottom of the ranking for as long as PR A ran alone. S
-2. `feat(web)`: one-tap Played on Top list rows, member lists, the course page and the search dialog; Log a round and Add a course land Played; Undo removes an added course. M
+2. `feat(web)`: one-tap Played on Top list rows, member lists, the course page and the search dialog; Add a course lands Played. (Round logging per the 2026-11-15 answers.) M
 3. `feat(web)`: the Played line on Home and the own Ranking tab; ranking a Played course; Take out of ranking. M to L
 4. `feat(web)`: friends see Played; ticks, progress and stats read the whole list; Timeline and Activity label Played rounds; the public page stays Ranked only; privacy text. M
 5. `feat(seed)`: personas with Played courses and one with no rounds. S
