@@ -1,10 +1,9 @@
 import { stateName } from "../catalog/geography";
 
 /**
- * Published consensus lists as checklists ("Top lists"): titles and a
- * member's progress through each, computed from the published entries and
- * the courses on the member's personal list. Every course on a list has at
- * least one round, so being on the list means played.
+ * Published consensus lists as checklists ("Top lists"): their entries,
+ * titles, kinds and display order. A member's progress through them is
+ * counted where it is shown (the web's `features/social/stats.ts`).
  */
 
 /** One published ranking entry, as `GET /v1/rankings` returns it. */
@@ -14,14 +13,6 @@ export interface TopListEntry {
   type: string;
   /** WORLD, USA, USA_PUBLIC or a two-letter state code. */
   scope: string;
-}
-
-export interface TopListProgress {
-  type: string;
-  scope: string;
-  title: string;
-  size: number;
-  played: number;
 }
 
 /** Display order of the national lists; state lists follow, alphabetically. */
@@ -51,33 +42,14 @@ export function topListTitle(type: string, scope: string): string {
   }
 }
 
-/**
- * Progress through every published list the member should see.
- *
- * Args:
- *     entries: Every published ranking entry.
- *     played: Ids of the courses on the member's list.
- *
- * Returns:
- *     The national lists always, then each state list the member has played
- *     at least one course from. National lists come first in a fixed order
- *     (World, USA, USA Public, International), then states by title.
- */
-export function topListProgress(entries: readonly TopListEntry[], played: ReadonlySet<string>): TopListProgress[] {
-  const lists = new Map<string, TopListProgress>();
-  for (const entry of entries) {
-    const key = entry.type + ":" + entry.scope;
-    const list = lists.get(key) ?? { type: entry.type, scope: entry.scope, title: topListTitle(entry.type, entry.scope), size: 0, played: 0 };
-    list.size++;
-    if (played.has(entry.courseId)) list.played++;
-    lists.set(key, list);
-  }
-  return [...lists.values()].filter((list) => NATIONAL.includes(list.type) || list.played > 0).sort(compareTopLists);
-}
-
 /** Whether a list is one of the national lists, which every member sees. */
 export function isNationalList(type: string): boolean {
   return NATIONAL.includes(type);
+}
+
+/** Whether a list is a state's "Best in" list, whose scope is the state's two-letter code. */
+export function isStateList(type: string): boolean {
+  return type === "state";
 }
 
 /** Display order: the national lists in a fixed order, then the rest by title. */

@@ -2,6 +2,7 @@ import { courseSchema } from "@coursebook/domain/catalog/course";
 import { FeedItemType, type FeedItem, type TimelineRound } from "@coursebook/domain/social/types";
 import { describe, expect, it } from "vitest";
 import {
+  countLabel,
   AvatarTone,
   CourseTone,
   avatarTone,
@@ -170,5 +171,16 @@ describe("newFromFriends", () => {
       2,
     );
     expect(picks.map((pick) => pick.round.id)).toEqual(["r1", "r4"]);
+  });
+});
+
+describe("countLabel", () => {
+  it.each([
+    [1, "Country"],
+    [0, "Countries"],
+    [2, "Countries"],
+    [50, "Countries"],
+  ])("labels %i as %s", (count, label) => {
+    expect(countLabel(count, "Country", "Countries")).toBe(label);
   });
 });

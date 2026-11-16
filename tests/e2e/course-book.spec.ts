@@ -320,6 +320,8 @@ test.describe("signed in", () => {
     await expect.poll(() => rankingOrder(page)).toEqual(["Test Alpha Links", "Test Beta Links"]);
     await page.getByRole("navigation", { name: "Profile sections" }).getByRole("link", { name: "Stats" }).click();
     await expect(page).toHaveURL(new RegExp(`/u/${owner.username}/stats$`));
+    await page.getByRole("navigation", { name: "Profile sections" }).getByRole("link", { name: "Want to play" }).click();
+    await expect(page).toHaveURL(new RegExp(`/u/${owner.username}/want-to-play$`));
     await page.getByRole("navigation", { name: "Profile sections" }).getByRole("link", { name: "Timeline" }).click();
     await expect(page).toHaveURL(new RegExp(`/u/${owner.username}/timeline$`));
   });
@@ -329,7 +331,7 @@ test.describe("signed in", () => {
     await signInAs(page, owner);
     await expect(homeRanking(page)).toBeVisible();
     const profile = `/u/${owner.username}`;
-    const pages = ["/", "/courses", "/friends", "/activity", `${profile}/ranking`, `${profile}/lists`, `${profile}/lists/usa`, `${profile}/stats`, `${profile}/timeline`, `/r/${owner.username}`, "/account", "/privacy"];
+    const pages = ["/", "/courses", "/friends", "/activity", `${profile}/ranking`, `${profile}/stats`, `${profile}/lists/usa`, `${profile}/want-to-play`, `${profile}/timeline`, `/r/${owner.username}`, "/account", "/privacy"];
     for (const path of pages) {
       await page.goto(path);
       await expect(page.locator("main h1"), path).toHaveCount(1);
@@ -443,7 +445,7 @@ test.describe("signed in", () => {
     await expect(page).toHaveURL(new RegExp(`/courses/${augusta}$`));
     await expect(page.getByRole("heading", { level: 1, name: "Augusta National Golf Club" })).toBeVisible();
 
-    await page.goto(`/u/${owner.username}/lists`);
+    await page.goto(`/u/${owner.username}/want-to-play`);
     await expect(page.locator("#wantToPlay")).toContainText("Pine Valley Golf Club");
     await page.getByRole("button", { name: "Want to play Pine Valley Golf Club" }).click();
     await expect.poll(() => wantedIds(db, owner.id)).toEqual([]);
@@ -502,9 +504,14 @@ test.describe("signed in", () => {
     await addPlayed(db, friend, await catalogCourse(db, "usa4"));
     await addPlayed(db, owner, await catalogCourse(db, "usa1"));
     await signInAs(page, owner);
+    // The Lists tab became part of Stats; its old address still lands there.
     await page.goto(`/u/${friend.username}/lists`);
-    await page.getByRole("link", { name: /USA Top 100/ }).click();
+    await expect(page).toHaveURL(new RegExp(`/u/${friend.username}/stats$`));
+    await page.getByRole("link", { name: /^USA Top 100:/ }).click();
     await expect(page).toHaveURL(new RegExp(`/u/${friend.username}/lists/usa$`));
+    // A list's page belongs to Stats: the tab stays current and the way back says so.
+    await expect(page.getByRole("navigation", { name: "Profile sections" }).getByRole("link", { name: "Stats" })).toHaveAttribute("aria-current", "page");
+    await expect(page.getByRole("link", { name: "← Stats" })).toHaveAttribute("href", `/u/${friend.username}/stats`);
     const list = page.locator("#memberTopList");
     await expect(list.locator('[data-course="Shinnecock Hills Golf Club"]')).toHaveAttribute("data-played", "true");
     await expect(list.locator('[data-course="Pine Valley Golf Club"]')).toContainText("You");
@@ -518,7 +525,7 @@ test.describe("signed in", () => {
     await expect(page.getByRole("list", { name: "Friends' progress" })).toContainText(friend.displayName);
   });
 
-  test("Stats shows which states and countries a member played, on their own profile and a friend's", async ({ page }) => {
+  test("Stats shows a member's progress through the lists state by state, on their own profile and a friend's", async ({ page }) => {
     const { owner, friend } = members();
     // A course in Scotland and Shinnecock Hills (New York, USA Top 100) join the owner's two Michigan courses.
     await addHiddenCourse(db, owner);
@@ -526,28 +533,38 @@ test.describe("signed in", () => {
     await signInAs(page, owner);
     await page.goto(`/u/${owner.username}/stats`);
 
-    const states = page.getByRole("region", { name: /^States/ });
-    await page.getByRole("link", { name: "See the 2 states" }).click();
-    await expect(page).toHaveURL(new RegExp(`/u/${owner.username}/stats#states$`));
-    await expect(states).toBeInViewport();
-    await expect(states.getByRole("listitem")).toHaveText(["Michigan 2 courses", "New York 1 course"]);
-    await expect(page.getByRole("region", { name: /^Countries/ }).getByRole("listitem")).toHaveText(["USA 3 courses", "Scotland 1 course"]);
-    await expect(page.getByRole("link", { name: "1 of the USA Top 100" })).toHaveAttribute("href", `/u/${owner.username}/lists/usa`);
-    // One round per course: nothing about rounds.
+    // The counts sit in the profile's header, each label agreeing with its number.
+    const headerStat = (label: string) => page.getByLabel("Stats").locator("div").filter({ hasText: label });
+    await expect(headerStat("States")).toHaveText("2States");
+    await expect(headerStat("Countries")).toHaveText("2Countries");
+    await expect(page.getByRole("heading", { name: /^Where you/ })).toHaveCount(0);
+
+    // Each state says how many courses, how many of those its list holds, and the member's top-ranked course there.
+    const states = page.getByRole("region", { name: "States" });
+    await expect(states.getByRole("listitem")).toHaveText([
+      /^Michigan\s*2 courses\s*None are on Best in Michigan \(100 courses\)\s*Your top-ranked: #\d Test (Alpha|Beta) Links$/,
+      /^New York\s*1 course\s*It's on Best in New York \(\d+ courses\)\s*Your top-ranked: #\d Shinnecock Hills Golf Club$/,
+    ]);
+    await expect(page.getByRole("region", { name: "Countries" }).getByRole("listitem")).toHaveText([/^USA\s*3 courses/, /^Scotland\s*1 course/]);
+    await expect(page.getByRole("link", { name: "USA Top 100: 1 of 100 played" })).toHaveAttribute("href", `/u/${owner.username}/lists/usa`);
+    await expect(page.getByRole("region", { name: "The best you've played" })).toContainText("Shinnecock Hills Golf Club");
+    await expect(page.getByRole("region", { name: "Your ranking vs the lists" })).toContainText(/Hidden gem\s*Test (Alpha|Beta) Links\s*Your #\d, and on no published list\./);
+    // Rounds have no place on this page.
     await expect(page.getByRole("heading", { name: "Most played" })).toHaveCount(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
-    // A state opens the member's ranking in that state.
-    await states.getByRole("link", { name: "Michigan 2 courses" }).click();
-    await expect(page).toHaveURL(new RegExp(`/r/${owner.username}\\?view=state-mi$`));
+    // The top-ranked course opens its own page; the rest of the row opens the state's list with the member's ticks.
+    await expect(states.getByRole("link", { name: "Shinnecock Hills Golf Club" })).toHaveAttribute("href", /^\/courses\//);
+    await states.getByRole("link", { name: /^Michigan:/ }).click();
+    await expect(page).toHaveURL(new RegExp(`/u/${owner.username}/lists/state-mi$`));
     await expect(page.getByRole("heading", { level: 2, name: "Best in Michigan" })).toBeVisible();
-    await expect.poll(() => rankingOrder(page)).toEqual(["Test Beta Links", "Test Alpha Links"]);
 
-    // A friend with courses in one state and one country gets no country list.
+    // A friend with courses in one state and one country: singular labels, no country list, and "their".
     await page.goto(`/u/${friend.username}/stats`);
-    await expect(page.getByRole("heading", { level: 2, name: "Where they've played" })).toBeVisible();
-    await expect(page.getByRole("region", { name: /^States/ }).getByRole("listitem")).toHaveText(["Michigan 2 courses"]);
-    await expect(page.getByRole("region", { name: /^Countries/ })).toHaveCount(0);
+    await expect(headerStat("State")).toHaveText("1State");
+    await expect(headerStat("Country")).toHaveText("1Country");
+    await expect(page.getByRole("region", { name: "States" }).getByRole("listitem")).toHaveText([/^Michigan\s*2 courses.*Their top-ranked: #\d Test (Alpha|Beta) Links$/]);
+    await expect(page.getByRole("region", { name: "Countries" })).toHaveCount(0);
   });
 
   test("members befriend by username, accept, and remove a friend from their profile", async ({ page }) => {

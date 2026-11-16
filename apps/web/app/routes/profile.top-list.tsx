@@ -38,7 +38,7 @@ export default function ProfileTopList({ loaderData }: Route.ComponentProps) {
       self={profile.relationship === ProfileRelationship.Self}
       memberPlayed={new Set(list.rows.map((row) => row.course.id))}
       viewer={loaderData.viewer}
-      backTo={profilePath(profile.member.username, "lists")}
+      backTo={profilePath(profile.member.username, "stats")}
       notify={shell.notify}
       openAuth={shell.openAuth}
     />

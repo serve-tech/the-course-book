@@ -19,6 +19,7 @@ export default [
       route("lists", "routes/profile.lists.tsx"),
       route("lists/:list", "routes/profile.top-list.tsx"),
       route("stats", "routes/profile.stats.tsx"),
+      route("want-to-play", "routes/profile.want-to-play.tsx"),
       route("timeline", "routes/profile.timeline.tsx"),
     ]),
     route("r/:username", "routes/public-ranking.tsx"),

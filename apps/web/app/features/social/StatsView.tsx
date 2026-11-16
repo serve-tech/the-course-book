@@ -1,195 +1,283 @@
-import { useMemo } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import type { MemberListRow, PublicMember } from "@coursebook/domain/friends/types";
-import { sharePath } from "@coursebook/domain/sharing/view";
 import { cx } from "../../shared/lib/cx";
-import { CourseTile } from "./CourseTile";
+import { coursePath } from "../courses/paths";
+import { ordinal } from "./format";
 import { displayName, profilePath } from "./paths";
-import profileStyles from "./profile.module.css";
-import { TileSize } from "./sizes";
 import socialStyles from "./social.module.css";
-import { mostPlayed, nationalProgress, placeBreakdown, stateView, type PlaceCount } from "./stats";
+import { GemReason, listedPhrase, profileStats, shownPlaces, type Disagreement, type HiddenGem, type ListProgress, type PublishedEntry, type RankedRef } from "./stats";
 import styles from "./stats.module.css";
 
 /**
- * A profile's Stats tab, from the member's ranking alone: how many courses,
- * states and countries, which states and countries with how many courses in
- * each, and how far through the national Top 100s. Rounds barely matter
- * (decision 2026-11-03, ranking-first product), so the one line about them,
- * the most played course, sits last and shows only when a course has a
- * second round.
+ * A profile's Stats tab: the member's progress through the published lists,
+ * then how their ranking compares with those lists. The counts of courses,
+ * states and countries are in the profile's header, above every tab.
  *
- * Each part is its own section, so a later line (architects, favourite holes)
- * is one more section with a `Breakdown` or a list of its own.
+ * The national Top 100s are one section. The states are another: one row per
+ * state the member has played in, with the courses played there and, on its
+ * own labelled line, their progress through that state's "Best in" list. The
+ * two numbers differ whenever a course played in the state is not on its
+ * list, so each is named. Every row names the member's top-ranked course on
+ * it and opens the list with their ticks.
+ *
+ * Further down: the best course they have played on each national list, the
+ * course their ranking and a list disagree on most, and their hidden gem.
+ * Each part is its own section, so a later line (architects, favourite
+ * holes) is one more section.
  *
  * @param member - Whose stats.
  * @param self - Whether it is the viewer's own profile.
  * @param rows - Their ranking, in rank order.
+ * @param entries - Every published ranking entry, for progress through the lists.
  */
-export function StatsView({ member, self, rows }: { member: PublicMember; self: boolean; rows: readonly MemberListRow[] }) {
-  const places = useMemo(() => placeBreakdown(rows), [rows]);
-  const national = useMemo(() => nationalProgress(rows), [rows]);
-  const most = useMemo(() => mostPlayed(rows), [rows]);
-  const { username } = member;
-  const name = displayName(member);
-  const showCountries = places.countries.length > 1;
+export function StatsView({
+  member,
+  self,
+  rows,
+  entries,
+}: {
+  member: PublicMember;
+  self: boolean;
+  rows: readonly MemberListRow[];
+  entries: readonly PublishedEntry[];
+}) {
+  const stats = useMemo(() => profileStats(rows, entries), [rows, entries]);
+  const listPath = (slug: string) => profilePath(member.username, "lists/" + slug);
+  const whose = self ? "Your" : "Their";
+  const { disagreement, hiddenGem } = stats;
 
   return (
-    <div className={profileStyles.columns}>
-      <div className={styles.main}>
-        <section aria-labelledby="places">
-          <h2 id="places" className={socialStyles.sectionLabel}>
-            {self ? "Where you've played" : "Where they've played"}
-          </h2>
-          <dl className={styles.figures}>
-            <Figure label="Courses" value={rows.length} />
-            <Figure label="States" value={places.states.length} target={places.states.length ? { id: "states", noun: "state" } : null} />
-            <Figure label="Countries" value={places.countries.length} target={showCountries ? { id: "countries", noun: "country" } : null} />
-          </dl>
-          {!rows.length && (
-            <div className={cx(socialStyles.emptyNote, styles.empty)}>
-              <strong>No courses yet</strong>
-              {self ? "Rank a course and the places you've played show up here." : name + " hasn't ranked any courses yet."}
-            </div>
-          )}
-        </section>
-        {places.states.length > 0 && (
-          <Breakdown
-            id="states"
-            title="States"
-            places={places.states}
-            link={(place) => {
-              const view = stateView(rows, place.key);
-              return view && sharePath(username, view);
-            }}
-          />
-        )}
-        {showCountries && <Breakdown id="countries" title="Countries" places={places.countries} />}
-      </div>
+    <div className={styles.page}>
+      {!stats.courses && (
+        <div className={socialStyles.emptyNote}>
+          <strong>No courses yet</strong>
+          {self ? "Rank a course and your progress through the lists shows up here." : displayName(member) + " hasn't ranked any courses yet."}
+        </div>
+      )}
 
-      <aside className={profileStyles.aside}>
-        <section aria-labelledby="top-100s">
-          <h2 id="top-100s" className={socialStyles.sectionLabel}>
-            Top 100s <Link to={profilePath(username, "lists")}>All lists</Link>
-          </h2>
-          <ul className={styles.lists}>
-            {national.map((list) => (
-              <li key={list.list}>
-                <Link className={styles.listLink} to={profilePath(username, "lists/" + list.list)}>
-                  <span className={styles.listCount}>{list.played}</span>{" "}
-                  <span>
-                    of the <span className={styles.listTitle}>{list.title}</span>
-                  </span>
+      <section aria-labelledby="top-100s">
+        <h2 id="top-100s" className={socialStyles.sectionLabel}>
+          Top 100s
+        </h2>
+        <ul className={styles.grid}>
+          {stats.national.map((list) => (
+            <li key={list.slug} className={styles.row}>
+              <div className={styles.rowHead}>
+                <Link className={cx(styles.rowTitle, styles.rowLink)} to={listPath(list.slug)} aria-label={list.title + ": " + playedOf(list)}>
+                  {list.title}
                 </Link>
-              </li>
-            ))}
-          </ul>
-        </section>
-        {most && (
-          <section aria-labelledby="most-played">
-            <h2 id="most-played" className={socialStyles.sectionLabel}>
-              Most played
-            </h2>
-            <div className={styles.mostPlayed}>
-              <CourseTile course={most.course} size={TileSize.Thumb} />
-              <div>
-                <span className={styles.courseName}>{most.course.name}</span>
-                <span className={styles.coursePlace}>{most.course.location}</span>
+                <Count value={list.played} unit={"/ " + String(list.size)} />
               </div>
-              <span className={styles.rounds}>
-                <b>{most.played}</b> rounds
-              </span>
+              <Bar list={list} />
+              <TopRanked whose={whose} course={list.top} />
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      {stats.states.length > 0 && (
+        <PlaceSection id="states" title="States" noun="states" places={stats.states}>
+          {(state) => {
+            const onList = state.list && listedPhrase(state.courses, state.list.played, whose.toLowerCase()) + " " + state.list.title + " (" + courses(state.list.size) + ")";
+            return (
+              <li key={state.key} className={styles.row}>
+                <div className={styles.rowHead}>
+                  {state.list ? (
+                    <Link className={cx(styles.rowTitle, styles.rowLink)} to={listPath(state.list.slug)} aria-label={state.name + ": " + courses(state.courses) + ". " + String(onList)}>
+                      {state.name}
+                    </Link>
+                  ) : (
+                    <span className={styles.rowTitle}>{state.name}</span>
+                  )}
+                  <Count value={state.courses} unit={state.courses === 1 ? "course" : "courses"} />
+                </div>
+                {state.list && (
+                  <>
+                    <p className={styles.onList}>{onList}</p>
+                    <Bar list={state.list} />
+                  </>
+                )}
+                <TopRanked whose={whose} course={state.top} />
+              </li>
+            );
+          }}
+        </PlaceSection>
+      )}
+      {stats.countries.length > 1 && (
+        <PlaceSection id="countries" title="Countries" noun="countries" places={stats.countries}>
+          {(country) => (
+            <li key={country.key} className={styles.row}>
+              <div className={styles.rowHead}>
+                <span className={styles.rowTitle}>{country.name}</span>
+                <Count value={country.courses} unit={country.courses === 1 ? "course" : "courses"} />
+              </div>
+              <TopRanked whose={whose} course={country.top} />
+            </li>
+          )}
+        </PlaceSection>
+      )}
+
+      <div className={styles.pair}>
+        {(disagreement || hiddenGem) && (
+          <section aria-labelledby="versus">
+            <h2 id="versus" className={socialStyles.sectionLabel}>
+              {whose} ranking vs the lists
+            </h2>
+            <div className={styles.notes}>
+              {hiddenGem && (
+                <Note label="Hidden gem" course={hiddenGem.course}>
+                  <GemText gem={hiddenGem} self={self} listPath={listPath} />
+                </Note>
+              )}
+              {disagreement && (
+                <Note label="Biggest disagreement" course={disagreement.course}>
+                  <GapText gap={disagreement} self={self} listPath={listPath} />
+                </Note>
+              )}
             </div>
           </section>
         )}
-      </aside>
-    </div>
-  );
-}
 
-/** The section a headline number jumps to, and what it counts ("state"), for the link's name. */
-interface FigureTarget {
-  id: string;
-  noun: string;
-}
-
-/** "1 state", "8 states", "2 countries". */
-function countOf(count: number, noun: string): string {
-  if (count === 1) return "1 " + noun;
-  return String(count) + " " + (noun.endsWith("y") ? noun.slice(0, -1) + "ies" : noun + "s");
-}
-
-/**
- * One headline number. With a target, the number jumps to the section that
- * breaks it down.
- */
-function Figure({ label, value, target = null }: { label: string; value: number; target?: FigureTarget | null }) {
-  return (
-    <div className={styles.figure}>
-      <dt className={styles.figureLabel}>{label}</dt>
-      <dd className={styles.figureValue}>
-        {target ? (
-          <a href={"#" + target.id} aria-label={"See the " + countOf(value, target.noun)}>
-            {value.toLocaleString()}
-          </a>
-        ) : (
-          value.toLocaleString()
+        {stats.best.length > 0 && (
+          <section aria-labelledby="best">
+            <h2 id="best" className={socialStyles.sectionLabel}>
+              {self ? "The best you've played" : "The best they've played"}
+            </h2>
+            <ul className={styles.rows}>
+              {stats.best.map((best) => (
+                <li key={best.slug} className={styles.best}>
+                  <span className={styles.bestRank}>#{best.published}</span>
+                  <span>
+                    <Link className={styles.courseLink} to={coursePath(best.course.id)}>
+                      {best.course.name}
+                    </Link>
+                    <span className={styles.bestList}>
+                      on the <Link to={listPath(best.slug)}>{best.title}</Link>
+                    </span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
         )}
-      </dd>
+      </div>
     </div>
   );
 }
 
 /**
- * A list of places with their course counts and a bar for each, most first.
+ * A section of places, which can run long: a member may have played in
+ * every state. It shows the first few, most courses first, and a button for
+ * the rest, so nothing below is pushed out of reach (`shownPlaces`).
  *
- * @param id - The section's id, which the headline number links to.
- * @param title - The section's heading.
- * @param places - The places, most courses first.
- * @param link - Where a place opens; null or omitted when it opens nothing.
+ * @param id - The heading's id.
+ * @param title - The heading.
+ * @param noun - What the places are, for the button: "states".
+ * @param places - Every place, most courses first.
+ * @param children - Draws one place as a list item.
  */
-export function Breakdown({
-  id,
-  title,
-  places,
-  link,
-}: {
-  id: string;
-  title: string;
-  places: readonly PlaceCount[];
-  link?: (place: PlaceCount) => string | null;
-}) {
-  const most = places[0]?.courses ?? 0;
+function PlaceSection<T>({ id, title, noun, places, children }: { id: string; title: string; noun: string; places: readonly T[]; children: (place: T) => ReactNode }) {
+  const [expanded, setExpanded] = useState(false);
+  const heading = useRef<HTMLHeadingElement>(null);
+  const capped = shownPlaces(places, false).length < places.length;
   return (
-    <section id={id} className={styles.breakdown} aria-labelledby={id + "-title"}>
-      <h2 id={id + "-title"} className={socialStyles.sectionLabel}>
-        {title} <span>{places.length}</span>
+    <section aria-labelledby={id}>
+      <h2 id={id} ref={heading} className={cx(socialStyles.sectionLabel, styles.anchor)}>
+        {title}
       </h2>
-      <ol className={styles.places}>
-        {places.map((place) => {
-          const href = link?.(place) ?? null;
-          const content = (
-            <>
-              <span className={styles.placeName}>{place.name}</span>{" "}
-              <progress className={styles.bar} value={place.courses} max={most} aria-hidden="true" />
-              <span className={styles.placeCount}>
-                {place.courses} <span className={styles.unit}>{place.courses === 1 ? "course" : "courses"}</span>
-              </span>
-            </>
-          );
-          return (
-            <li key={place.key}>
-              {href ? (
-                <Link className={styles.place} to={href}>
-                  {content}
-                </Link>
-              ) : (
-                <div className={styles.place}>{content}</div>
-              )}
-            </li>
-          );
-        })}
-      </ol>
+      <ol className={styles.grid}>{shownPlaces(places, expanded).map(children)}</ol>
+      {capped && (
+        <button
+          type="button"
+          className={cx(socialStyles.button, styles.more)}
+          aria-expanded={expanded}
+          onClick={() => {
+            // Folding a long list away from its foot would leave the page far below the section.
+            if (expanded) heading.current?.scrollIntoView({ block: "start" });
+            setExpanded(!expanded);
+          }}
+        >
+          {expanded ? "Show fewer" : "Show all " + String(places.length) + " " + noun}
+        </button>
+      )}
     </section>
+  );
+}
+
+/** "1 course", "14 courses". */
+function courses(count: number): string {
+  return count === 1 ? "1 course" : String(count) + " courses";
+}
+
+/** "13 of 100 played". */
+function playedOf(list: ListProgress): string {
+  return String(list.played) + " of " + String(list.size) + " played";
+}
+
+/** A row's number with its unit beside it: "5 / 100", "14 courses". */
+function Count({ value, unit }: { value: number; unit: string }) {
+  return (
+    <span className={styles.rowCount}>
+      {value} <small>{unit}</small>
+    </span>
+  );
+}
+
+/** A list's progress as a bar; the numbers beside it say the same in words. */
+function Bar({ list }: { list: ListProgress }) {
+  // A progress element's max must be above zero.
+  return <progress className={styles.bar} value={list.played} max={Math.max(list.size, 1)} aria-hidden="true" />;
+}
+
+/**
+ * The member's top-ranked course on a row's list or in its place, opening
+ * the course's page. Nothing for a list they have played none of.
+ */
+function TopRanked({ whose, course }: { whose: string; course: RankedRef | null }) {
+  if (!course) return null;
+  return (
+    <p className={styles.topRanked}>
+      {whose} top-ranked: <b>#{course.rank}</b>{" "}
+      <Link className={styles.courseLink} to={coursePath(course.id)}>
+        {course.name}
+      </Link>
+    </p>
+  );
+}
+
+/** "USA Top 100 has it 6th of your 7 courses on that list. You have it 1st." */
+function GapText({ gap, self, listPath }: { gap: Disagreement; self: boolean; listPath: (slug: string) => string }) {
+  return (
+    <>
+      <Link to={listPath(gap.slug)}>{gap.title}</Link> has it {ordinal(gap.listPosition)} of {self ? "your" : "their"} {gap.of} courses on that list.{" "}
+      {self ? "You have" : "They have"} it {ordinal(gap.ownPosition)}.
+    </>
+  );
+}
+
+/** Why the course is the gem, in a sentence. */
+function GemText({ gem, self, listPath }: { gem: HiddenGem; self: boolean; listPath: (slug: string) => string }) {
+  const theirs = (self ? "Your" : "Their") + " #" + String(gem.course.rank);
+  if (gem.reason === GemReason.RankedHigher && gem.gap) return <GapText gap={gem.gap} self={self} listPath={listPath} />;
+  if (gem.reason === GemReason.StateListOnly && gem.stateList)
+    return (
+      <>
+        {theirs}, and on no national list. It's #{gem.stateList.published} on <Link to={listPath(gem.stateList.slug)}>{gem.stateList.title}</Link>.
+      </>
+    );
+  return <>{theirs}, and on no published list.</>;
+}
+
+/** One comparison with the lists: what it is, the course, and the sentence that explains it. */
+function Note({ label, course, children }: { label: string; course: RankedRef; children: ReactNode }) {
+  return (
+    <div className={styles.note}>
+      <span className={styles.noteLabel}>{label}</span>
+      <Link className={cx(styles.courseLink, styles.noteCourse)} to={coursePath(course.id)}>
+        {course.name}
+      </Link>
+      <p className={styles.noteText}>{children}</p>
+    </div>
   );
 }
