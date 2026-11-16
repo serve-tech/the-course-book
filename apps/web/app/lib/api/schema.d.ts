@@ -1121,7 +1121,7 @@ export interface components {
             license: string;
             /**
              * Format: uri
-             * @description The license's text, when it has one.
+             * @description The license's text, when it has one; http or https.
              */
             licenseUrl?: string | null;
             /**

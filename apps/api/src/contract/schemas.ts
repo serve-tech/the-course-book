@@ -595,6 +595,12 @@ export const PhotoUploadSettingsSchema = z
   })
   .openapi("PhotoUploadSettings");
 
+/**
+ * A link a curator types, shown to every member as a link: http or https
+ * only, because `z.url()` alone accepts `javascript:` URLs.
+ */
+const webUrl = z.url({ protocol: /^https?$/, message: "Enter a link starting with https://." });
+
 /** A multipart file part; validated as a `File`, published as binary. */
 const photoFile = z
   .custom<File>((value) => value instanceof File, { message: "Attach the photo as a file." })
@@ -610,9 +616,8 @@ export const UploadCoursePhotoRequestSchema = z
       .min(1, "Enter the photo's license or the permission given.")
       .max(100)
       .openapi({ description: "A license's short name (`CC BY 4.0`) or the permission given (`Used with permission`)." }),
-    licenseUrl: z.url().max(500).nullish().openapi({ description: "The license's text, when it has one." }),
-    sourceUrl: z
-      .url()
+    licenseUrl: webUrl.max(500).nullish().openapi({ description: "The license's text, when it has one; http or https." }),
+    sourceUrl: webUrl
       .max(500)
       .nullish()
       .openapi({ description: "Where the photo came from. Without one, the photo's own address is its `sourceUrl`." }),

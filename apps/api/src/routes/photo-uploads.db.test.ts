@@ -171,6 +171,8 @@ describe("uploading a photo", () => {
     { name: "no license", fields: { license: null }, status: 400, code: "validation_failed" },
     { name: "no photo", fields: { photo: null }, status: 400, code: "validation_failed" },
     { name: "a source that isn't a URL", fields: { sourceUrl: "my phone" }, status: 400, code: "validation_failed" },
+    // Every member gets the source as a link, so only web links are taken.
+    { name: "a javascript: source", fields: { sourceUrl: "javascript:alert(document.cookie)" }, status: 400, code: "validation_failed" },
     { name: "a file that isn't an image", fields: { photo: new TextEncoder().encode("GIF89a? no") }, status: 400, code: "photo_unsupported" },
   ])("refuses an upload with $name and stores nothing", async ({ fields, status, code }) => {
     const { memory, curator, upload, photoRow } = await scenario();
