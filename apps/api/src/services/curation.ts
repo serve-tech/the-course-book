@@ -104,7 +104,7 @@ export async function searchCommons(db: Database, commons: CommonsClient, userId
 type PhotoValues = Omit<typeof coursePhotos.$inferInsert, "courseId" | "createdAt" | "updatedAt">;
 
 /** A stored copy's prefix and the hero file's address and size. */
-interface StoredFiles {
+export interface StoredFiles {
   prefix: string;
   url: string;
   width: number;
@@ -115,7 +115,7 @@ interface StoredFiles {
  * Delete a stored photo's files. Never throws: the row no longer names
  * them, so a failure only leaves unused files, which is logged.
  */
-async function deleteFiles(store: PhotoStore | null, prefix: string, log: LeftoverLog): Promise<void> {
+export async function deleteFiles(store: PhotoStore | null, prefix: string, log: LeftoverLog): Promise<void> {
   const keys = photoKeys(prefix);
   if (!store) {
     log("Photo storage is off, so a removed photo's files were left in the bucket", { keys });
@@ -139,7 +139,7 @@ async function deleteFiles(store: PhotoStore | null, prefix: string, log: Leftov
  * write fails, the files already written are deleted before the error is
  * passed on.
  */
-async function storeFiles(store: PhotoStore, courseId: string, photo: ProcessedPhoto, log: LeftoverLog): Promise<StoredFiles> {
+export async function storeFiles(store: PhotoStore, courseId: string, photo: ProcessedPhoto, log: LeftoverLog): Promise<StoredFiles> {
   const prefix = photoPrefix(courseId, randomUUID());
   try {
     for (const size of Object.values(PhotoSize)) await store.put(photoKey(prefix, size), photo[size].bytes, STORED_PHOTO_TYPE, STORED_PHOTO_CACHE_CONTROL);

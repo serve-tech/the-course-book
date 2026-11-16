@@ -24,7 +24,8 @@
     "role:set": "tsx scripts/set-role.ts",
     "contract:emit": "tsx scripts/emit-openapi.ts",
     "test:s3": "vitest run --project s3",
-    "photos:local-bucket": "tsx scripts/prepare-photo-bucket.ts"
+    "photos:local-bucket": "tsx scripts/prepare-photo-bucket.ts",
+    "photos:copy-commons": "tsx scripts/copy-commons-photos.ts"
   },
   "dependencies": {
     "@clerk/backend": "^3.18.1",

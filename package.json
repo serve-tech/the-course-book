@@ -27,6 +27,7 @@
     "seed:dev": "pnpm --filter @coursebook/api seed:dev",
     "role:set": "pnpm --filter @coursebook/api role:set",
     "photos:local-bucket": "pnpm --filter @coursebook/api photos:local-bucket",
+    "photos:copy-commons": "pnpm --filter @coursebook/api photos:copy-commons",
     "format": "prettier --write apps packages tests/e2e package.json tsconfig.json tsconfig.base.json vitest.config.ts eslint.config.js"
   },
   "devDependencies": {
