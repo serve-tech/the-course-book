@@ -6,7 +6,7 @@ The authoritative description is [contract/openapi.json](../contract/openapi.jso
 
 - **Base URL:** the `coursebook-golf-api` Render service, `https://coursebook-golf-api.onrender.com` (`https://api.coursebook.golf` after cutover).
 - **Authentication:** `Authorization: Bearer <Clerk session token>` on member operations, exactly in that form: the scheme spelled `Bearer`, one space, then the token. Any other Authorization value (another scheme, a lowercase `bearer`, a bare token) is 401 `unauthenticated`, as is a token that does not verify, even on public operations. Omit the header on public operations. Cookies are ignored.
-- **Bodies:** JSON with `Content-Type: application/json`, at most 32 KB. Optional request fields may be missing or `null`.
+- **Bodies:** JSON with `Content-Type: application/json`, at most 32 KB. Optional request fields may be missing or `null`. The one exception is `uploadCoursePhoto`: `multipart/form-data`, at most 25 MB for the photo.
 - **Responses:** every documented field is always present; absent values are `null`. Changes to your list return the whole updated list (`courses`), so clients replace their copy.
 - **Dates:** `playedOn` is `YYYY-MM-DD` in the member's time zone; send it, because the server's date is UTC.
 - **Compatibility:** the contract only grows. Unknown response fields and unknown error codes must be tolerated. Read `GET /v1/client-config` at launch and ask the member to update when the app is older than `minimumVersions`.
@@ -21,16 +21,16 @@ Every failure returns:
 
 | Status | Codes |
 | --- | --- |
-| 400 | `bad_request` (unreadable JSON), `validation_failed` (with `fields`), `us_state_required` |
+| 400 | `bad_request` (unreadable JSON), `validation_failed` (with `fields`), `us_state_required`, `photo_not_usable`, `photo_unsupported`, `photo_too_narrow` |
 | 401 | `unauthenticated`, `account_deleted` |
-| 403 | `username_invalid` |
+| 403 | `username_invalid`, `curator_required`, `admin_required` |
 | 404 | `not_found`, `course_not_found`, `not_on_list`, `round_not_found`, `member_not_found`, `friendship_not_found`, `top_list_not_found` |
-| 409 | `username_taken` (another member holds the Clerk account's username; choose a different one) |
-| 413 | `payload_too_large` |
+| 409 | `username_taken` (another member holds the Clerk account's username; choose a different one), `role_protected` |
+| 413 | `payload_too_large`, `photo_too_large` |
 | 415 | `unsupported_media_type` |
 | 500 | `internal` |
 | 502 | `account_deletion_incomplete` (retry `DELETE /v1/me`) |
-| 503 | `search_unavailable` |
+| 503 | `search_unavailable`, `commons_unavailable`, `photo_uploads_off`, `photo_storage_unavailable` |
 
 `message` is written for members; `requestId` matches the server log and the `X-Request-Id` header. The API generates every request id; an `X-Request-Id` sent by the client is ignored.
 
@@ -65,6 +65,10 @@ Every failure returns:
 | `GET /v1/members/{username}/want-to-play` | `listWantToPlay` | member | The member's own or a friend's Want to play list, newest first; anyone else is 404 `member_not_found` |
 | `PUT /v1/me/want-to-play/{courseId}` | `addWantToPlay` | member | Add a catalog course (played ones too); idempotent, keeps the original date; returns the list |
 | `DELETE /v1/me/want-to-play/{courseId}` | `removeWantToPlay` | member | Remove a course; idempotent (removing one that is not there changes nothing); returns the list |
+| `PUT /v1/courses/{courseId}/photo` | `setCoursePhoto` | curator | Make a Commons file (`commonsFile`) the course's photo; credit and license come from Commons. With photo storage, the API keeps and serves its own copy |
+| `DELETE /v1/courses/{courseId}/photo` | `removeCoursePhoto` | curator | Remove the course's photo and its stored files; succeeds when there is none |
+| `GET /v1/curation/photo-uploads` | `getPhotoUploadSettings` | curator | Whether uploads are on (`enabled`, false until photo storage is configured) and the limits: `maxBytes`, `maxPixels`, `minWidth`, `contentTypes` (JPEG first; use that order in a file picker's `accept`) |
+| `POST /v1/courses/{courseId}/photo/upload` | `uploadCoursePhoto` | curator | Multipart: `photo` (JPEG, PNG or WebP, at most 25 MB and 50 MP, at least 500 px wide), `credit`, `license`, optional `licenseUrl` and `sourceUrl`. Stored upright as WebP at 1280 and 330 px with all metadata removed, location included. 413 `photo_too_large`, 400 `photo_unsupported` (HEIC included) or `photo_too_narrow`, 503 `photo_uploads_off` or `photo_storage_unavailable` |
 
 `relationship` is one of `none`, `friends`, `requested` (the viewer asked) and `incoming` (they asked); treat an unknown value as `none`. Friendships are mutual: one member asks, the other accepts, and either can end it. When both ask each other, they are friends ([decision](../.planning/decisions/2026-09-29-friends-only-visibility-with-mutual-friend-requests.md)).
 
