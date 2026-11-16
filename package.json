@@ -13,7 +13,7 @@
     "typegen": "pnpm --filter @coursebook/web typegen",
     "typecheck": "tsc --noEmit && pnpm -r typecheck",
     "lint": "pnpm --filter @coursebook/web typegen && eslint .",
-    "test": "vitest run",
+    "test": "vitest run && node --test .github/scripts/ci-jobs.test.mjs",
     "test:unit": "vitest run --project domain --project '@coursebook/api (node)' --project '@coursebook/web (node)' --project '@coursebook/web (jsdom)'",
     "test:watch": "vitest",
     "test:e2e": "pnpm --filter @coursebook/e2e test",
