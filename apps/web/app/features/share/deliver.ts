@@ -1,8 +1,9 @@
 /**
  * Sharing a view of a ranking with one Share button: the image and the link
  * together where the device can, the link alone when there is no image.
- * `chooseDelivery` and `shareNotice` are the pure rules; `shareSupport` and
- * `deliverShare` are the browser boundary, called from the click handler.
+ * `chooseDelivery`, `chooseImageSave` and `shareNotice` are the pure rules;
+ * `shareSupport`, `deliverShare` and `saveImage` are the browser boundary,
+ * called from the click handler.
  *
  * Which fields go to the share sheet (checked 2026-11-15):
  *
@@ -64,10 +65,32 @@ export enum ShareOutcome {
   Shared = "shared",
   /** The member closed the share sheet. */
   Cancelled = "cancelled",
+  /** The image was downloaded, from the preview's Save image. */
+  Saved = "saved",
   /** The link is on the clipboard (and the image saved, for SaveImageAndCopyLink). */
   Copied = "copied",
   /** The clipboard refused the link (the image was still saved, for SaveImageAndCopyLink). */
   CopyFailed = "copy-failed",
+}
+
+/** How the image alone reaches the member, from the preview's Save image. */
+export enum ImageSave {
+  /** The share sheet with the image and nothing else, which offers the phone's own Save Image. */
+  ShareSheet = "share-sheet",
+  /** A file download. */
+  Download = "download",
+}
+
+/**
+ * Choose how Save image saves. A phone has no downloads folder people look
+ * in, so there the image goes to the share sheet by itself, where the
+ * phone's Save Image puts it in their photos. A computer downloads it.
+ *
+ * Args:
+ *     support: What the browser offers.
+ */
+export function chooseImageSave(support: ShareSupport): ImageSave {
+  return support.coarsePointer && support.canShareImage ? ImageSave.ShareSheet : ImageSave.Download;
 }
 
 /**
@@ -229,4 +252,26 @@ export async function deliverShare(delivery: ShareDelivery, file: File | null, u
     case ShareDelivery.CopyLink:
       return copy(url);
   }
+}
+
+/**
+ * Save the image by itself, as `chooseImageSave` chose. Call it directly
+ * from the click, with no await before it, for the same reason as
+ * `deliverShare`.
+ *
+ * Args:
+ *     save: How to save it.
+ *     file: The image.
+ *
+ * Returns:
+ *     `Saved` after a download; `Shared` or `Cancelled` from the share sheet.
+ *
+ * Raises:
+ *     Error: When the share sheet fails for a reason other than the member
+ *         closing it.
+ */
+export async function saveImage(save: ImageSave, file: File): Promise<ShareOutcome> {
+  if (save === ImageSave.ShareSheet) return openSheet({ files: [file] });
+  download(file);
+  return ShareOutcome.Saved;
 }
