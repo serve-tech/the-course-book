@@ -1,8 +1,19 @@
 name: Verify application
+# GitHub bills every job rounded up to a whole minute, and the Free plan has
+# 2,000 minutes a month, so this workflow runs once per commit and starts only
+# the jobs a change needs (issue #85).
 on:
-  push:
-    branches: [main, 'feat/**', 'fix/**', 'hotfix/**']
+  # A pull request's commits run here. A push to its branch does not run
+  # again: until 2026-11-16 every commit ran twice, once per trigger.
   pull_request:
+  push:
+    branches: [main]
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  # A newer push to a pull request replaces the run before it. Never cancel on
+  # main: Render deploys a commit only after its checks pass, and a cancelled
+  # run would leave that commit undeployed.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 permissions:
   contents: read
 env:
@@ -13,8 +24,17 @@ env:
   # Placeholder for builds that only compile; the browser suite injects the real key.
   VITE_CLERK_PUBLISHABLE_KEY: pk_test_ZXhhbXBsZS5jbGVyay5hY2NvdW50cy5kZXYk
 jobs:
+  # The three jobs are the checks branch protection requires, so their names
+  # stay. `verify` always starts, because Render does not deploy a commit with
+  # no checks; its first step works out which jobs the change needs
+  # (.github/scripts/ci-jobs.mjs) and the rest of its steps, and the other two
+  # jobs, run only when needed. A skipped job counts as passed, for GitHub's
+  # required checks and for Render's deploy gate.
   verify:
     runs-on: ubuntu-latest
+    outputs:
+      browser: ${{ steps.changes.outputs.browser }}
+      docker: ${{ steps.changes.outputs.docker }}
     services:
       postgres:
         image: postgres:17-alpine
@@ -30,27 +50,48 @@ jobs:
           --health-retries 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The commit to compare with has to be in the clone.
+          fetch-depth: 0
+      - name: Which jobs does this change need?
+        id: changes
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BEFORE_SHA: ${{ github.event.before }}
+        run: node .github/scripts/ci-jobs.mjs
       - uses: pnpm/action-setup@v4
+        if: steps.changes.outputs.verify == 'true'
       - uses: actions/setup-node@v4
+        if: steps.changes.outputs.verify == 'true'
         with:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+        if: steps.changes.outputs.verify == 'true'
       - run: pnpm lint
+        if: steps.changes.outputs.verify == 'true'
       - run: pnpm typecheck
+        if: steps.changes.outputs.verify == 'true'
       - name: Migration drift gate
+        if: steps.changes.outputs.verify == 'true'
         run: |
           pnpm db:check
           pnpm db:generate
           git diff --exit-code --stat apps/api/src/db/migrations
       - name: API contract drift gate
+        if: steps.changes.outputs.verify == 'true'
         run: pnpm contract:check
       - run: pnpm db:migrate
+        if: steps.changes.outputs.verify == 'true'
       - run: pnpm test
+        if: steps.changes.outputs.verify == 'true'
       - run: pnpm build
+        if: steps.changes.outputs.verify == 'true'
   browser:
     runs-on: ubuntu-latest
     needs: verify
+    if: needs.verify.outputs.browser == 'true'
     services:
       postgres:
         image: postgres:17-alpine
@@ -92,6 +133,7 @@ jobs:
   docker:
     runs-on: ubuntu-latest
     needs: verify
+    if: needs.verify.outputs.docker == 'true'
     services:
       postgres:
         image: postgres:17-alpine

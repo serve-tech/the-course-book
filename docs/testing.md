@@ -74,6 +74,23 @@ Do not sign into production or create or delete real records as part of an autom
 
 ## CI and handoff
 
-[Verify application](../.github/workflows/ci.yml) runs lint, typecheck, the migration drift gate, the API contract drift gate, migrations against a Postgres service, all tests and the build on working branches and PRs, then a `browser` job with the Playwright suite and a `docker` job that builds and smoke-tests the API image.
+[Verify application](../.github/workflows/ci.yml) runs on every pull request and on `main`. Its `verify` job runs lint, typecheck, the migration drift gate, the API contract drift gate, migrations against a Postgres service, all tests and the build. Then a `browser` job runs the Playwright suite and a `docker` job builds and smoke-tests the API image.
+
+GitHub bills each job rounded up to a whole minute, a full run is about nine minutes, and the Free plan has 2,000 a month ([issue #85](https://github.com/serve-tech/the-course-book/issues/85)). So CI spends them carefully:
+
+- **One run per commit.** A push to a branch runs nothing by itself; CI starts when the branch has a pull request. A newer push to a pull request cancels the run before it. Runs on `main` are never cancelled, because Render deploys a commit only after its checks pass.
+- **Only the jobs a change needs**, on pull requests and on `main`. `verify`'s first step lists the changed files and decides ([`.github/scripts/ci-jobs.mjs`](../.github/scripts/ci-jobs.mjs), tested by `ci-jobs.test.mjs`, which `pnpm test` runs):
+
+  | What changed | `verify` | `browser` | `docker` |
+  | --- | --- | --- | --- |
+  | Only Markdown, `docs/`, `.planning/`, `render.yaml`, `.env.example`, editor or repository settings | starts, runs nothing | skipped | skipped |
+  | Only unit tests (`*.test.ts`, `*.test.tsx` under `apps/` or `packages/`) | runs | skipped | skipped |
+  | The web app, the Playwright suite, the contract, root config | runs | runs | skipped |
+  | Anything the API image is built from: `apps/api/`, `packages/domain/`, the lockfile, the package manifests, `.dockerignore` | runs | runs | runs |
+  | The workflow or `.github/scripts/`, or a change whose files cannot be listed | runs | runs | runs |
+
+- **A skipped job counts as passed**, for the required checks and for Render's deploy gate, so the three check names never change. `verify` always starts, because Render does not deploy a commit that has no checks at all.
+
+To spend fewer minutes: run the checks locally first, push when a unit of work is ready rather than after every commit, and keep a docs-only fix out of a code pull request's last push when it can wait for the next one.
 
 Report checks actually run, their outcomes and any remaining gaps.
